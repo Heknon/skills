@@ -62,6 +62,13 @@ def skipped(name: str, reason: str) -> Result:
     return Result(name, SKIP, 0, [], reason)
 
 
+def input_not_empty(what: str, count: int) -> Result:
+    """An empty export proves nothing, so it fails."""
+    if count == 0:
+        return Result("input-not-empty", FAIL, 0, [], f"no {what} were read from the file; an empty export is not a passing export")
+    return Result("input-not-empty", PASS, count, [], f"{count} {what} read")
+
+
 # ---------------------------------------------------------------- vocabulary
 
 

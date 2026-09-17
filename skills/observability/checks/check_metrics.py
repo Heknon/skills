@@ -35,6 +35,7 @@ from check_common import (  # noqa: E402
     WARN,
     Result,
     Vocabulary,
+    input_not_empty,
     json_type,
     load_vocabulary,
     looks_unbounded,
@@ -275,6 +276,7 @@ def rule_derived(metrics: list[Metric], vocabulary: Vocabulary | None) -> Result
 
 def run(metrics: list[Metric], vocabulary: Vocabulary | None, limit: int) -> list[Result]:
     return [
+        input_not_empty("metrics", len(metrics)),
         rule_names_in_vocabulary(metrics, vocabulary),
         rule_name_shape(metrics),
         rule_instrument_type(metrics, vocabulary),

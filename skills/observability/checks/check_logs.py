@@ -30,6 +30,7 @@ from check_common import (  # noqa: E402
     WARN,
     Result,
     Vocabulary,
+    input_not_empty,
     is_hex_id,
     json_type,
     load_vocabulary,
@@ -258,6 +259,7 @@ def load_span_trace_ids(path: str | None) -> set[str] | None:
 def run(lines: list[Line], vocabulary: Vocabulary | None, span_trace_ids: set[str] | None, max_messages: int) -> list[Result]:
     correlation, in_spans = rule_trace_correlation(lines, span_trace_ids)
     return [
+        input_not_empty("log lines", len(lines)),
         rule_fields_present(lines),
         rule_level_values(lines),
         rule_message_templates(lines, vocabulary, max_messages),

@@ -4,8 +4,9 @@
 # per run and a final line for the harness. Exit code 0 when every
 # expectation holds.
 set -u
-fixtures="$(cd "$(dirname "$0")" && pwd)"
-checks="$(dirname "$fixtures")"
+checks="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$checks" || exit 2
+fixtures="fixtures"
 vocabulary="$fixtures/vocabulary.md"
 failures=0
 
@@ -23,17 +24,18 @@ expect() {
     fi
 }
 
-expect 0 "$checks/check_spans.py"   --spans "$fixtures/spans.jsonl"        --vocabulary "$vocabulary"
-expect 0 "$checks/check_spans.py"   --spans "$fixtures/spans_otlp.json"    --vocabulary "$vocabulary"
-expect 1 "$checks/check_spans.py"   --spans "$fixtures/spans_bad.jsonl"    --vocabulary "$vocabulary"
-expect 0 "$checks/check_metrics.py" --metrics "$fixtures/metrics.json"     --vocabulary "$vocabulary"
-expect 0 "$checks/check_metrics.py" --metrics "$fixtures/metrics_console.json" --vocabulary "$vocabulary"
-expect 1 "$checks/check_metrics.py" --metrics "$fixtures/metrics_bad.json" --vocabulary "$vocabulary"
-expect 0 "$checks/check_logs.py"    --logs "$fixtures/logs.jsonl"          --vocabulary "$vocabulary" --spans "$fixtures/spans.jsonl"
-expect 1 "$checks/check_logs.py"    --logs "$fixtures/logs_bad.jsonl"      --vocabulary "$vocabulary" --spans "$fixtures/spans.jsonl"
-expect 0 "$checks/check_spans.py"   --spans "$fixtures/spans.jsonl"
-expect 0 "$checks/check_metrics.py" --metrics "$fixtures/metrics.json"
-expect 0 "$checks/check_logs.py"    --logs "$fixtures/logs.jsonl"
+expect 0 "check_spans.py"   --spans "$fixtures/spans.jsonl"        --vocabulary "$vocabulary"
+expect 0 "check_spans.py"   --spans "$fixtures/spans_otlp.json"    --vocabulary "$vocabulary"
+expect 1 "check_spans.py"   --spans "$fixtures/spans_bad.jsonl"    --vocabulary "$vocabulary"
+expect 0 "check_metrics.py" --metrics "$fixtures/metrics.json"     --vocabulary "$vocabulary"
+expect 0 "check_metrics.py" --metrics "$fixtures/metrics_console.json" --vocabulary "$vocabulary"
+expect 1 "check_spans.py"   --spans "$fixtures/empty.jsonl"
+expect 1 "check_metrics.py" --metrics "$fixtures/metrics_bad.json" --vocabulary "$vocabulary"
+expect 0 "check_logs.py"    --logs "$fixtures/logs.jsonl"          --vocabulary "$vocabulary" --spans "$fixtures/spans.jsonl"
+expect 1 "check_logs.py"    --logs "$fixtures/logs_bad.jsonl"      --vocabulary "$vocabulary" --spans "$fixtures/spans.jsonl"
+expect 0 "check_spans.py"   --spans "$fixtures/spans.jsonl"
+expect 0 "check_metrics.py" --metrics "$fixtures/metrics.json"
+expect 0 "check_logs.py"    --logs "$fixtures/logs.jsonl"
 
 if [ "$failures" -eq 0 ]; then
     echo "HARNESS PASS"

@@ -37,6 +37,7 @@ from check_common import (  # noqa: E402
     WARN,
     Result,
     Vocabulary,
+    input_not_empty,
     is_hex_id,
     is_known_dotted_key,
     json_type,
@@ -262,6 +263,15 @@ def rule_roots_are_units(spans: list[Span], vocabulary: Vocabulary | None, limit
             offenders.append(f"root {span.label()} matches no vocabulary span")
         elif not match.root:
             offenders.append(f"root {span.label()} matches vocabulary span {match.name!r} which is Root=no")
+    by_id = {span.span_id: span for span in spans}
+    for span in spans:
+        if span.parent_span_id is None:
+            continue
+        match = vocabulary.find_span(span.name)
+        if match is not None and match.root:
+            parent = by_id.get(span.parent_span_id)
+            parent_name = parent.name if parent else span.parent_span_id
+            offenders.append(f"{span.label()} is Root=yes but has parent {parent_name}; the outer thing is a link, not a parent")
     note = f"root span rule: {vocabulary.root_span_rule or 'not written'}; Root=yes rows: {', '.join(row.name for row in root_rows)}"
     return verdict("roots-are-units", offenders, note=note, passing_note=note)
 
@@ -501,6 +511,7 @@ def run(spans: list[Span], vocabulary: Vocabulary | None, limit: int, tolerance_
     one_parent, orphans = rule_one_parent(spans)
     time_sane, children = rule_time_sane(spans, tolerance_ms)
     return [
+        input_not_empty("spans", len(spans)),
         rule_ids_well_formed(spans),
         rule_roots_are_units(spans, vocabulary, limit),
         one_parent,
