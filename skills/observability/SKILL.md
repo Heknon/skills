@@ -118,6 +118,13 @@ ask, and the person may change the vocabulary.
 
 ## How to use a recipe
 
+Every recipe is Python, written against opentelemetry-python 1.2x, and the
+checkers are Python 3.11 with the standard library only. The procedures are
+language neutral, but their API names are Python's. For a service in another
+language, use the procedures and the backend files, and stop and ask before
+writing instrumentation code: a port of a recipe done from memory is where
+wrong API names come from.
+
 A recipe is a complete file that runs as it is. Copy it whole, rename what the
 top comment says to rename, and change nothing else the first time. Each
 recipe ends with the shape of data it produces. Compare your export with that
