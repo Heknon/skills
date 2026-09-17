@@ -80,8 +80,9 @@ Write into `vocabulary.md`, in the table for its signal:
   or a user-supplied string in a name or a label.
 - Never let a name be built by string formatting at the call site. The name
   is a constant or comes from a function in the vocabulary module.
-- Never send a value as a number in one place and a string in another. The
-  vocabulary fixes the type.
+- Never send a value as a number in one place and a string in another. On
+  Elastic the two land in different fields, `labels.*` and `numeric_labels.*`,
+  and no chart sees both. The vocabulary fixes the type.
 - Never use a key that a customer chose. Their key goes in the value.
 
 ## Stop and ask

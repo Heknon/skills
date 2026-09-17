@@ -42,7 +42,7 @@
         "Does not call it a bug and does not propose working around it by renaming the source attribute to underscores as a fix for a problem",
         "Says the vocabulary's Backend spelling column is where the index spelling is recorded",
         "Shows or names the verification ladder rung that confirms it, with a search by span.id or transaction.id",
-        "Mentions that ids must be strings and the type is fixed by the first document"
+        "Mentions that ids must be strings, because a numeric label lands in numeric_labels and a string one in labels"
       ]
     },
     {

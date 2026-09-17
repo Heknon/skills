@@ -14,8 +14,10 @@ Answer the questions in order. The first yes is the verdict.
 2. **Is it a fact about one moment inside work that already has a span?**
    A retry happened, a cache missed, a threshold was crossed, a payload arrived.
    **Yes: `span event`.** Load `traces/span-attributes-and-events.md`.
-   Not a log line: a log line inside a span is a second copy of the same fact
-   that lives in a different index and can be sampled apart from its span.
+   Not a log line written by hand: the event already carries the span's ids
+   and time, and the backend indexes it beside the span. Elastic stores it as
+   a log document tied to the span, per `backends/elastic/overview.md`. A
+   second line from the logger is a copy with weaker ids.
 
 3. **Is it a number you want to chart over time, with no unit of work around
    it, or too frequent to record each occurrence?**

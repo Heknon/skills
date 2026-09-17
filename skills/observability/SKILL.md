@@ -86,8 +86,10 @@ never overrides them. If a request conflicts with one, say which one and stop.
    in the status description.
 6. **Every signal carries the correlation keys of its unit.** Same key names,
    same string values, on spans, metrics and logs alike.
-7. **A value goes to the backend as the type the vocabulary says.** Attribute
-   types are fixed by the first document that arrives. Ids are strings, always.
+7. **A value goes to the backend as the type the vocabulary says.** A key sent
+   as a string once and a number later ends up split across two fields or
+   rejected, depending on the backend, and either way the chart is wrong.
+   Ids are strings, always.
 8. **One fact, one signal.** If the backend derives a metric from spans, do not
    also emit it. If a moment is inside a span, it is a span event, not a log.
 9. **Context is propagated by the library, not by hand.** Threads, processes
