@@ -13,13 +13,14 @@ and ask**, which means you write down what is missing and ask a person.
 Read this file, then load only what the task needs. Each file is short on
 purpose. Do not load a folder you were not sent to.
 
-## The five kinds of task
+## The six kinds of task
 
 Decide which one you have. If it is none of them, stop and ask.
 
 | Kind | You were asked to | Load, in order |
 | --- | --- | --- |
 | **Design** | model a new system or a new part of one | `core/unit-of-work.md`, `core/correlation-keys.md`, `core/signal-choice.md`, `core/naming-and-cardinality.md`, then the nearest `examples/` |
+| **Measure** | answer a question someone asked with a number, such as a percentile, a count or "is it stuck" | `core/question-to-measurement.md`, then the signal folder it names |
 | **Instrument** | add or change instrumentation at one place | `core/signal-choice.md`, then the signal folder's procedures, then its `recipes/` |
 | **Query** | build a dashboard, a chart or a search | `backends/README.md`, then the backend's `kibana-screens.md` and `queries.md` |
 | **Debug** | find out why data is missing, wrong or duplicated | `backends/elastic/verification-ladder.md`, then the hop it fails at |
@@ -34,6 +35,7 @@ the checker passes. If a checker cannot be run, say so and say why.
 | Dilemma | Procedure |
 | --- | --- |
 | What is the transaction, the thing to aggregate over | `core/unit-of-work.md` |
+| A question with a number in it, and which measurement answers it | `core/question-to-measurement.md` |
 | Span, span event, metric, or log line | `core/signal-choice.md` |
 | Which keys must every signal carry | `core/correlation-keys.md` |
 | Can this value go in a name | `core/naming-and-cardinality.md` |

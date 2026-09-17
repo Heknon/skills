@@ -84,6 +84,22 @@
         "The candidate follows noun.verb lower case and reuses an existing noun from the vocabulary",
         "Offers the attribute alternative if the fact could ride on an existing span"
       ]
+    },
+    {
+      "id": 6,
+      "name": "duration-that-may-never-end",
+      "prompt": "We need p95 and p99 of how long an environment lives. Last week environments got stuck and never closed, so we got no close event and no duration at all. What should we measure?",
+      "expected_output": "Applies core/question-to-measurement.md, pattern Duration that may never end: a histogram at close with an outcome label, an observable gauge over the open set reporting open.count and open.age.max per process, abandonment at shutdown, and a staleness alert derived from the closed p99; not an average, not an id label, not a percentile computed in the callback.",
+      "expectations": [
+        "Names the pattern and says a measurement taken at close is blind to the things that never close",
+        "Proposes a histogram of environment duration recorded at close, with an outcome label having completed and abandoned",
+        "Proposes an observable gauge with a callback that reports the count of open environments and the age of the oldest, combined across workers by sum and max",
+        "Says not to put the environment id on the metric and not to compute percentiles inside the callback",
+        "Says to close open environments as abandoned at shutdown and record their age",
+        "Proposes a staleness alert with a threshold derived from the closed histogram's p99",
+        "States that a span alone cannot answer it because a span that never ends is never exported",
+        "Writes the verdict rows in the vocabulary format"
+      ]
     }
   ]
 }
