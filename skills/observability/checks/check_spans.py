@@ -245,6 +245,25 @@ def rule_ids_well_formed(spans: list[Span]) -> Result:
     return verdict("ids-well-formed", offenders, note="ids are lower case hex: 32 for a trace, 16 for a span, unique per span")
 
 
+def rule_vocabulary_sane(vocabulary: Vocabulary | None) -> Result:
+    """The vocabulary itself must be consistent before it can judge anything.
+
+    A key of tier label with no allowed list is the tier confusion that lets
+    an unbounded id become a metric dimension. Catch it here, in the file,
+    rather than later in a series count.
+    """
+    if vocabulary is None or not vocabulary.has("span attributes"):
+        return skipped("vocabulary-sane", "no vocabulary Span attributes table")
+    offenders: list[str] = []
+    for attribute in vocabulary.attributes.values():
+        tier = attribute.tier.lower()
+        if tier == "label" and attribute.allowed_values is None:
+            offenders.append(f"{attribute.key} is tier label but allowed values say unbounded; a label lists its values, an unbounded key is tier attribute")
+        if tier not in ("label", "attribute", "name"):
+            offenders.append(f"{attribute.key} has tier {attribute.tier!r}; use label or attribute")
+    return verdict("vocabulary-sane", offenders, note="core/naming-and-cardinality.md, the three tiers")
+
+
 def rule_roots_are_units(spans: list[Span], vocabulary: Vocabulary | None, limit: int) -> Result:
     roots = [span for span in spans if span.parent_span_id is None]
     distinct_root_names = sorted({span.name for span in roots})
@@ -543,6 +562,7 @@ def run(spans: list[Span], vocabulary: Vocabulary | None, limit: int, tolerance_
     return [
         input_not_empty("spans", len(spans)),
         rule_ids_well_formed(spans),
+        rule_vocabulary_sane(vocabulary),
         rule_roots_are_units(spans, vocabulary, limit),
         one_parent,
         orphans,

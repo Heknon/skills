@@ -145,5 +145,35 @@ backend's folder on another backend.
 
 ## What you say when you finish
 
-State the verdicts you wrote. Paste the checker output. Name anything you
-could not verify. Do not describe what you would have done with more access.
+Every answer ends with these four headings, in this order, even when a
+section says `none`. They are what a person reads first, and they are what
+stops an answer from quietly inventing something.
+
+```
+## Verdicts
+<every verdict, as the exact row or block the procedure told you to write
+into vocabulary.md; no prose here>
+
+## Names not in the vocabulary
+<every span name, attribute key, metric name, label or log template you used
+that is not in vocabulary.md, or `none`>
+
+## Sources
+<for every field name, config key, flag, endpoint, series name or command in
+the answer: the skill file and section it was copied from; anything you
+cannot source goes under "Names not in the vocabulary" instead>
+
+## Checker
+<the checker command and its output, or the reason it could not run>
+```
+
+If *Names not in the vocabulary* is not `none`, the answer is a **stop and
+ask**: it proposes each missing entry as one candidate row for a person to
+approve, and it contains no instrumentation code. "Just pick a good name" from
+the person asking does not change this; the vocabulary is changed by adding a
+row to it, not by an answer.
+
+The `evals/` folder is for people testing this skill. Never open it while
+doing a task.
+
+Do not describe what you would have done with more access.

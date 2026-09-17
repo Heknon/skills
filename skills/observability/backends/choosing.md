@@ -141,6 +141,9 @@ and the same three lines into the header of `vocabulary.md`.
   beta without a person accepting that in writing.
 - Never choose Elastic for a metrics only need, or Prometheus alone for a
   trace need. Both fit the wrong shape.
+- Never put configuration in the choice. The verdict names folders and
+  reasons. Flags, keys and endpoints come later, copied from that folder's
+  files, never from memory.
 
 ## Stop and ask
 

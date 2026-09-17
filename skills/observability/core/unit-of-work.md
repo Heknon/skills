@@ -23,7 +23,9 @@ List every thing that happens in the system. For each one, answer with a fact.
    `core/naming-and-cardinality.md` to find the stable part, then come back.
 3. **Does it start and end inside one process?** If it crosses processes, the
    unit is the part inside the first process, and the rest continues it through
-   `core/context-propagation.md`.
+   `core/context-propagation.md`. Parallel workers running the same code, such
+   as xdist workers, are one service with a worker attribute, never one service
+   each; see `core/concurrency-and-clocks.md`.
 4. **Would a person name it when asked "what failed"?** A request, a message,
    a test, a batch item. Not a thread, not a fixture, not a database call.
 
