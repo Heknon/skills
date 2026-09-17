@@ -24,7 +24,7 @@ Decide which one you have. If it is none of them, stop and ask.
 | **Instrument** | add or change instrumentation at one place | `core/signal-choice.md`, then the signal folder's procedures, then its `recipes/` |
 | **Query** | build a dashboard, a chart or a search | `backends/README.md` to pick the backend, then `backends/<backend>/screens.md` and `queries.md` |
 | **Debug** | find out why data is missing, wrong or duplicated | `backends/README.md` to pick the backend, then `backends/<backend>/verification-ladder.md`, then the hop it fails at |
-| **Choose** | pick between two approaches | the one procedure that names the dilemma; the list is below |
+| **Choose** | pick between two approaches, or pick a backend | the one procedure that names the dilemma; the list is below. For a backend, `backends/choosing.md` then `backends/paradigms.md` |
 
 Every task that changes code ends with the matching `checks/` script run on a
 real export, and its output pasted into your answer. A task is not done until
@@ -36,6 +36,7 @@ the checker passes. If a checker cannot be run, say so and say why.
 | --- | --- |
 | What is the transaction, the thing to aggregate over | `core/unit-of-work.md` |
 | A question with a number in it, and which measurement answers it | `core/question-to-measurement.md` |
+| Which backend, or which store for one signal, and why | `backends/choosing.md`, with the differences in `backends/paradigms.md` |
 | Span, span event, metric, or log line | `core/signal-choice.md` |
 | Which keys must every signal carry | `core/correlation-keys.md` |
 | Can this value go in a name | `core/naming-and-cardinality.md` |

@@ -114,6 +114,20 @@
         "Mentions that Prometheus style naming rewrites dots in label names and points at backends/grafana/mapping.md for the stored spelling",
         "Does not use Elastic field names such as span.destination.service.resource or labels.* in the answer"
       ]
+    },
+    {
+      "id": 8,
+      "name": "choose-a-backend-from-facts",
+      "prompt": "New team, nothing installed yet, air gapped on two machines, one operator. Workloads are batch jobs that run for minutes and exit. We expect about two million active series, want three months of metrics, and the questions are mostly 'is it slow and which job'. Logs are small. What stack should we run?",
+      "expected_output": "Applies backends/choosing.md: answers the questions as facts (nothing running, push not pull, large cardinality and long retention, small logs, one operator), lands on VictoriaMetrics for metrics with OTLP push, notes that 'which job' is a trace question and either adds a trace store with an explicit readiness check for VictoriaTraces or Tempo, and does not choose Prometheus alone because of the pull model and the series count, nor Elastic for a metrics first need.",
+      "expectations": [
+        "Writes the answers to the choosing questions as facts before naming a stack",
+        "Names VictoriaMetrics for metrics and gives the two reasons from the table: series count with long retention, and one operator on tight hardware",
+        "Says batch jobs that exit cannot be scraped, so Prometheus alone does not fit unless through its OTLP receiver, and prefers push",
+        "Recognises 'which job was slow' as a trace question and proposes a trace store with a readiness check rather than leaving it unanswered",
+        "Does not propose Elastic for a metrics first need with small logs",
+        "Writes the verdict block per signal with one sentence each"
+      ]
     }
   ]
 }

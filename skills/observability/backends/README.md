@@ -3,7 +3,9 @@
 Three backends are documented, one folder each, with the same file names so
 the router can say `backends/<backend>/<file>` without caring which one is in
 use. They are three paradigms, not three spellings. `paradigms.md` answers
-the questions that differ between them side by side. Read it once.
+the questions that differ between them side by side. `choosing.md` turns
+facts about a situation into a backend per signal, and says why one fits
+where another costs. Read both once.
 
 | Folder | Stack | Traces | Metrics | Logs | UI |
 | --- | --- | --- | --- | --- | --- |
