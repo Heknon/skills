@@ -1,0 +1,587 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "sahara-harness"
+            }
+          },
+          {
+            "key": "service.version",
+            "value": {
+              "stringValue": "1.4.0"
+            }
+          },
+          {
+            "key": "deployment.environment",
+            "value": {
+              "stringValue": "ci"
+            }
+          },
+          {
+            "key": "host.name",
+            "value": {
+              "stringValue": "ci-runner-01"
+            }
+          },
+          {
+            "key": "process.pid",
+            "value": {
+              "intValue": "4242"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "sahara.harness",
+            "version": "1.4.0"
+          },
+          "spans": [
+            {
+              "traceId": "0af7651916cd43dd8448eb211c80319c",
+              "spanId": "b7ad6b7169203331",
+              "parentSpanId": "",
+              "name": "pytest.session",
+              "kind": 1,
+              "startTimeUnixNano": "1789603200000000000",
+              "endTimeUnixNano": "1789603205000000000",
+              "attributes": [
+                {
+                  "key": "sahara.cycle.id",
+                  "value": {
+                    "stringValue": "cycle-0007"
+                  }
+                },
+                {
+                  "key": "sahara.environment.id",
+                  "value": {
+                    "stringValue": "environment-3"
+                  }
+                },
+                {
+                  "key": "sahara.worker.id",
+                  "value": {
+                    "stringValue": "gw0"
+                  }
+                }
+              ],
+              "events": [],
+              "links": [],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+              "spanId": "00f067aa0ba902b7",
+              "parentSpanId": "",
+              "name": "tests/test_tank.py::test_fill",
+              "kind": 1,
+              "startTimeUnixNano": "1789603200100000000",
+              "endTimeUnixNano": "1789603200900000000",
+              "attributes": [
+                {
+                  "key": "sahara.cycle.id",
+                  "value": {
+                    "stringValue": "cycle-0007"
+                  }
+                },
+                {
+                  "key": "sahara.environment.id",
+                  "value": {
+                    "stringValue": "environment-3"
+                  }
+                },
+                {
+                  "key": "sahara.worker.id",
+                  "value": {
+                    "stringValue": "gw0"
+                  }
+                },
+                {
+                  "key": "test.nodeid_hash",
+                  "value": {
+                    "stringValue": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+                  }
+                },
+                {
+                  "key": "test.outcome",
+                  "value": {
+                    "stringValue": "passed"
+                  }
+                },
+                {
+                  "key": "test.parameter_id",
+                  "value": {
+                    "stringValue": "admin-1"
+                  }
+                }
+              ],
+              "events": [],
+              "links": [
+                {
+                  "traceId": "0af7651916cd43dd8448eb211c80319c",
+                  "spanId": "b7ad6b7169203331",
+                  "attributes": [
+                    {
+                      "key": "sahara.link.kind",
+                      "value": {
+                        "stringValue": "session"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "status": {
+                "code": 1
+              }
+            },
+            {
+              "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+              "spanId": "53995c3f42cd8ad8",
+              "parentSpanId": "00f067aa0ba902b7",
+              "name": "entity.create",
+              "kind": 3,
+              "startTimeUnixNano": "1789603200120000000",
+              "endTimeUnixNano": "1789603200300000000",
+              "attributes": [
+                {
+                  "key": "sahara.cycle.id",
+                  "value": {
+                    "stringValue": "cycle-0007"
+                  }
+                },
+                {
+                  "key": "sahara.environment.id",
+                  "value": {
+                    "stringValue": "environment-3"
+                  }
+                },
+                {
+                  "key": "sahara.worker.id",
+                  "value": {
+                    "stringValue": "gw0"
+                  }
+                },
+                {
+                  "key": "test.nodeid_hash",
+                  "value": {
+                    "stringValue": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+                  }
+                },
+                {
+                  "key": "peer.service",
+                  "value": {
+                    "stringValue": "tank"
+                  }
+                },
+                {
+                  "key": "sahara.entity.definition",
+                  "value": {
+                    "stringValue": "tank"
+                  }
+                },
+                {
+                  "key": "sahara.entity.id",
+                  "value": {
+                    "stringValue": "tank-7"
+                  }
+                }
+              ],
+              "events": [
+                {
+                  "name": "entity.retry",
+                  "timeUnixNano": "1789603200200000000",
+                  "attributes": [
+                    {
+                      "key": "sahara.retry.attempt",
+                      "value": {
+                        "intValue": "1"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "links": [],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+              "spanId": "1b2c3d4e5f607182",
+              "parentSpanId": "00f067aa0ba902b7",
+              "name": "entity.controller",
+              "kind": 3,
+              "startTimeUnixNano": "1789603200320000000",
+              "endTimeUnixNano": "1789603200700000000",
+              "attributes": [
+                {
+                  "key": "sahara.cycle.id",
+                  "value": {
+                    "stringValue": "cycle-0007"
+                  }
+                },
+                {
+                  "key": "sahara.environment.id",
+                  "value": {
+                    "stringValue": "environment-3"
+                  }
+                },
+                {
+                  "key": "sahara.worker.id",
+                  "value": {
+                    "stringValue": "gw0"
+                  }
+                },
+                {
+                  "key": "test.nodeid_hash",
+                  "value": {
+                    "stringValue": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+                  }
+                },
+                {
+                  "key": "peer.service",
+                  "value": {
+                    "stringValue": "tank"
+                  }
+                },
+                {
+                  "key": "sahara.entity.definition",
+                  "value": {
+                    "stringValue": "tank"
+                  }
+                },
+                {
+                  "key": "sahara.entity.id",
+                  "value": {
+                    "stringValue": "tank-7"
+                  }
+                },
+                {
+                  "key": "sahara.entity.operation",
+                  "value": {
+                    "stringValue": "fill"
+                  }
+                }
+              ],
+              "events": [],
+              "links": [],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+              "spanId": "2b3c4d5e6f708192",
+              "parentSpanId": "00f067aa0ba902b7",
+              "name": "entity.destroy",
+              "kind": 3,
+              "startTimeUnixNano": "1789603200720000000",
+              "endTimeUnixNano": "1789603200880000000",
+              "attributes": [
+                {
+                  "key": "sahara.cycle.id",
+                  "value": {
+                    "stringValue": "cycle-0007"
+                  }
+                },
+                {
+                  "key": "sahara.environment.id",
+                  "value": {
+                    "stringValue": "environment-3"
+                  }
+                },
+                {
+                  "key": "sahara.worker.id",
+                  "value": {
+                    "stringValue": "gw0"
+                  }
+                },
+                {
+                  "key": "test.nodeid_hash",
+                  "value": {
+                    "stringValue": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+                  }
+                },
+                {
+                  "key": "peer.service",
+                  "value": {
+                    "stringValue": "tank"
+                  }
+                },
+                {
+                  "key": "sahara.entity.definition",
+                  "value": {
+                    "stringValue": "tank"
+                  }
+                },
+                {
+                  "key": "sahara.entity.id",
+                  "value": {
+                    "stringValue": "tank-7"
+                  }
+                }
+              ],
+              "events": [],
+              "links": [],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "7c3e7a5c1b2d4e6f8a9b0c1d2e3f4a5b",
+              "spanId": "a1b2c3d4e5f60718",
+              "parentSpanId": "",
+              "name": "tests/test_valve.py::test_open",
+              "kind": 1,
+              "startTimeUnixNano": "1789603201000000000",
+              "endTimeUnixNano": "1789603201600000000",
+              "attributes": [
+                {
+                  "key": "sahara.cycle.id",
+                  "value": {
+                    "stringValue": "cycle-0007"
+                  }
+                },
+                {
+                  "key": "sahara.environment.id",
+                  "value": {
+                    "stringValue": "environment-3"
+                  }
+                },
+                {
+                  "key": "sahara.worker.id",
+                  "value": {
+                    "stringValue": "gw0"
+                  }
+                },
+                {
+                  "key": "test.nodeid_hash",
+                  "value": {
+                    "stringValue": "3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b"
+                  }
+                },
+                {
+                  "key": "test.outcome",
+                  "value": {
+                    "stringValue": "failed"
+                  }
+                }
+              ],
+              "events": [
+                {
+                  "name": "exception",
+                  "timeUnixNano": "1789603201590000000",
+                  "attributes": [
+                    {
+                      "key": "exception.type",
+                      "value": {
+                        "stringValue": "ValveTimeout"
+                      }
+                    },
+                    {
+                      "key": "exception.message",
+                      "value": {
+                        "stringValue": "valve-2 did not open in 5s"
+                      }
+                    },
+                    {
+                      "key": "exception.stacktrace",
+                      "value": {
+                        "stringValue": "Traceback (most recent call last): ..."
+                      }
+                    },
+                    {
+                      "key": "exception.escaped",
+                      "value": {
+                        "boolValue": true
+                      }
+                    }
+                  ]
+                }
+              ],
+              "links": [
+                {
+                  "traceId": "0af7651916cd43dd8448eb211c80319c",
+                  "spanId": "b7ad6b7169203331",
+                  "attributes": [
+                    {
+                      "key": "sahara.link.kind",
+                      "value": {
+                        "stringValue": "session"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "status": {
+                "code": 2,
+                "message": "ValveTimeout: valve-2 did not open in 5s"
+              }
+            },
+            {
+              "traceId": "7c3e7a5c1b2d4e6f8a9b0c1d2e3f4a5b",
+              "spanId": "b2c3d4e5f6071829",
+              "parentSpanId": "a1b2c3d4e5f60718",
+              "name": "entity.create",
+              "kind": 3,
+              "startTimeUnixNano": "1789603201010000000",
+              "endTimeUnixNano": "1789603201100000000",
+              "attributes": [
+                {
+                  "key": "sahara.cycle.id",
+                  "value": {
+                    "stringValue": "cycle-0007"
+                  }
+                },
+                {
+                  "key": "sahara.environment.id",
+                  "value": {
+                    "stringValue": "environment-3"
+                  }
+                },
+                {
+                  "key": "sahara.worker.id",
+                  "value": {
+                    "stringValue": "gw0"
+                  }
+                },
+                {
+                  "key": "test.nodeid_hash",
+                  "value": {
+                    "stringValue": "3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b"
+                  }
+                },
+                {
+                  "key": "peer.service",
+                  "value": {
+                    "stringValue": "valve"
+                  }
+                },
+                {
+                  "key": "sahara.entity.definition",
+                  "value": {
+                    "stringValue": "valve"
+                  }
+                },
+                {
+                  "key": "sahara.entity.id",
+                  "value": {
+                    "stringValue": "valve-2"
+                  }
+                }
+              ],
+              "events": [],
+              "links": [],
+              "status": {
+                "code": 1
+              }
+            },
+            {
+              "traceId": "7c3e7a5c1b2d4e6f8a9b0c1d2e3f4a5b",
+              "spanId": "c3d4e5f60718293a",
+              "parentSpanId": "a1b2c3d4e5f60718",
+              "name": "entity.controller",
+              "kind": 3,
+              "startTimeUnixNano": "1789603201110000000",
+              "endTimeUnixNano": "1789603201580000000",
+              "attributes": [
+                {
+                  "key": "sahara.cycle.id",
+                  "value": {
+                    "stringValue": "cycle-0007"
+                  }
+                },
+                {
+                  "key": "sahara.environment.id",
+                  "value": {
+                    "stringValue": "environment-3"
+                  }
+                },
+                {
+                  "key": "sahara.worker.id",
+                  "value": {
+                    "stringValue": "gw0"
+                  }
+                },
+                {
+                  "key": "test.nodeid_hash",
+                  "value": {
+                    "stringValue": "3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b"
+                  }
+                },
+                {
+                  "key": "peer.service",
+                  "value": {
+                    "stringValue": "valve"
+                  }
+                },
+                {
+                  "key": "sahara.entity.definition",
+                  "value": {
+                    "stringValue": "valve"
+                  }
+                },
+                {
+                  "key": "sahara.entity.id",
+                  "value": {
+                    "stringValue": "valve-2"
+                  }
+                },
+                {
+                  "key": "sahara.entity.operation",
+                  "value": {
+                    "stringValue": "open"
+                  }
+                }
+              ],
+              "events": [
+                {
+                  "name": "exception",
+                  "timeUnixNano": "1789603201575000000",
+                  "attributes": [
+                    {
+                      "key": "exception.type",
+                      "value": {
+                        "stringValue": "ValveTimeout"
+                      }
+                    },
+                    {
+                      "key": "exception.message",
+                      "value": {
+                        "stringValue": "valve-2 did not open in 5s"
+                      }
+                    },
+                    {
+                      "key": "exception.stacktrace",
+                      "value": {
+                        "stringValue": "Traceback (most recent call last): ..."
+                      }
+                    },
+                    {
+                      "key": "exception.escaped",
+                      "value": {
+                        "boolValue": true
+                      }
+                    }
+                  ]
+                }
+              ],
+              "links": [],
+              "status": {
+                "code": 2,
+                "message": "ValveTimeout: valve-2 did not open in 5s"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
