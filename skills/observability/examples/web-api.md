@@ -93,10 +93,9 @@ process is one container.
 - The job root has no parent and no link. The timer is not work.
 - `SELECT orders` after a cache miss is a child of the request root, a sibling
   of `cache.get`. The get span has ended; the code ran in the handler.
-- The partner's retries are not spans. One `partner.quote` span per call, one
+- Retries are not spans. One `partner.quote` span per call, one
   `partner.retry` event per failed attempt, `orders.partner.attempts` on the
-  span. The HTTP client library's own per-attempt spans, if its
-  instrumentation is enabled, are children of `partner.quote`.
+  span. The HTTP library's per-attempt spans, if enabled, are its children.
 - `cache.set` after the read is a child of the request root. It ran there.
 
 ## 7. Service, dependency, attribute decisions
@@ -261,8 +260,8 @@ payloads, in any span name, metric name, metric label or log template.
 
 ## 11. What Kibana shows
 
-Screen names are from `backends/elastic/kibana-screens.md`; read it for the
-exact path and the fields each screen groups by.
+Screen names are from `backends/elastic/kibana-screens.md`; it has the path
+and the grouping field of each.
 
 1. Services lists one service, `orders-api`, per `service.environment`.
 2. Transactions lists `GET /orders/{order_id}`, `POST /orders` and

@@ -36,7 +36,7 @@ Facts, from `core/unit-of-work.md`:
 unit: record
 root span name: "record.process"
 instance key: ledger.record.id
-outer roots: file ("file.process", own trace, linked from each record root), batch ("batch.run", own trace, linked from each file root)
+outer roots: file, root span "file.process", own trace, linked from each record root; batch, root span "batch.run", own trace, linked from each file root
 ```
 
 ## 3. Correlation keys
@@ -51,10 +51,9 @@ outer roots: file ("file.process", own trace, linked from each record root), bat
 | ledger.file.key | string | every span, every log | labels.ledger_file_key | the object key; `-` in the coordinator before a file is chosen |
 | ledger.record.id | string | every span, every log | labels.ledger_record_id | `record_id` from the file, record traces only |
 
-The worker id is a resource attribute here, not a span attribute, because each
-worker is a separate process that starts its own SDK and never changes role.
-`core/correlation-keys.md` question 4 puts a logical worker that shares a
-process on the span instead.
+The worker id is a resource attribute here because each worker is its own
+process with its own SDK and never changes role. A logical worker that shares
+a process goes on the span instead, per `core/correlation-keys.md`.
 
 ## 4. Signal choice
 
@@ -87,18 +86,15 @@ process on the span instead.
 | `queue_depth{file=accounts-03}` | the file | `ledger.queue.depth` | metric name, no file label | none; queue depth is one number |
 | `record 7f31 quarantined to dead-letter/...` | id and key | `record quarantined` | log template | `ledger.record.id`, `ledger.dead_letter.key` fields |
 
-Schema version is a label, `v1` or `v2`, because the code lists both. Outcome
-is a label with three values. Record ids, file keys, byte counts, row counts
-are attributes.
+Schema version and outcome are labels: the code lists their values. Ids,
+keys, byte counts and row counts are attributes.
 
 ## 6. Parent or link decisions
 
-- `record.process` has no parent. It links to the `file.process` span. The
-  file is what it belongs to; the loop that called it is not a parent, because
-  a file trace with a million children cannot be opened.
-- `file.process` has no parent. It links to `batch.run`. The batch root is in
-  the coordinator, the file root is in a worker; a link crosses that without
-  propagation.
+- `record.process` has no parent. It links to `file.process`: the file is
+  what it belongs to, and a file trace with a million children cannot open.
+- `file.process` has no parent. It links to `batch.run`, which is in the
+  coordinator process; a link crosses that without propagation.
 - `object.put` for a dead letter is a child of the record that failed. It ran
   there and it belongs there.
 - `object.list` is a child of `batch.run`. The coordinator does it once.
@@ -125,7 +121,7 @@ are attributes.
 | Insert failed all attempts | `warehouse.insert` ERROR with exception; `record.process` ERROR; outcome `failed` is not a value, the record is re-queued and its next attempt is a new trace with the same `ledger.record.id` |
 | Duplicate record already in the warehouse | `ledger.record.outcome=skipped_duplicate`, status UNSET. Not an error. |
 | Run cancelled midway | `batch.cancel_requested` event on `batch.run` with `ledger.cancel.signal=SIGTERM`; `batch.run` status ERROR, description `cancelled by SIGTERM`, `ledger.batch.outcome=cancelled`; every in-flight `record.process` ends with status ERROR, description `cancelled`, and the `CancelledError` recorded; queued files get no span. |
-| Worker crashes | its open spans are lost; `ledger.batch.files_unprocessed` on the batch root says how many keys were never taken. See `core/errors-and-status.md` for what a lost span looks like. |
+| Worker crashes | its open spans are lost; `ledger.batch.files_unprocessed` on the batch root counts keys never taken. See `core/errors-and-status.md`. |
 
 ## 9. The vocabulary
 
@@ -140,7 +136,7 @@ verified against: fill in from the running system on the day you check
 unit: record
 root span name: "record.process"
 instance key: ledger.record.id
-outer roots: file ("file.process", own trace, linked from each record root), batch ("batch.run", own trace, linked from each file root)
+outer roots: file, root span "file.process", own trace, linked from each record root; batch, root span "batch.run", own trace, linked from each file root
 
 ## Correlation keys
 
@@ -251,7 +247,7 @@ any span name, metric name, metric label or log template.
 {"name":"record.validate","trace_id":"9c029c029c029c029c029c029c029c02","span_id":"9c02000000000002","parent_span_id":"9c02000000000001","kind":"INTERNAL","start_time_unix_nano":1789610402050100000,"end_time_unix_nano":1789610402051000000,"status":{"code":"ERROR","description":"SchemaError: field 'amount' is not a number"},"attributes":{"ledger.file.schema_version":"v2","ledger.record.id":"9c02","ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"drops/2026-09-17/accounts-03.ndjson"},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-3"},"events":[{"name":"exception","time_unix_nano":1789610402051000000,"attributes":{"exception.type":"ledger.schema.SchemaError","exception.message":"field 'amount' is not a number","exception.stacktrace":"Traceback (most recent call last): ..."}}],"links":[]}
 // Dead letter write, child of the poison record. The write itself succeeded.
 {"name":"object.put","trace_id":"9c029c029c029c029c029c029c029c02","span_id":"9c02000000000003","parent_span_id":"9c02000000000001","kind":"CLIENT","start_time_unix_nano":1789610402052000000,"end_time_unix_nano":1789610402060000000,"status":{"code":"UNSET","description":null},"attributes":{"peer.service":"object-store","ledger.object.bucket":"ledger-drops","ledger.object.key":"dead-letter/2026-09-17/9c02.json","ledger.object.size_bytes":412,"ledger.record.id":"9c02","ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"drops/2026-09-17/accounts-03.ndjson"},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-3"},"events":[],"links":[]}
-// A record that was in flight when SIGTERM arrived. ERROR with the cancellation recorded; no outcome label, because it had none.
+// A record in flight when SIGTERM arrived, on worker-5, linked to a file root not shown here. ERROR with the cancellation recorded; no outcome label, because it had none.
 {"name":"record.process","trace_id":"e4d3e4d3e4d3e4d3e4d3e4d3e4d3e4d3","span_id":"e4d3000000000001","parent_span_id":null,"kind":"INTERNAL","start_time_unix_nano":1789612199990000000,"end_time_unix_nano":1789612200004000000,"status":{"code":"ERROR","description":"cancelled"},"attributes":{"ledger.record.id":"e4d3","ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"drops/2026-09-17/journal-88.ndjson"},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-5"},"events":[{"name":"exception","time_unix_nano":1789612200004000000,"attributes":{"exception.type":"asyncio.CancelledError","exception.message":"","exception.stacktrace":"Traceback (most recent call last): ..."}}],"links":[{"trace_id":"a5a5a5a5a5a5a5a5a5a5a5a5a5a5a588","span_id":"a50000000000a088","attributes":{}}]}
 ```
 
@@ -269,8 +265,8 @@ any span name, metric name, metric label or log template.
 
 ## 11. What Kibana shows
 
-Screen names are from `backends/elastic/kibana-screens.md`; read it for the
-exact path and the fields each screen groups by.
+Screen names are from `backends/elastic/kibana-screens.md`; it has the path
+and the grouping field of each.
 
 1. Services lists one service, `ledger-ingest`; filter on
    `labels.ledger_worker_id` to see one worker.
