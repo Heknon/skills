@@ -1,0 +1,89 @@
+{
+  "skill_name": "observability",
+  "notes": "Manual scenarios for checking that a model using this skill reaches the procedure's verdict instead of improvising. Each expectation is checkable by reading the answer. Run with the skill loaded and no internet. The scenarios come from real dilemmas met while instrumenting a pytest harness against Elastic APM.",
+  "evals": [
+    {
+      "id": 0,
+      "name": "session-as-only-transaction",
+      "prompt": "Our Elastic APM only ever shows one transaction called 'pytest session' per run, and every test is a span under it. The service overview is useless. What should the transaction be and why?",
+      "expected_output": "Applies core/unit-of-work.md: the test is the unit of work because it repeats many times with a stable name; the session happens once and becomes a linked outer root in its own trace, never the parent; names the instance key and says what Kibana screens start working.",
+      "expectations": [
+        "Names the test as the unit of work and gives the observable reasons from the procedure: many per run, stable name, starts and ends in one process, what a person names when asked what failed",
+        "Says the session becomes its own root span in its own trace, linked from each test root, and explicitly NOT the parent of the tests",
+        "Gives a stable root span name rule that removes the parametrization, and puts the parameters in attributes",
+        "Names an instance key attribute for one test",
+        "Mentions at least two Kibana screens that become useful: transactions tab, latency distribution, failed transaction rate, or correlations",
+        "Writes a verdict block in the vocabulary format rather than only prose",
+        "Does not propose the run, the cycle or the worker as the transaction"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "entity-as-service",
+      "prompt": "Each customer defines their own entity types (tank, pump, gateway...). We want each one to show up in APM with its own pretty latency and error charts. Should we register an APM service per entity type?",
+      "expected_output": "Applies traces/service-dependency-attribute.md: no service per entity type; entity operations are CLIENT exit spans with peer.service set to the definition name, which makes each definition a dependency row and a service-map node; the entity instance id stays an attribute.",
+      "expectations": [
+        "Says no to a service per entity type and gives the observable criterion: a service is a process that emits its own telemetry",
+        "Says entity operations are exit spans with SpanKind CLIENT and peer.service equal to the entity definition name",
+        "Says the Dependencies tab and the service map then show each definition without registering anything",
+        "Keeps the entity instance id as an attribute, not a label and not a peer.service value, and says why (cardinality)",
+        "Mentions that a customer-controlled value must never become a key or a service name",
+        "Points at the checker rule that would catch an INTERNAL span with no destination"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "dots-to-underscores",
+      "prompt": "We send an attribute sahara.cycle.id on every span but in Kibana we can only find labels.sahara_cycle_id. Is the collector broken?",
+      "expected_output": "Uses backends/elastic/apm-server-mapping.md and the verification ladder: APM Server, not the collector, rewrites dots in non-ECS attribute keys to underscores under labels.*; this is documented behavior; the vocabulary's Backend spelling column records labels.sahara_cycle_id; the model shows how to confirm at rung 3 with a search by span.id.",
+      "expectations": [
+        "States that APM Server performs the rewrite, and that the collector does not rewrite keys",
+        "Gives the exact index spelling labels.sahara_cycle_id",
+        "Does not call it a bug and does not propose working around it by renaming the source attribute to underscores as a fix for a problem",
+        "Says the vocabulary's Backend spelling column is where the index spelling is recorded",
+        "Shows or names the verification ladder rung that confirms it, with a search by span.id or transaction.id",
+        "Mentions that ids must be strings and the type is fixed by the first document"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "which-signal-for-retry",
+      "prompt": "Inside entity create we retry the API call up to three times. Should I log each retry, count them in a metric, or something else?",
+      "expected_output": "Applies core/signal-choice.md: a retry is a moment inside a span that already exists, so it is a span event on the create span, with the attempt number as an event attribute; not a log line and not an emitted metric; a count of retries could be derived later if needed.",
+      "expectations": [
+        "Verdict is span event, stated first",
+        "Puts the attempt number and the reason in event attributes, not in the event name",
+        "Says a log line inside a span duplicates the fact and can be sampled apart from it",
+        "Says not to emit a retry counter beside the events unless a person asks for a chart, and marks it as a duplicate in the vocabulary if so",
+        "Uses the exact event name convention and shows the vocabulary Span events row"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "dependency-row-missing",
+      "prompt": "I set peer.service on my entity.create spans but the Dependencies tab is empty. Traces show the spans fine.",
+      "expected_output": "Uses backends/elastic/kibana-screens.md and verification-ladder.md: checks span kind is CLIENT or PRODUCER (INTERNAL is the usual cause), checks span.destination.service.resource on the indexed document, checks the service_destination metrics data stream, checks sampling; gives the exact searches.",
+      "expectations": [
+        "First suspect named is SpanKind INTERNAL instead of CLIENT or PRODUCER",
+        "Gives the Elasticsearch search by span.id and names the field span.destination.service.resource to look for",
+        "Names the aggregated metrics data stream for service destination and says the tab reads from it",
+        "Mentions sampling or span compression as a later rung",
+        "Walks bottom up through the rungs rather than guessing at Kibana settings",
+        "Does not propose registering a service"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "refuses-to-invent-a-name",
+      "prompt": "Quick one: add a span for when the entity manager resolves a definition's dependencies. Vocabulary is attached and does not have anything for it. Just pick a good name.",
+      "expected_output": "Stops and asks instead of inventing: names the missing vocabulary entry, proposes exactly one candidate in the noun.verb form with kind and required attributes, and does not write code until a person adds it.",
+      "expectations": [
+        "Does not add code with a new span name",
+        "Says explicitly that the vocabulary is the only source of names and that this name is missing",
+        "Proposes one candidate row in the vocabulary Spans table format for a person to approve",
+        "The candidate follows noun.verb lower case and reuses an existing noun from the vocabulary",
+        "Offers the attribute alternative if the fact could ride on an existing span"
+      ]
+    }
+  ]
+}
