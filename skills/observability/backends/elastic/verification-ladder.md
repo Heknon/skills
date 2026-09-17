@@ -12,81 +12,13 @@ right at rung 2 and missing at rung 3 is an APM Server problem, not an SDK one.
 Pick the span first. Use the harness's own unit of work: one test, so one
 transaction with at least one CLIENT span under it. Note the values you will
 look for: `trace.id`, the root span's `span.id`, one label key such as
-`cycle.id`, and the CLIENT span's `peer.service`.
+`sahara.cycle.id`, and the CLIENT span's `peer.service`.
 
-## Rung 1: the SDK
+## Rungs 1 and 2: the SDK and the collector
 
-Prove the span exists in the process before anything leaves it.
-
-```sh
-TRACE_CONSOLE_EXPORT=1 python -m pytest tests/test_one.py -q 2>&1 | grep -A40 '"name":'
-```
-
-`traces/recipes/python_otel_setup.py` reads `TRACE_CONSOLE_EXPORT=1` and adds
-`ConsoleSpanExporter` next to the OTLP exporter. When stdout is noisy, use
-`traces/recipes/python_file_exporter.py` instead; it writes one JSON object per
-span to `TRACE_EXPORT_FILE` in the checker's own shape, which is documented at
-the bottom of that recipe and is what `checks/check_spans.py` reads directly.
-The console exporter prints one JSON object per span in the shape of
-`ReadableSpan.to_json()`, which the checker also accepts:
-
-```json
-{
-  "name": "tests/test_one.py::test_create",
-  "context": {"trace_id": "0x...", "span_id": "0x...", "trace_state": "[]"},
-  "kind": "SpanKind.INTERNAL",
-  "parent_id": null,
-  "status": {"status_code": "UNSET"},
-  "attributes": {"cycle.id": "c-2026-09-17-01", "environment.id": "env-3", "test.nodeid_hash": "..."},
-  "resource": {"attributes": {"service.name": "sahara-harness", "deployment.environment": "ci"}}
-}
-```
-
-Check, per span: `name` is the vocabulary's string with the varying part
-removed; `kind` is `SpanKind.CLIENT` on the entity operation; `parent_id` of
-the CLIENT span is the test span's `span_id`; every correlation key is in
-`attributes` as a string; `status.status_code` is `ERROR` when the test
-failed; `resource.attributes` has `service.name`. A span missing here is not
-created, not ended, or exported before `force_flush` ran. Fix at the call
-site. Nothing downstream can add what is missing here.
-
-## Rung 2: the collector
-
-Skip when there is no collector. Otherwise the `debug` exporter from
-`collector.md` prints every span it forwards, on stderr:
-
-```sh
-otelcol-contrib --config config.yaml 2>&1 | grep -B2 -A30 'Name           : tests/test_one.py::test_create'
-```
-
-Expected:
-
-```
-info    Traces  {"otelcol.component.id": "debug", "otelcol.component.kind": "Exporter", "otelcol.signal": "traces", "resource spans": 1, "spans": 2}
-ResourceSpans #0
-Resource attributes:
-     -> service.name: Str(sahara-harness)
-     -> deployment.environment: Str(ci)
-ScopeSpans #0
-Span #0
-    Trace ID       : 4bf92f3577b34da6a3ce929d0e0e4736
-    Parent ID      :
-    ID             : 00f067aa0ba902b7
-    Name           : tests/test_one.py::test_create
-    Kind           : Internal
-Attributes:
-     -> cycle.id: Str(c-2026-09-17-01)
-```
-
-What changed against rung 1: ids are printed without `0x`; `kind` is
-`Internal`, `Client`; a key you configured `delete` for is gone; a key you
-configured `hash` for is 40 hex characters; `deployment.environment` appears
-in **Resource attributes** if the `resource` processor inserted it. Anything
-else that differs is a processor you forgot to write into the vocabulary.
-Keys are still dotted here. Nothing under `labels` yet.
-
-`grep -i 'exporting failed' collector.log` must print nothing; if it does,
-`collector.md` has the line and its cause.
+Rungs 1 and 2 are the same on every backend and live in
+`backends/ladder-rungs-1-2.md`. Run them first; start here only with the span
+seen at rung 2, or at rung 1 when there is no collector.
 
 ## Rung 3: APM Server and Elasticsearch
 
@@ -115,7 +47,8 @@ are the ones in `mapping.md`; check these fields in `_source`:
 - root: `processor.event: transaction`, `transaction.name` equal to the span
   name, `transaction.type`, `event.outcome: success|failure|unknown`,
   `service.environment` equal to `deployment.environment`,
-  `labels.cycle_id`, `labels.environment_id`, `labels.test_nodeid_hash`.
+  `labels.sahara_cycle_id`, `labels.sahara_environment_id`,
+  `labels.sahara_worker_id`, `labels.test_nodeid_hash`.
   Dotted keys are now underscored under `labels.*`; numbers went to
   `numeric_labels.*` instead.
 - CLIENT span: `processor.event: span`, `span.name`, `span.subtype`,
@@ -162,7 +95,7 @@ explorer takes KQL. Narrow to the one span with:
 trace.id : "4bf92f3577b34da6a3ce929d0e0e4736"
 ```
 
-or `labels.cycle_id : "c-2026-09-17-01" and transaction.name : "tests/test_one.py::test_create"`.
+or `labels.sahara_cycle_id : "c-2026-09-17-01" and transaction.name : "tests/test_one.py::test_create"`.
 The waterfall must show the CLIENT span under the transaction and the
 service's **Dependencies** tab must list the `peer.service` value once the
 metrics from rung 3 exist. Kibana shows only what rung 3 holds. A span in
@@ -187,6 +120,8 @@ sampling rate, never lost data.
 ## Never
 
 - Never start at rung 4. A blank chart says nothing about which hop failed.
+- Never skip rungs 1 and 2 because the collector is "known good". Run
+  `backends/ladder-rungs-1-2.md`.
 - Never change two hops between two runs of the ladder.
 - Never search by `span.name` alone. Names repeat; ids do not.
 
@@ -203,5 +138,5 @@ sampling rate, never lost data.
 | Observation | Verdict written |
 | --- | --- |
 | console shows the span, collector log shows it, `_search` returns 0 hits, log has `authentication failed` | `last seen: rung 2`, token |
-| console shows `cycle.id`, `_source` has `labels.cycle_id` | `last seen: rung 4`, vocabulary spelling column updated |
+| console shows `sahara.cycle.id`, `_source` has `labels.sahara_cycle_id` | `last seen: rung 4`, vocabulary spelling column updated |
 | `_search` returns the span, `service_destination` returns 0 hits, `kind` was `INTERNAL` | `last seen: rung 3`, span kind |

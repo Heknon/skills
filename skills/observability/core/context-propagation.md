@@ -40,7 +40,7 @@ All names are from opentelemetry-python 1.2x. Default propagator is
 | `threading.Thread`, `ThreadPoolExecutor` | automatic | `from opentelemetry.instrumentation.threading import ThreadingInstrumentor` then `ThreadingInstrumentor().instrument()` once at startup, package `opentelemetry-instrumentation-threading` |
 | a thread you cannot instrument | inject and extract | `context = opentelemetry.context.get_current()` before submit; `token = opentelemetry.context.attach(context)` at the start of the work and `opentelemetry.context.detach(token)` at the end; or submit `contextvars.copy_context().run(function)` |
 | `subprocess`, `multiprocessing` started per unit | inject and extract | `carrier = {}`; `opentelemetry.propagate.inject(carrier)`; pass `carrier["traceparent"]` as environment variable `TRACEPARENT`; far side `context = opentelemetry.propagate.extract({"traceparent": os.environ["TRACEPARENT"]})`; `tracer.start_as_current_span(name, context=context)` |
-| xdist worker | link by key | workers start once per session, so a test on a worker is its own root; `cycle.id` and `session.id` are the keys; `PYTEST_XDIST_WORKER` holds the worker name |
+| xdist worker | link by key | workers start once per session, so a test on a worker is its own root; `sahara.cycle.id` and `sahara.worker.id` are the keys; `PYTEST_XDIST_WORKER` holds the worker name |
 | HTTP through an instrumented client | automatic | the instrumentation calls `inject` on the request headers |
 | HTTP through a bare client | inject and extract | `opentelemetry.propagate.inject(headers)` before the call; server side `opentelemetry.propagate.extract(request.headers)` |
 | queue, producer side | inject and extract | span kind `PRODUCER`; `inject(message_attributes)` |
@@ -78,10 +78,10 @@ Use it for a link only. Never make a rebuilt context a parent.
 
 ## Verdict
 
-Write into `vocabulary.md` under *Boundaries*:
+Write into the *Boundaries* table of `vocabulary.md`, one row per boundary:
 
 ```
-| <from> -> <to> | automatic, inject and extract, or link by key | <carrier: header, TRACEPARENT env, message attribute, key name> | <child or link on the far side> |
+| <from> -> <to> | automatic, inject and extract, or link by key | <header, TRACEPARENT environment variable, message attribute, or key name> | child or link |
 ```
 
 ## Never
@@ -114,5 +114,5 @@ Write into `vocabulary.md` under *Boundaries*:
 | Test starts a helper binary per test | inject and extract | `TRACEPARENT` environment variable, far span is a child |
 | Controller pushes a job onto a broker, a service processes it later | inject and extract, as a link | message attribute `traceparent`, far span is a `CONSUMER` root |
 | Controller calls the entity's REST API with `requests` | automatic | `traceparent` header |
-| Controller drives hardware over a serial line | link by key | `entity.id` on both sides' logs |
-| Controller test runs on an xdist worker | link by key | `cycle.id`, `session.id` |
+| Controller drives hardware over a serial line | link by key | `sahara.entity.id` on both sides' logs |
+| Controller test runs on an xdist worker | link by key | `sahara.cycle.id`, `sahara.worker.id` |

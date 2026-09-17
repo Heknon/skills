@@ -13,9 +13,9 @@ keys* in `vocabulary.md` as `collector: <path or none>`.
 The collector is a relay. It forwards OTLP as OTLP. Left alone it changes
 nothing a document holds.
 
-- It does **not** rename keys. `cycle.id` leaves the collector as `cycle.id`.
-  APM Server is what writes it as `labels.cycle_id`. The rename map is in
-  `mapping.md`.
+- It does **not** rename keys. `sahara.cycle.id` leaves the collector as
+  `sahara.cycle.id`. APM Server is what writes it as `labels.sahara_cycle_id`.
+  The rename map is in `mapping.md`.
 - It does **not** drop or add attributes unless a processor says so.
 - It **does** re-batch. A span leaves the collector up to `batch.timeout`
   after it arrived.
@@ -97,21 +97,15 @@ Environment the collector reads: `DEPLOYMENT_ENVIRONMENT`,
 `ELASTIC_APM_SERVER_ENDPOINT`, `ELASTIC_APM_SECRET_TOKEN`. Set them in the
 shell or the systemd unit before starting it.
 
-## The `spanmetrics` connector
+## The `span_metrics` and `service_graph` connectors
 
-A connector is an exporter of one pipeline and a receiver of another. Wired
-as `traces: exporters: [spanmetrics]` and `metrics: receivers: [spanmetrics]`,
-it emits, per `service.name`, `span.name`, `span.kind` and `status.code`:
-
-- `traces.span.metrics.calls`, a counter of spans,
-- `traces.span.metrics.duration`, a histogram of span duration in `ms`,
-- `traces.span.metrics.events` when enabled.
-
-Do not add it in front of APM Server. APM Server already aggregates the same
-spans into `metrics-apm.transaction.*` and `metrics-apm.service_destination.*`
-and Kibana draws its latency and throughput charts from those. The connector's
-metrics land in `metrics-apm.app.*` as a second count of every span. A chart
-built on both counts every span twice. Invariant 8: one fact, one signal.
+Do not add them in front of APM Server. On this backend the
+`span metrics derived by` line is `APM Server`: it already aggregates every
+span into `metrics-apm.transaction.*` and `metrics-apm.service_destination.*`,
+and a connector's series would land in `metrics-apm.app.*` as a second count
+of the same spans. What the connectors emit, and the rule against two copies
+of one fact, are in `metrics/derived-or-emitted.md`; the side by side of who
+derives what on each stack is in `backends/paradigms.md`.
 
 ## `tail_sampling` in one paragraph
 
@@ -176,7 +170,7 @@ same layout with `otelcol-contrib` in place of `otelcol`.
 ## Stop and ask
 
 - A processor is wanted that the vocabulary has no row for.
-- Someone wants `spanmetrics` for a chart Kibana already draws.
+- Someone wants `span_metrics` for a chart Kibana already draws.
 - The collector must fan out to a second backend. That is a second exporter
   and a second spelling column.
 

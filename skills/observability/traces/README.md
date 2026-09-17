@@ -9,7 +9,7 @@ Target: opentelemetry-python 1.2x sending OTLP to whichever backend `backends/RE
 | --- | --- |
 | `parent-or-link.md` | which span is the parent and which spans are links |
 | `service-dependency-attribute.md` | is this thing a service, a dependency, or an attribute |
-| `span-attributes-and-events.md` | attribute or event, allowed types, limits, what Elastic renames |
+| `span-attributes-and-events.md` | attribute or event, allowed types, limits, what the backend renames (`backends/<backend>/mapping.md`) |
 | `recipes/python_otel_setup.py` | `configure_tracing(...)`: resource, correlation keys processor, OTLP exporter, sampler, limits, shutdown |
 | `recipes/python_span_wrapper.py` | `operation`, `traced`, `exit_span`, `link_to`: spans that fail correctly |
 | `recipes/python_http_propagation.py` | `traceparent` over HTTP headers and into a subprocess |

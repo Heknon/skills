@@ -6,8 +6,11 @@ attribute goes into `Span attributes` in `vocabulary.md`; the event goes into
 `Span events`.
 
 An attribute is a fact about the whole span. An event is a fact about one
-moment inside it, with its own timestamp and its own attributes. Both live in
-the span document. Neither is a log line.
+moment inside it, with its own timestamp and its own attributes. Both are
+sent with the span, and neither is written as a log line by the code. What
+the backend stores an event as is its own business, in
+`backends/<backend>/mapping.md`; on Elastic a non exception event becomes a
+log document of its own, see below.
 
 ## Questions
 
@@ -28,24 +31,30 @@ the span document. Neither is a log line.
    reaches the backend. Fix the type in the vocabulary before writing code.
 4. **Is the value a structure, a customer-defined dictionary, or a payload?**
    One attribute holding `json.dumps(value, sort_keys=True)` as a `str`.
-   Never spread its keys into attributes; see invariant 11. Name the key
-   `<noun>.json`, for example `entity.definition.json`.
-5. **Is the value an id?** Send it as `str`, even when it is numeric. Elastic
-   fixes a label's type from the first document that arrives, and a second
-   type for the same key is rejected.
+   Never spread its keys into attributes; see invariant 11. The key ends in
+   `_json`: `<namespace>.<noun>_json`, for example `sahara.entity.fields_json`.
+   That suffix is the one rule; there is no `.json` form.
+5. **Is the value an id?** Send it as `str`, even when it is numeric. A
+   backend that fixes a field's type from the first document to arrive
+   rejects or splits the second type; `backends/<backend>/mapping.md` says
+   what this backend does. Invariant 7.
 6. **Does an event need attributes?** Yes when the moment has facts of its
-   own, such as `retry.attempt`, `retry.delay_seconds`. They follow the same
-   types and limits as span attributes. They are on the event, not the span.
+   own, such as `sahara.retry.attempt` and `sahara.retry.reason` on
+   `entity.retry`. They follow the same types and limits as span attributes.
+   They are on the event, not the span. The rule for a retry event is
+   `<noun>.retry` with `<namespace>.retry.attempt` (int) and
+   `<namespace>.retry.reason` (string).
 
 ## Verdict
 
-Write into `vocabulary.md`:
+Write into `vocabulary.md`, `Span attributes`, one of:
 
 ```
-| <key> | string, int, float, bool | attribute or label | <allowed values or unbounded> | labels.<key with dots as underscores> |
+| <key> | string | label | <a, b, c> | <stored spelling per backends/<backend>/mapping.md> |
+| <key> | string, int, float or bool | attribute | unbounded | <stored spelling per backends/<backend>/mapping.md> |
 ```
 
-or
+or `Span events`:
 
 ```
 | <event name> | <span names it may appear on> | <event attribute keys> |
@@ -69,21 +78,30 @@ Past a count limit the SDK drops the newest silently. Past the length limit a
 string is cut with `value[:max_len]`. A JSON payload attribute needs a length
 limit chosen on purpose; `traces/recipes/python_otel_setup.py` sets one.
 
-## What Elastic does with them
+## On Elastic
 
 - An attribute key that is not an ECS field, and that is every key you invent,
   is stored under `labels.` for strings and booleans and `numeric_labels.` for
-  numbers, with every `.` in the key replaced by `_`. `cycle.id` is
-  `labels.cycle_id` in the index. APM Server does this in
+  numbers, with every `.` in the key replaced by `_`. `sahara.cycle.id` is
+  `labels.sahara_cycle_id` in the index. APM Server does this in
   `input/otlp/traces.go`, function `replaceDots`. The `Backend spelling`
   column of the vocabulary records the result.
 - `deployment.environment` on the resource becomes `service.environment`.
-- Events other than `exception` stay in the span document.
-  UNVERIFIED: under which field Kibana 8.x shows a non exception event in the
+- An event other than `exception` becomes a separate log document in
+  `logs-apm.app.<service.name>-<namespace>`, with `event.kind: event`, the
+  event name as `message` and its attributes under `labels.*`. The span
+  document keeps nothing of it. See the span events rows of
+  `backends/elastic/mapping.md`.
+  UNVERIFIED: whether Kibana 8.x shows that log document anywhere in the
   span flyout.
 - UNVERIFIED: how APM Server stores a sequence valued attribute under
   `labels.`. Do not use sequences on a span bound for Elastic until a person
   has checked one in the index.
+
+## Other backends
+
+Other backends: the verdicts do not change; the stored shape is in
+backends/<backend>/mapping.md and the differences in backends/paradigms.md.
 
 ## Never
 
@@ -102,26 +120,17 @@ limit chosen on purpose; `traces/recipes/python_otel_setup.py` sets one.
 - The payload is larger than a few kilobytes per span. That is a volume
   decision, `core/sampling-and-volume.md`, and a person approves it.
 - The fact needs to be grouped by on a chart and is currently an event
-  attribute. Events are not aggregable in Kibana; the fact may need to be a
-  span attribute in the label tier, or a metric.
+  attribute. No backend here charts event attributes; the fact may need to be
+  a span attribute in the label tier, or a metric.
 
 ## Examples
 
 | Fact | Verdict | Exact string | Type |
 | --- | --- | --- | --- |
-| The entity instance id | attribute | `entity.id` | string |
-| The entity definition | attribute, label tier | `entity.definition` | string |
-| The entity definition's fields, customer defined | attribute | `entity.definition.json` | string, JSON |
-| A create was retried | event | `retry` with `retry.attempt` int, `retry.reason` string | |
+| The entity instance id | attribute | `sahara.entity.id` | string |
+| The entity definition | attribute, label tier | `sahara.entity.definition` | string |
+| The entity's fields, customer defined | attribute | `sahara.entity.fields_json` | string, JSON |
+| A create was retried | event | `entity.retry` with `sahara.retry.attempt` int, `sahara.retry.reason` string | |
 | The controller raised | `record_exception` | `exception` | |
 | Rows returned by a query | attribute | `db.response.returned_rows` | int |
 | Worker heap size sampled each second | neither, it is a metric | | |
-
-## Other backends
-
-The section above is Elastic. For the Grafana stack read
-`backends/grafana/mapping.md` and `backends/grafana/screens.md`; for the
-Victoria stack read `backends/victoria/mapping.md` and
-`backends/victoria/screens.md`. The verdicts of this procedure do not
-change between them. What changes is which component draws the result and
-what the stored key looks like.

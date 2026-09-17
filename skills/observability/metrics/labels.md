@@ -25,9 +25,11 @@ For each key you want to pass with a measurement:
    parameter value?** Yes: never a label. It goes on spans and logs as an
    attribute, and a person reaches the metric's traces through
    `service.name` and the time range.
-4. **Is it a worker id?** It may be a label only if the vocabulary lists every
-   value, such as `gw0` to `gw7`. A worker id that grows with the machine
-   count is not a label.
+4. **Is it a worker id?** In the running example `sahara.worker.id` is a
+   correlation key, not a label: `sahara.worker.queue.depth` carries no
+   labels, and each worker process's own resource tells its series apart. A
+   worker id may be a label only if the vocabulary lists every value, such as
+   `gw0` to `gw7`, and a worker id that grows with the machine count never is.
 5. **Is the value chosen by a customer or read from input?** Yes: never a
    label, never a key. Invariant 11.
 6. **Multiply the allowed value counts of every key that passed.** That is
@@ -46,14 +48,19 @@ documents per interval per process = number of distinct label sets actually seen
 
 | Metric | Labels and sizes | Series |
 | --- | --- | --- |
-| `sahara.controller.polls` | `entity.definition` 40, `entity.operation` 5, `outcome` 2 | 400 |
-| `sahara.entities.live` | `entity.definition` 40 | 40 |
-| `sahara.worker.queue.depth` | `worker.id` 8 | 8 |
-| `sahara.controller.polls` with `entity.id` | unbounded | refused |
+| `sahara.controller.polls` | `sahara.entity.definition` 3, `outcome` 3 | 9 |
+| `sahara.entities.live` | `sahara.entity.definition` 3 | 3 |
+| `sahara.controller.poll.duration` | `sahara.entity.definition` 3 | 3 |
+| `sahara.worker.queue.depth` | none | 1 per process |
+| `sahara.controller.polls` with `sahara.entity.id` | unbounded | refused |
 
-## How Elastic 8.x stores them
+The sizes are the fixture vocabulary's, `tank, valve, pump` and
+`ok, timeout, error`. A customer with forty definitions has 120 series for
+the polls counter, still far under the limit.
 
-Source: `elastic/apm-data` `input/otlp/metrics.go` and `metadata.go`, and the
+## On Elastic
+
+Source, 8.x: `elastic/apm-data` `input/otlp/metrics.go` and `metadata.go`, and the
 APM index templates in the Elasticsearch `apm-data` plugin.
 
 - A string or bool attribute becomes `labels.<key>`, mapped `keyword`. A bool
@@ -62,12 +69,13 @@ APM index templates in the Elasticsearch `apm-data` plugin.
   `scaled_float` with `scaling_factor: 1000000`. That is a different field
   from `labels.<key>`. Send every label as a string, always. Invariant 7.
 - Span and log attribute keys have dots rewritten to underscores before they
-  become labels: `entity.definition` is `labels.entity_definition`. For metric
-  data point attributes `metrics.go` passes the key to `setLabel` unchanged.
+  become labels: `sahara.entity.definition` is
+  `labels.sahara_entity_definition`. For metric data point attributes
+  `metrics.go` passes the key to `setLabel` unchanged.
   UNVERIFIED: whether a metric label reaches the index as
-  `labels.entity.definition` or `labels.entity_definition`. Look at one
-  document in Discover under `metrics-apm.app.*` and write what you see into
-  the *Backend spelling* column. Until then, filter on both.
+  `labels.sahara.entity.definition` or `labels.sahara_entity_definition`.
+  Look at one document in Discover under `metrics-apm.app.*` and write what
+  you see into the *Backend spelling* column. Until then, filter on both.
 - One document is written per distinct attribute set per timestamp, holding
   every metric that shares that set. More label sets means more documents,
   not wider ones.
@@ -96,9 +104,10 @@ row in *Span attributes* with tier `label` and its allowed values:
 
 - Never pass a value that is not in the vocabulary's allowed list. The
   recipe's `label_set` raises on one; keep it that way.
-- Never pass a number as a label. `worker.id="3"`, not `3`.
-- Never pass the correlation keys `cycle.id`, `environment.id` or the unit
-  instance key on a metric. They are attributes on spans and fields on logs.
+- Never pass a number as a label. `outcome="timeout"`, never a numeric code.
+- Never pass the correlation keys `sahara.cycle.id`, `sahara.environment.id`,
+  `sahara.worker.id` or the unit instance key `test.nodeid_hash` on a metric.
+  They are attributes on spans and fields on logs.
 - Never pass the same key with different spellings in different places.
 - Never let a label set be built from a dictionary you did not write.
 
@@ -113,11 +122,12 @@ row in *Span attributes* with tier `label` and its allowed values:
 
 | Key | Tier in vocabulary | Metric label | Why |
 | --- | --- | --- | --- |
-| `entity.definition` | label, 40 values | yes | bounded, listed, grouped on charts |
-| `entity.operation` | label, 5 values | yes | fixed verb list |
-| `outcome` | label, `success` `failure` | yes | two values |
-| `worker.id` | label, `gw0` to `gw7` | yes | bounded by the vocabulary |
-| `entity.id` | attribute | no | one per instance |
-| `cycle.id` | correlation key | no | one per run |
+| `sahara.entity.definition` | label, `tank`, `valve`, `pump` | yes | bounded, listed, grouped on charts |
+| `sahara.entity.operation` | label, `create`, `tag`, `revert`, `destroy`, `controller` | yes, when a metric needs it | fixed verb list; the canon metrics do not use it |
+| `outcome` | label, `ok`, `timeout`, `error` | yes | three values |
+| `sahara.worker.id` | correlation key | no | one per worker; the process resource tells workers apart |
+| `sahara.entity.id` | attribute | no | one per instance |
+| `sahara.entity.controller.method` | attribute | no | customer named, unbounded |
+| `sahara.cycle.id` | correlation key | no | one per run |
 | `test.nodeid_hash` | instance key | no | one per test |
 | entity field names from a customer definition | forbidden | no | customer controlled keys |

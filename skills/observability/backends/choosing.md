@@ -14,12 +14,17 @@ if your situation is not in it, stop and ask.
 
 ## What the four options are
 
-| Option | What it is | Signals it holds | Who derives span metrics and dependencies |
+| Option | What it is | Signals it holds | Span metrics derived by |
 | --- | --- | --- | --- |
-| **Elastic** | one product: Elasticsearch, Kibana, APM Server | traces, metrics, logs, in one store, with full text search over all of them | APM Server, automatically, from every span |
-| **Grafana stack** | four products: Tempo, Prometheus or Mimir, Loki, Grafana | traces, metrics, logs, in three stores built for each | Tempo's metrics-generator or the collector's connectors, when enabled |
-| **Victoria stack** | VictoriaMetrics, VictoriaLogs, VictoriaTraces, Grafana on top | metrics first, logs second, traces newest | only the collector's connectors |
-| **Prometheus alone** | one binary that scrapes and stores metrics | metrics only | nothing; there are no spans |
+| **Elastic** | one product: Elasticsearch, Kibana, APM Server | traces, metrics, logs, in one store, with full text search over all of them | `APM Server` |
+| **Grafana stack** | four products: Tempo, Prometheus or Mimir, Loki, Grafana | traces, metrics, logs, in three stores built for each | `Tempo metrics-generator` or `collector connectors`, once enabled |
+| **Victoria stack** | VictoriaMetrics, VictoriaLogs, VictoriaTraces, Grafana on top | metrics first, logs second, traces newest | `collector connectors`, once enabled |
+| **Prometheus alone** | one binary that scrapes and stores metrics | metrics only | `nothing`; there are no spans |
+
+The last column is the value of the `span metrics derived by` line in
+`backends/README.md`. What each of them derives, where the numbers land and
+what is on by default is the first table of `paradigms.md`; this table does
+not repeat it.
 
 Prometheus alone is in the table on purpose. Many systems need metrics and
 alerts and nothing else, and adding a trace store to them is cost without a
@@ -121,13 +126,15 @@ when signals live apart.
 Write into `backends/README.md` under *This installation*:
 
 ```
-traces:   <folder>   because <one sentence from the table>
-metrics:  <folder>   because <one sentence>
-logs:     <folder>   because <one sentence>
+traces:                  <elastic | grafana | victoria> because <one sentence from the table>
+metrics:                 <elastic | grafana | victoria> because <one sentence>
+logs:                    <elastic | grafana | victoria> because <one sentence>
 span metrics derived by: <APM Server | Tempo metrics-generator | collector connectors | nothing>
 ```
 
-and the same three lines into the header of `vocabulary.md`.
+These are the same lines, spelled the same way, as the *This installation*
+block in `backends/README.md`; the same three signal lines go into the header
+of `vocabulary.md`.
 
 ## Never
 

@@ -8,8 +8,9 @@ named *Fails when*.
 
 Invariant 5 fixes the mechanics: a failure is a status plus a recorded
 exception. This procedure decides which span carries it and when a failure is
-not an error at all. The backend counts failures from `event.outcome` on the
-root span, so a wrong verdict here makes the failure rate wrong everywhere.
+not an error at all. The backend counts failures from the status of the root
+span, stored under the name in `backends/<backend>/mapping.md`, so a wrong
+verdict here makes the failure rate wrong everywhere.
 
 ## How to record one
 
@@ -30,8 +31,11 @@ span.set_status(Status(StatusCode.ERROR, description=str(exception)))
 - `set_status` takes a `Status` or a `StatusCode`, plus `description`. A
   description is stored only with `StatusCode.ERROR`. With `OK` it is
   dropped and a warning is logged.
-- Once a span's status is `OK`, later calls to `set_status` are ignored. Set
-  `OK` last, or not at all. `UNSET` cannot be set by a call.
+- Once a span's status is `OK`, later calls to `set_status` are ignored, so
+  `OK` is final. Set it on clean exit through the wrapper, `operation()` in
+  `traces/recipes/python_span_wrapper.py`, which sets it last; never by hand
+  mid-span. A span left `UNSET` is not a success to every backend; see
+  `backends/<backend>/mapping.md`. `UNSET` cannot be set by a call.
 - `tracer.start_as_current_span(...)` defaults to `record_exception=True` and
   `set_status_on_exception=True`. An exception that leaves the `with` block
   already does both. Call them by hand only for an exception you caught.
@@ -56,12 +60,13 @@ span.set_status(Status(StatusCode.ERROR, description=str(exception)))
    absent. Yes: verdict `expected, no error`. No `record_exception`, no
    `ERROR`. Record the verdict in a label attribute from the vocabulary, such
    as `test.outcome=xfailed` or `http.response.status_code=404`. An exception
-   event would become an error document and pollute the Errors tab.
+   event would be counted as an error by the backend and pollute its error
+   screens; see the exceptions row in `backends/<backend>/mapping.md`.
 5. **Is there no span around it at all?** Startup, configuration, a thread
    with no context. Yes: verdict `error log line`, level `error`, with the
    correlation keys from `core/correlation-keys.md` set by hand.
 
-## What Elastic does with it
+## On Elastic
 
 From `elastic/apm-data`, `input/otlp/traces.go`:
 
@@ -83,20 +88,26 @@ From `elastic/apm-data`, `input/otlp/traces.go`:
 - Error documents are kept even when the trace is not sampled. The span
   status is not: an unsampled span is never exported.
 
+Other backends: the verdicts do not change; the stored shape is in
+`backends/<backend>/mapping.md` and the differences in `backends/paradigms.md`.
+
 ## On metrics and logs
 
-- Failure rate, error count per transaction name, errors per minute: all
-  **derived** from `event.outcome` and error documents. Emit no error
-  counter beside spans. Confirm in `metrics/derived-or-emitted.md`.
+- Failure rate, error count per root span name, errors per minute: all
+  **derived** by the backend from span status and exception events, where
+  it derives span metrics at all. Emit no error counter beside spans.
+  Confirm in `metrics/derived-or-emitted.md`, and who derives in
+  `backends/paradigms.md`.
 - A log line at level `error` is written only under verdict `error log
-  line`. Inside a span it duplicates the exception event in another index.
+  line`. Inside a span it duplicates the exception event in another store.
 
 ## Verdict
 
-Write into the *Spans* table of `vocabulary.md`, one cell per span name:
+Write into the *Fails when* cell of the span's row in the *Spans* table of
+`vocabulary.md`. The other cells come from `traces/`; the whole row is:
 
 ```
-| <span name> | ... | fails when: <exact condition, e.g. "the controller raises" or "http.response.status_code >= 500"> ; expected: <conditions that stay OK, or none> |
+| <span name> | <kind> | <yes or no> | <required attribute keys> | <destination attribute, or none> | <exact condition, e.g. "the controller raises" or "http.response.status_code >= 500"> ; expected: <conditions that stay OK, or none> |
 ```
 
 ## Never
@@ -127,12 +138,3 @@ Write into the *Spans* table of `vocabulary.md`, one cell per span name:
 | Test marked xfail fails | pytest reports `xfailed` | expected, no error, `test.outcome=xfailed` |
 | `entity.get` returns 404 and the caller treats it as absent | inside the caller | expected, no error, `http.response.status_code=404` |
 | Plugin cannot parse its config file | before `pytest_sessionstart` | error log line |
-
-## Other backends
-
-The recording rules above are the same everywhere; only the stored shape
-differs. Tempo keeps the `exception` event on the span and TraceQL filters
-on `status = error` and `event:name = "exception"`. Loki and VictoriaLogs see
-an exception only if a log line is written, which the rules above forbid
-inside a span. Read the status, events and exceptions rows in
-`backends/<backend>/mapping.md`.

@@ -8,8 +8,9 @@ Grafana Alloy component references at latest; Tempo 3.0, Loki 3.7, Prometheus
 **Verdict you produce:** `no collector`, or the path of the collector's
 `config.yaml`, plus one line per processor that touches attributes, copied
 into the vocabulary's *Backend spelling* column, plus the line
-`derived by: tempo-metrics-generator | collector-connectors | none`. Write
-them under *Correlation keys* and *Metrics* in `vocabulary.md`.
+`derived by: <Tempo metrics-generator | collector connectors | nothing>`, the
+same value as `span metrics derived by` in `backends/README.md`. Write them
+under *Correlation keys* and *Metrics* in `vocabulary.md`.
 
 ## What the collector changes and what it does not
 
@@ -24,8 +25,8 @@ stores, three exporters, and every one of them must be in the right pipeline.
 
 SDK sends OTLP to `localhost:4317` or `localhost:4318`. Rename the
 `${env:...}` values and nothing else. The `connectors` block and the two
-extra pipelines are for the collector-connectors verdict only; delete them
-under the metrics-generator verdict.
+extra pipelines are for the `collector connectors` verdict only; delete them
+under the `Tempo metrics-generator` verdict.
 
 ```yaml
 receivers:
@@ -43,9 +44,10 @@ processors:
     spike_limit_mib: 128
   resource:
     attributes:
-      - key: deployment.environment.name    # the key Loki indexes by default; see mapping.md
-        value: ${env:DEPLOYMENT_ENVIRONMENT}
-        action: insert                      # only when the SDK did not set it
+      - key: deployment.environment.name    # the SDK recipe sets deployment.environment, which Loki keeps as structured
+        value: ${env:DEPLOYMENT_ENVIRONMENT} # metadata; Loki's default index list carries deployment.environment.name, so this
+        action: insert                      # adds that key too and the environment becomes a stream label. The other way,
+                                            # promoting deployment.environment with otlp_config, is in mapping.md. Pick one.
   attributes/scrub:                         # span, metric and log attributes; not resource
     actions:
       - key: db.statement
@@ -54,7 +56,7 @@ processors:
     timeout: 1s
     send_batch_size: 512
 
-connectors:                                 # collector-connectors verdict only
+connectors:                                 # collector connectors verdict only
   span_metrics:                             # type span_metrics; spanmetrics is the deprecated spelling
     histogram:
       unit: s                               # default ms; s matches Tempo's seconds
@@ -143,13 +145,13 @@ views care.
 `CLIENT` span with the `SERVER` span it parented, or `PRODUCER` with
 `CONSUMER`, and naming an unpaired peer from `virtual_node_peer_attributes`.
 
-Run them only under the `collector-connectors` verdict from `overview.md`:
+Run them only under the `collector connectors` verdict from `overview.md`:
 a sampler stands between the SDK and Tempo. Then order the traces pipeline so
 the connectors see every span: `exporters: [span_metrics, service_graph,
 otlp/tempo]` on a pipeline without the sampler, and a second traces pipeline
 `traces/sampled` with `tail_sampling` feeding `otlp/tempo`. UNVERIFIED: the
 exact two-pipeline layout with a `forward` connector; the README shows only
-the one-pipeline wiring. Under the `tempo-metrics-generator` verdict the
+the one-pipeline wiring. Under the `Tempo metrics-generator` verdict the
 connectors are off and Tempo does the same work on the spans it stored.
 
 ## `tail_sampling` in one paragraph

@@ -103,7 +103,8 @@ you turn it on**, and there are two places that can do it:
 | Collector connectors | `span_metrics`, `service_graph` | `traces_span_metrics_calls_total`, `traces_span_metrics_duration_milliseconds_bucket`, `traces_service_graph_request_total`, ... | `connectors:` plus a metrics pipeline, see `collector.md` |
 
 **Decision rule.** One place, written into `vocabulary.md` under *Metrics* as
-`derived by: tempo-metrics-generator` or `derived by: collector-connectors`.
+`derived by: Tempo metrics-generator` or `derived by: collector connectors`,
+the same words as the `span metrics derived by` line in `backends/README.md`.
 
 - Tempo receives every span, no sampler before it: **metrics-generator**.
   Grafana's Service Graph view and span metrics table are built for its

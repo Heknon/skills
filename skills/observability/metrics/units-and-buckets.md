@@ -3,7 +3,8 @@
 **Verdict you produce:** for every metric the exact UCUM unit string passed to
 the instrument, and for every histogram the exact boundary list and the View
 that installs it. Both go into `vocabulary.md`, the unit in the *Metrics* table
-and the boundaries in a *Histogram boundaries* line under it.
+and the boundaries as a `histogram boundaries:` line in the `## Volume`
+section, together with the temporality this installation uses.
 
 ## Units
 
@@ -27,10 +28,11 @@ Rules, from the OpenTelemetry semantic conventions on metrics:
 3. Names are not pluralized "unless the value being recorded represents
    discrete instances of a countable quantity", and then the unit is an
    annotation like `{operation}`.
-4. Elastic 8.x APM Server does not store the unit. `metrics.go` carries the
-   comment `TODO(axw) support units`, and the field is a bare number. The
-   vocabulary is the only record of the unit. Put it in the description too:
-   `description="Poll round trip time in seconds"`.
+4. Do not count on the backend storing the unit; whether it does is in
+   `backends/<backend>/mapping.md`. Elastic 8.x APM Server does not:
+   `metrics.go` carries the comment `TODO(axw) support units`, and the field
+   is a bare number. The vocabulary is the only record of the unit. Put it in
+   the description too: `description="Poll round trip time in seconds"`.
 
 ## Histogram boundaries
 

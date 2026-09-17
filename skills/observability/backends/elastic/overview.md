@@ -23,6 +23,12 @@ OpenTelemetry SDK --OTLP--> [Collector, optional] --OTLP--> APM Server
    Auth header: `Authorization=Bearer <secret_token>` or
    `Authorization=ApiKey <api_key>`, with the space. APM Server translates
    OTLP into APM documents, computes aggregated metrics, and indexes.
+   OTLP metrics must arrive with **delta** temporality: set
+   `configure_metrics(..., temporality="delta")` from
+   `metrics/recipes/python_meter_setup.py`, whose default `cumulative` is for
+   Prometheus, Mimir and VictoriaMetrics, and write
+   `metric temporality: delta` into the installation block of
+   `backends/README.md`.
 4. **Elasticsearch.** Data streams named `<type>-<dataset>-<namespace>`.
    The namespace is set in the APM integration policy, default `default`.
 5. **Kibana APM app.** Reads the index patterns in its settings:
@@ -121,6 +127,18 @@ regardless of the sampling decision.
 The `service_destination` metrics exist only for spans that carry
 `span.destination.service.resource`. Everything the Dependencies screen shows
 is a query over those metrics. See `screens.md`.
+
+## How to read the running version
+
+One row per component. Compare with the stamp at the top of the file you
+are about to use; a different major is a stop and ask.
+
+| Component | Command or place | Field to read |
+| --- | --- | --- |
+| Elasticsearch | `GET /` against the Elasticsearch URL | `version.number` |
+| Kibana | `GET /api/status` against the Kibana URL | `version.number` |
+| APM Server, standalone | `apm-server version` | the printed version |
+| APM Server, under Elastic Agent | `elastic-agent version`, and Kibana **Integrations > Installed integrations > Elastic APM > Settings** | the agent version and the integration version |
 
 ## Never
 

@@ -13,9 +13,11 @@ Rename before use:
 What each helper guarantees:
 - operation: on an exception, status ERROR with "<Type>: <message>" as the
   description, the exception recorded as the `exception` event, and the
-  exception re-raised. On success the status stays UNSET, which Elastic reads
-  as success.
-- exit_span: SpanKind.CLIENT plus peer.service, so Elastic draws a dependency.
+  exception re-raised. On a clean exit, status OK, set last: OK is final in
+  the SDK, and a span left UNSET reads as "unknown" on some backends, see
+  core/errors-and-status.md. Never set OK by hand mid-span.
+- exit_span: SpanKind.CLIENT plus peer.service, so the backend draws a
+  dependency.
 - link_to: a Link carrying link.relation, for the links= argument at start.
 """
 
@@ -51,7 +53,12 @@ def operation(
     attributes: Attributes = None,
     links: Optional[Sequence[Link]] = None,
 ) -> Iterator[Span]:
-    """One span around one thing that starts, ends, and can fail."""
+    """One span around one thing that starts, ends, and can fail.
+
+    The status is ERROR with a description on an exception, and OK on a
+    clean exit. OK is set last because the SDK treats it as final: once a
+    span is OK, a later set_status is ignored.
+    """
     with tracer.start_as_current_span(
         name,
         kind=kind,
@@ -66,6 +73,8 @@ def operation(
         except BaseException as exception:
             _fail(span, exception)
             raise
+        else:
+            span.set_status(Status(StatusCode.OK))
 
 
 def traced(
@@ -98,7 +107,8 @@ def exit_span(
     """A call out of this service. peer_service names what was called.
 
     peer_service must come from the label tier: bounded, known in advance.
-    Elastic keys the Dependencies screen and the service map by it.
+    The backend keys its dependencies screen and service map by it; the
+    stored field is in backends/<backend>/mapping.md.
     """
     merged: dict = {PEER_SERVICE_KEY: peer_service}
     if attributes:
@@ -139,7 +149,14 @@ if __name__ == "__main__":
     with operation(tracer, "tests/a.py::test_x", links=links_from(session_link)) as test_span:
         test_span.set_attribute("test.nodeid_hash", "0" * 64)
         with exit_span(
-            tracer, "entity.create", peer_service="tank", attributes={"entity.id": "tank-7"}
+            tracer,
+            "entity.create",
+            peer_service="tank",
+            attributes={
+                "sahara.entity.definition": "tank",
+                "sahara.entity.operation": "create",
+                "sahara.entity.id": "environment-a/tank-7/1",
+            },
         ) as create_span:
             create_link = link_to(create_span, "operates_on")
         try:
@@ -150,12 +167,15 @@ if __name__ == "__main__":
 
 # Shape of data this recipe produces, one span per with block:
 #
-# session.run          kind INTERNAL, root, status UNSET
-# tests/a.py::test_x   kind INTERNAL, root, status UNSET,
+# session.run          kind INTERNAL, root, status OK
+# tests/a.py::test_x   kind INTERNAL, root, status OK,
 #                      links [{trace_id, span_id of session.run,
 #                              attributes {"link.relation": "belongs_to"}}]
-# entity.create        kind CLIENT, parent test span,
-#                      attributes {"peer.service": "tank", "entity.id": "tank-7"}
+# entity.create        kind CLIENT, parent test span, status OK,
+#                      attributes {"peer.service": "tank",
+#                                  "sahara.entity.definition": "tank",
+#                                  "sahara.entity.operation": "create",
+#                                  "sahara.entity.id": "environment-a/tank-7/1"}
 # entity.revert        kind CLIENT, parent test span, status ERROR,
 #                      status description "RuntimeError: controller refused",
 #                      events [{"name": "exception", attributes
@@ -164,6 +184,11 @@ if __name__ == "__main__":
 #                         "exception.stacktrace": "...", "exception.escaped": "False"}}],
 #                      links [{... of entity.create, {"link.relation": "operates_on"}}]
 #
-# In Elastic 8.x: peer.service becomes span.destination.service.resource and
-# service.target.name; entity.id becomes labels.entity_id; the link
-# attributes are dropped and the link ids land in span.links.
+# The correlation keys sahara.cycle.id, sahara.environment.id and
+# sahara.worker.id are added to every span by the processor in
+# python_otel_setup.py, not here.
+#
+# What the backend stores is in backends/<backend>/mapping.md. On Elastic
+# 8.x: peer.service becomes span.destination.service.resource and
+# service.target.name; sahara.entity.id becomes labels.sahara_entity_id; the
+# link attributes are dropped and the link ids land in span.links.

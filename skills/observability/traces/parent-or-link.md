@@ -3,7 +3,9 @@
 **Verdict you produce:** for the span you are adding, the one span that is its
 **parent**, and the list of spans it **links** to. The parent goes into the
 `Spans` table of `vocabulary.md` as `Root: no`. Each link goes into the
-`Required attributes` column as `link:<relation>`.
+`Links` table as one row: from this span, to the linked span, with its
+`link.relation`. A link is never written into `Required attributes`; that
+column holds attribute keys only.
 
 A span has exactly one parent and any number of links. The parent is where the
 code ran. A link is anything else the span belongs to. Getting this wrong in
@@ -32,22 +34,22 @@ on.
 3. **Is the linked span's context available before this span starts?** Yes:
    pass it in `links=` at start. No: call `span.add_link(...)` after start,
    and note that the sampler did not see it.
-4. **Does the link have a fact of its own?** Put it in the link's attributes,
-   under the key `link.relation` with one of the values from the table below.
+4. **What is the link's relation?** Every link carries the attribute
+   `link.relation` with exactly one of `belongs_to`, `operates_on`,
+   `produced_by`, `retries`. The Examples table says which case is which.
+   A link with no `link.relation` is a link nobody can read back.
 
 ## Verdict
 
-Write into `vocabulary.md`, in the `Spans` table row for this span:
+Write into `vocabulary.md`, one row per link in the `Links` table:
 
 ```
-| <span name> | <kind> | no | link:belongs_to, link:operates_on, ... | ... |
+| <span name> | <linked span name> | <belongs_to, operates_on, produced_by or retries> |
 ```
 
-and in `Span attributes`:
-
-```
-| link.relation | string | label | belongs_to, operates_on, produced_by, retries | not indexed by Elastic |
-```
+and in the `Spans` table row for this span, `Root: no` when question 1 said
+yes. The `Required attributes` cell of that row lists attribute keys only,
+never a link.
 
 ## The API, opentelemetry-python 1.2x
 
@@ -65,10 +67,12 @@ and in `Span attributes`:
   `OTEL_SPAN_LINK_COUNT_LIMIT` and `OTEL_LINK_ATTRIBUTE_COUNT_LIMIT`.
 - Recipe: `traces/recipes/python_span_wrapper.py`, function `link_to`.
 
-## How Elastic treats a link
+## On Elastic
 
 - APM Server writes each OTLP link as one entry of `span.links`, with the
-  linked trace id and span id, and drops the link's attributes.
+  linked trace id and span id, and drops the link's attributes, so
+  `link.relation` is not stored on Elastic. It is still required: the checkers
+  and the other backends read it.
   UNVERIFIED: the exact index field paths, expected `span.links.trace.id`
   and `span.links.span.id`.
 - A link whose attributes contain `elastic.is_child` or `is_child` set to
@@ -83,6 +87,11 @@ and in `Span attributes`:
   links. They follow the parent and `span.destination.service.resource`. A
   linked span contributes nothing to the linked trace's numbers.
 
+## Other backends
+
+Other backends: the verdicts do not change; the stored shape is in
+backends/<backend>/mapping.md and the differences in backends/paradigms.md.
+
 ## Never
 
 - Never make the outer thing the parent to keep everything in one trace.
@@ -90,6 +99,8 @@ and in `Span attributes`:
   not run inside. That hides where the code ran.
 - Never link to a span you have no `SpanContext` for. An id string is an
   attribute, not a link.
+- Never write a link into the `Required attributes` column. The checker reads
+  that column as attribute keys and would look for one named `link:...`.
 - Never set `elastic.is_child` or `is_child` on a link.
 - Never expect a link to appear in a chart. It appears in the waterfall only.
 
@@ -105,18 +116,16 @@ and in `Span attributes`:
 
 | Span | Parent | Links | `link.relation` |
 | --- | --- | --- | --- |
-| test root span | none, it is a root | the session root span | `belongs_to` |
+| test root span, `tests/*::test_*` | none, it is a root | `session.run` | `belongs_to` |
 | `entity.create` inside a test | the test span | none | |
 | `entity.revert` on an entity created in an earlier test | the current test span | the earlier `entity.create` span, if its context is stored on the entity | `operates_on` |
 | `job.run` in a consumer | the consumer's poll span | the producer's `job.enqueue` span | `produced_by` |
 | `entity.create` second attempt | the current test span | the first `entity.create` span | `retries` |
-| session root span | none | the cycle root span, if one exists | `belongs_to` |
 
-## Other backends
+As `Links` table rows for the running example:
 
-The section above is Elastic. For the Grafana stack read
-`backends/grafana/mapping.md` and `backends/grafana/screens.md`; for the
-Victoria stack read `backends/victoria/mapping.md` and
-`backends/victoria/screens.md`. The verdicts of this procedure do not
-change between them. What changes is which component draws the result and
-what the stored key looks like.
+```
+| tests/*::test_* | session.run | belongs_to |
+| entity.revert | entity.create | operates_on |
+| entity.create | entity.create | retries |
+```

@@ -6,7 +6,7 @@ cannot express are in `queries-dsl.md`.
 
 Rename before pasting: the label keys `labels.sahara_cycle_id`,
 `labels.sahara_environment_id`, `labels.sahara_entity_definition`,
-`labels.sahara_entity_instance_id`, and the values in angle brackets. Take the
+`labels.sahara_entity_id`, and the values in angle brackets. Take the
 index spelling from the vocabulary's *Backend spelling* column, never from
 the attribute key.
 
@@ -42,18 +42,18 @@ Only the test transactions of the cycle:
 labels.sahara_cycle_id : "<cycle id>" and processor.event : "transaction"
 ```
 
-## All operations on one entity instance
+## All operations on one entity
 
-Data view `traces-apm-*`:
-
-```
-labels.sahara_entity_instance_id : "<instance id>" and processor.event : "span"
-```
-
-Add the cycle when instance ids repeat across cycles:
+Data view `traces-apm-*`; the value is `<environment id>/<entity name>/<generation>`:
 
 ```
-labels.sahara_entity_instance_id : "<instance id>" and labels.sahara_cycle_id : "<cycle id>"
+labels.sahara_entity_id : "<entity id>" and processor.event : "span"
+```
+
+Add the cycle when entity ids repeat across cycles:
+
+```
+labels.sahara_entity_id : "<entity id>" and labels.sahara_cycle_id : "<cycle id>"
 ```
 
 ## Find one span by span id
@@ -79,10 +79,11 @@ An id that someone sent as a number:
 numeric_labels.sahara_cycle_id : *
 ```
 
-A count that someone sent as a string:
+A count that someone sent as a string, on data view `logs-*`, because the
+`entity.retry` span event is a log document there:
 
 ```
-labels.sahara_retry_count : *
+labels.sahara_retry_attempt : *
 ```
 
 Anything Elasticsearch had to ignore, from `ignore_above`, `ignore_malformed`

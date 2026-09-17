@@ -28,7 +28,7 @@
         "Says the Dependencies tab and the service map then show each definition without registering anything",
         "Keeps the entity instance id as an attribute, not a label and not a peer.service value, and says why (cardinality)",
         "Mentions that a customer-controlled value must never become a key or a service name",
-        "Points at the checker rule that would catch an INTERNAL span with no destination"
+        "Points at the checker rule that would catch an INTERNAL span carrying peer.service"
       ]
     },
     {

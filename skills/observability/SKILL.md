@@ -57,8 +57,9 @@ the checker passes. If a checker cannot be run, say so and say why.
 
 The Design task produces one file, `vocabulary.md` in the project being
 instrumented, from the template in `core/vocabulary-template.md`. It lists the
-unit of work, the correlation keys, every span name, every attribute key, every
-metric name and label, and every log field, as exact strings.
+unit of work, the correlation keys, every span name, every link between spans
+(`## Links`), every attribute key, every metric name and label, and every log
+field, as exact strings.
 
 After it exists, **it is law**. Every Instrument task reads it first and uses
 its strings verbatim. The checkers read it to know what to check. If a task

@@ -47,11 +47,12 @@ fixed separator, and nothing else.
   `GET /users/{id}`, never the URL. For a test it is the nodeid with the
   parametrization removed. For a job it is the job type.
 - **Metric name:** `<namespace>.<noun>.<measure>` with the unit in the
-  instrument, not in the name, such as `sahara.tests.duration` with unit `s`.
+  instrument, not in the name, such as `sahara.controller.poll.duration`
+  with unit `s`.
   See `metrics/units-and-buckets.md`.
 - **Log message template:** a fixed sentence with named placeholders, and the
-  values in fields. `entity create failed` with `entity.definition` as a
-  field, never `tank-7 create failed`.
+  values in fields. `entity create failed` with `sahara.entity.definition`
+  as a field, never `tank-7 create failed`.
 
 ## Removing the varying part
 
@@ -68,10 +69,14 @@ If you cannot find the stable part, the thing has no name yet. Stop and ask.
 
 ## Verdict
 
-Write into `vocabulary.md`, in the table for its signal:
+A **name** goes into the *Name* cell, or the *Message template* cell, of its
+signal's table in `vocabulary.md`, as the exact string or the glob that states
+the rule; the procedure for that signal fills the rest of the row. A value
+that is a **label** or an **attribute** is one row of the *Span attributes*
+table:
 
 ```
-| <exact name or rule> | <tier> | <type: string, int, float, bool> | <allowed values, or "unbounded"> |
+| <key> | <string, int, float, bool> | <label or attribute> | <allowed values, or unbounded> | <stored spelling per backends/<backend>/mapping.md> |
 ```
 
 ## Never

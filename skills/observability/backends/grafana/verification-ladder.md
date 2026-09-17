@@ -19,55 +19,11 @@ root span with at least one CLIENT span under it. Note the values you will
 look for: `trace_id`, the root span's `span_id`, one attribute such as
 `sahara.cycle.id`, and the CLIENT span's `peer.service`.
 
-## Rung 1: the SDK
+## Rungs 1 and 2: the SDK and the collector
 
-Prove the span exists in the process before anything leaves it.
-
-```sh
-TRACE_CONSOLE_EXPORT=1 python -m pytest tests/test_one.py -q 2>&1 | grep -A40 '"name":'
-```
-
-`traces/recipes/python_otel_setup.py` reads `TRACE_CONSOLE_EXPORT=1` and adds
-`ConsoleSpanExporter` next to the OTLP exporter. When stdout is noisy, use
-`traces/recipes/python_file_exporter.py` instead; it writes one JSON object per
-span to `TRACE_EXPORT_FILE` in the checker's own shape, which is documented at
-the bottom of that recipe and is what `checks/check_spans.py` reads directly.
-The console exporter prints one JSON object per span in the shape of
-`ReadableSpan.to_json()`, which the checker also accepts:
-
-```json
-{
-  "name": "tests/test_one.py::test_create",
-  "context": {"trace_id": "0x...", "span_id": "0x...", "trace_state": "[]"},
-  "kind": "SpanKind.INTERNAL",
-  "parent_id": null,
-  "status": {"status_code": "UNSET"},
-  "attributes": {"sahara.cycle.id": "c-2026-09-17-01", "sahara.environment.id": "env-3", "test.nodeid_hash": "..."},
-  "resource": {"attributes": {"service.name": "sahara-harness", "deployment.environment.name": "ci"}}
-}
-```
-
-Check, per span: `name` is the vocabulary's string with the varying part
-removed; `kind` is `SpanKind.CLIENT` on the entity operation; `parent_id` of
-the CLIENT span is the test span's `span_id`; every correlation key is in
-`attributes` as a string; `status.status_code` is `ERROR` when the test
-failed; `resource.attributes` has `service.name`. A span missing here is not
-created, not ended, or exported before `force_flush` ran. Fix at the call
-site. Nothing downstream can add what is missing here.
-
-## Rung 2: the collector
-
-Skip when there is no collector. Otherwise the `debug` exporter from
-`collector.md` prints every span it forwards, on stderr. The expected block
-and what differs from rung 1 are exactly as in
-`elastic/verification-ladder.md`: ids without `0x`, `Kind: Client`, keys
-still dotted, a `delete`d key gone. Two things are new:
-
-- Three `info Traces|Metrics|Logs` lines per batch, one per signal. A signal
-  whose line never appears is not in a pipeline that has `debug`.
-- `grep -i 'exporting failed' collector.log` must print nothing. If it names
-  `otlp/tempo`, `otlphttp/loki` or `otlphttp/prometheus`, only that store is
-  unreached; the other two may be fine. `collector.md` has the lines.
+Rungs 1 and 2 are the same on every backend and live in
+`backends/ladder-rungs-1-2.md`. Run them first; start here only with the span
+seen at rung 2, or at rung 1 when there is no collector.
 
 ## Rung 3: the stores
 
@@ -134,7 +90,7 @@ empty `result` for the first query with the span in Tempo means the
 `prometheus_remote_storage_samples_failed_total` on Tempo's `/metrics`. An
 empty `result` for the second with the first present means the span was not
 `CLIENT`, had no `peer.service`, or `service-graphs` is off. Under the
-collector-connectors verdict the names are `traces_span_metrics_calls_total`
+`collector connectors` verdict the names are `traces_span_metrics_calls_total`
 and the label `service_name`.
 
 Your own metric, one export interval after the process flushed:

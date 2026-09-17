@@ -172,6 +172,7 @@ if __name__ == "__main__":
 #       child.work   INTERNAL, parent process.run, same trace_id,
 #                    resource of the child process, remote parent
 #
-# In Elastic 8.x the SERVER span and every root become transactions; the
-# waterfall shows both processes in one trace when their clocks agree,
-# see core/concurrency-and-clocks.md.
+# The backend's waterfall shows both processes in one trace when their clocks
+# agree, see core/concurrency-and-clocks.md. What a SERVER span or a root
+# becomes on each backend is in backends/paradigms.md; on Elastic 8.x both
+# become transactions.

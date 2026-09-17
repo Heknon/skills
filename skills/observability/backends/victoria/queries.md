@@ -4,7 +4,7 @@ Stamp: MetricsQL and URL examples for VictoriaMetrics v1.152.0, LogsQL for
 VictoriaLogs v1.52.0, VictoriaTraces v0.11.1 querying docs, read
 2026-09-17. Field names are the ones in `mapping.md`.
 
-Rename before pasting: `sahara.cycle.id`, `sahara.entity.instance.id`,
+Rename before pasting: `sahara.cycle.id`, `sahara.entity.id`,
 `sahara.entity.definition`, `test.nodeid_hash`, the service name
 `sahara-harness`, and every value in angle brackets. Metric labels assume
 `-opentelemetry.usePrometheusNaming`, so they are `sahara_cycle_id`,
@@ -63,13 +63,15 @@ Jaeger search, Explore > Jaeger > Search, `Tags` field:
 `sahara.cycle.id=<cycle id>`. Resource attributes need the prefix:
 `resource_attr:deployment.environment=ci`.
 
-## All operations on one entity instance
+## All operations on one entity
+
+The value is `<environment id>/<entity name>/<generation>`:
 
 ```
-"span_attr:sahara.entity.instance.id":="<instance id>" _time:7d | fields _time, trace_id, name, status_code, duration | sort by (_time)
+"span_attr:sahara.entity.id":="<entity id>" _time:7d | fields _time, trace_id, name, status_code, duration | sort by (_time)
 ```
 
-Add the cycle when instance ids repeat: `AND "span_attr:sahara.cycle.id":="<cycle id>"`.
+Add the cycle when entity ids repeat: `AND "span_attr:sahara.cycle.id":="<cycle id>"`.
 
 ## Find one span by span id
 
@@ -92,8 +94,11 @@ Every stored value is a string here, so a type mistake does not split a
 field. It shows as a value with the wrong shape, or as an unexpected set of
 label values. Check the shape:
 
+The `entity.retry` event's attribute is stored per event index, `mapping.md`;
+`0` is the first event on the span:
+
 ```
-"span_attr:sahara.retry.count":* AND NOT "span_attr:sahara.retry.count":~"^[0-9]+$" _time:24h | fields trace_id, "span_attr:sahara.retry.count"
+"event:event_attr:sahara.retry.attempt:0":* AND NOT "event:event_attr:sahara.retry.attempt:0":~"^[0-9]+$" _time:24h | fields trace_id, "event:event_attr:sahara.retry.attempt:0"
 ```
 
 Check which spellings of a key exist, a dotted and an underscored one at

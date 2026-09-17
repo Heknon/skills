@@ -7,7 +7,7 @@ in `queries-promql.md`.
 
 Rename before pasting: the attribute keys `sahara.cycle.id`,
 `sahara.environment.id`, `sahara.entity.definition`,
-`sahara.entity.instance.id`, `test.nodeid_hash`, the service name
+`sahara.entity.id`, `test.nodeid_hash`, the service name
 `sahara-harness`, and the values in angle brackets. TraceQL uses the key as
 sent, dots and all. LogQL uses the Loki spelling from `mapping.md`,
 underscores, and the same key is a stream label only when it is in the index
@@ -72,22 +72,24 @@ The session root that a test links to, given the session's trace id:
 { link:traceID = "<32 hex characters>" }
 ```
 
-## All operations on one entity instance
+## All operations on one entity
+
+The value is `<environment id>/<entity name>/<generation>`:
 
 ```
-{ span.sahara.entity.instance.id = "<instance id>" && span:kind = client }
+{ span.sahara.entity.id = "<entity id>" && span:kind = client }
 ```
 
-Add the cycle when instance ids repeat across cycles:
+Add the cycle when entity ids repeat across cycles:
 
 ```
-{ span.sahara.entity.instance.id = "<instance id>" && span.sahara.cycle.id = "<cycle id>" }
+{ span.sahara.entity.id = "<entity id>" && span.sahara.cycle.id = "<cycle id>" }
 ```
 
-The tests whose entity operation on that instance failed, structural form:
+The tests whose entity operation on that entity failed, structural form:
 
 ```
-{ trace:rootService = "sahara-harness" } >> { span.sahara.entity.instance.id = "<instance id>" && span:status = error }
+{ trace:rootService = "sahara-harness" } >> { span.sahara.entity.id = "<entity id>" && span:status = error }
 ```
 
 Latency of one operation per definition, p95 over the time range:
@@ -123,10 +125,10 @@ An id that someone sent as a number:
 { span.sahara.cycle.id > 0 }
 ```
 
-A count that someone sent as a string:
+A count that someone sent as a string, on the `entity.retry` event:
 
 ```
-{ span.sahara.retry.count =~ ".+" && span.sahara.retry.count != "" }
+{ event:name = "entity.retry" && event.sahara.retry.attempt =~ ".+" && event.sahara.retry.attempt != "" }
 ```
 
 UNVERIFIED: that a regex comparison skips numeric values rather than
@@ -139,7 +141,7 @@ Attributes that exceeded `distributor.max_attribute_bytes` are truncated,
 not refused. Nothing marks them. Search for a value that ends early:
 
 ```
-{ span.sahara.entity.instance.id =~ ".{2048,}" }
+{ span.sahara.entity.id =~ ".{2048,}" }
 ```
 
 ## Spans that can become a dependency

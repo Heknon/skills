@@ -167,10 +167,14 @@ def shutdown_tracing(provider: TracerProvider, timeout_millis: int = 30000) -> N
 
 if __name__ == "__main__":
     tracer_provider = configure_tracing(
-        service_name="example-service",
+        service_name="sahara-harness",
         service_version="0.0.0",
-        deployment_environment="local",
-        correlation_keys={"cycle.id": "cycle-0001", "environment.id": "environment-a"},
+        deployment_environment="ci",
+        correlation_keys={
+            "sahara.cycle.id": "cycle-0001",
+            "sahara.environment.id": "environment-a",
+            "sahara.worker.id": "gw0",
+        },
     )
     tracer = trace.get_tracer("example.instrumentation")
     with tracer.start_as_current_span("example.run"):
@@ -185,7 +189,11 @@ if __name__ == "__main__":
 #             process.runtime.name, process.runtime.version, process.command,
 #             telemetry.sdk.language, telemetry.sdk.name, telemetry.sdk.version
 # attributes: every key of correlation_keys, as str, on every span,
-#             plus whatever the call site set.
+#             plus whatever the call site set. The keys are the OTel
+#             spelling from vocabulary.md, sahara.cycle.id and so on; the
+#             backend does its own renaming, never this file.
 #
-# In Elastic 8.x: deployment.environment arrives as service.environment;
-# cycle.id arrives as labels.cycle_id; environment.id as labels.environment_id.
+# What the backend stores each key as is in backends/<backend>/mapping.md.
+# On Elastic 8.x: deployment.environment arrives as service.environment;
+# sahara.cycle.id as labels.sahara_cycle_id; sahara.environment.id as
+# labels.sahara_environment_id; sahara.worker.id as labels.sahara_worker_id.

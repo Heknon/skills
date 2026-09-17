@@ -96,7 +96,7 @@ A counter with unit `{poll}` and a histogram with unit `s`:
 
 ```
 sum by (sahara_entity_definition) (rate(sahara_controller_polls_total[5m]))
-histogram_quantile(0.95, sum by (le) (rate(sahara_tests_duration_seconds_bucket[5m])))
+histogram_quantile(0.95, sum by (sahara_entity_definition, le) (rate(sahara_controller_poll_duration_seconds_bucket[5m])))
 ```
 
 Resource attributes are on `target_info`, not on the series. Join by `job`
@@ -112,7 +112,7 @@ Prometheus has no types on labels; the split shows up as two metric names.
 A metric emitted with unit `s` in one process and `ms` in another:
 
 ```
-count by (__name__) ({__name__=~"sahara_tests_duration.*"})
+count by (__name__) ({__name__=~"sahara_controller_poll_duration.*"})
 ```
 
 Two names means two units. Fix the vocabulary. A label emitted as `1` in

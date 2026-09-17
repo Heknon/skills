@@ -52,7 +52,7 @@ it where Elastic uses a different word. Use these words and no synonyms.
 | --- | --- | --- |
 | log record | log document | One line: timestamp, severity, body, attributes, and the span context if inside a span. |
 | body | message | The text of the line; a fixed template, with values in fields. |
-| severity | log.level | `DEBUG`, `INFO`, `WARN`, `ERROR`; Elastic stores the lower case word. |
+| severity | log.level | Shipped as `ERROR`, `WARN`, `INFO`, `DEBUG`; written in the vocabulary's *Level* column as `error, warn, info, debug`; how the backend stores the word is in `backends/<backend>/mapping.md`. |
 | message template | | The fixed sentence a line is grouped by; never contains a value. |
 | field | field | A key and value beside the message; ECS names where they exist. |
 | trace correlation | trace.id, span.id on the line | The log record carrying the span context of the span it was written inside. |
@@ -98,8 +98,12 @@ it where Elastic uses a different word. Use these words and no synonyms.
 | resource attribute | `service.*`, `host.*`, `labels.*` | `resource.*` in TraceQL; `target_info` and `job`/`instance` in Prometheus | `target_info` and labels in VictoriaMetrics |
 | metric label | dimension on a metrics document | Prometheus label, dots to underscores | VictoriaMetrics label |
 | log field | ECS field | stream label or structured metadata in Loki | field in VictoriaLogs |
-| span metrics | made by APM Server, always on | made by Tempo's metrics-generator or the collector's `spanmetrics` connector, must be enabled | made only by the collector's `spanmetrics` connector |
-| dependency view | Dependencies tab and service map | service graph from `servicegraph` connector or metrics-generator | node graph over `servicegraph` series, if any |
+| span metrics | APM Server | Tempo metrics-generator or the collector's `span_metrics` connector | the collector's `span_metrics` connector |
+| dependency view | Dependencies tab and service map | service graph from the `service_graph` connector or metrics-generator | node graph over `service_graph` series, if any |
 | metric to trace | not through exemplars | exemplars in Prometheus, opened in Tempo | exemplars are limited; use the trace id label or time range |
 | trace to logs | `trace.id` on the log document | derived field or `trace_id` structured metadata in Loki | `trace_id` field in VictoriaLogs |
 | trace query | KQL over `traces-apm*` | TraceQL | Jaeger API search or LogsQL over the trace store |
+
+The span metrics and dependency view rows are a summary. Who derives span
+metrics and the service graph, what must be enabled and what it is called is
+the table in `backends/paradigms.md`; that table wins.

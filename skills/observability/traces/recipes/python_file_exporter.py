@@ -1,7 +1,8 @@
 """A SpanExporter that appends one JSON object per span to a file.
 
 The checkers in checks/ read this file. Register it beside the OTLP exporter
-so the same spans go to both, then compare the file with what Kibana shows.
+so the same spans go to both, then compare the file with what the backend
+shows; the stored shape is in backends/<backend>/mapping.md.
 
 Written against the documented API of opentelemetry-sdk 1.2x. Verified
 names: SpanExporter.export(spans) -> SpanExportResult, shutdown(),
@@ -159,8 +160,12 @@ if __name__ == "__main__":
 #   "status": {"code": "ERROR", "description": "RuntimeError: controller refused"},
 #                                                        code is UNSET, OK or ERROR;
 #                                                        description is null unless ERROR
-#   "attributes": {"peer.service": "tank", "entity.id": "tank-7", "cycle.id": "cycle-0001"},
-#                                                        values: str, bool, int, float, or a list of one of those
+#   "attributes": {"peer.service": "tank", "sahara.entity.definition": "tank",
+#                  "sahara.entity.id": "environment-a/tank-7/1",
+#                  "sahara.cycle.id": "cycle-0001", "sahara.environment.id": "environment-a",
+#                  "sahara.worker.id": "gw0", "test.nodeid_hash": "<64 hex>"},
+#                                                        values: str, bool, int, float, or a list of one of those;
+#                                                        keys are the OTel spelling, never the backend's
 #   "resource": {"service.name": "sahara-harness", "service.version": "1.4.0",
 #                "deployment.environment": "ci", "host.name": "runner-3", "process.pid": 4242,
 #                "telemetry.sdk.language": "python", "telemetry.sdk.name": "opentelemetry",

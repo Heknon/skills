@@ -117,9 +117,9 @@ Key rule: every `.` becomes `_`. Nothing else is changed. Examples:
 | `sahara.cycle.id` | `labels.sahara_cycle_id` |
 | `sahara.environment.id` | `labels.sahara_environment_id` |
 | `sahara.entity.definition` | `labels.sahara_entity_definition` |
-| `sahara.entity.instance.id` | `labels.sahara_entity_instance_id` |
+| `sahara.entity.id` | `labels.sahara_entity_id` |
 | `test.nodeid_hash` | `labels.test_nodeid_hash` |
-| `sahara.retry.count`, int | `numeric_labels.sahara_retry_count` |
+| `sahara.retry.attempt`, int, on the `entity.retry` event | `numeric_labels.sahara_retry_attempt` on the event's log document |
 
 `labels.*` is keyword because the last component template of every APM
 index template is `ecs@mappings`, whose dynamic template
@@ -129,10 +129,10 @@ no nested objects.
 
 ## Index behaviors you will meet
 
-- **A key with two types is two fields.** A string `sahara.retry.count` in one
-  span and an int in another do not conflict. They land in
-  `labels.sahara_retry_count` and `numeric_labels.sahara_retry_count`, and a
-  query on one misses the other. This is why the vocabulary fixes the type.
+- **A key with two types is two fields.** A string `sahara.retry.attempt` in
+  one event and an int in another do not conflict. They land in
+  `labels.sahara_retry_attempt` and `numeric_labels.sahara_retry_attempt`, and
+  a query on one misses the other. This is why the vocabulary fixes the type.
 - **Type is fixed by the first document.** Elasticsearch cannot change the
   mapping of an existing field. Inside `labels.*` every field is keyword, so
   this bites only outside `labels.*`: in OTel-native `attributes.*`, and in

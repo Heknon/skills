@@ -38,8 +38,9 @@ quoted, `span."attribute name with space"`. Mixed form is allowed,
 `span.attribute."sub.name"`. `sahara.cycle.id` needs no quotes.
 
 Value types survive: string, int, float, bool. TraceQL compares each with its
-own operators, so `span.sahara.retry.count > 2` works only when the value was
-sent as a number, and `span.sahara.retry.count = "3"` matches only the string.
+own operators, so `event.sahara.retry.attempt > 2` works only when the value
+was sent as a number, and `event.sahara.retry.attempt = "3"` matches only the
+string.
 Invariant 7 holds here too. UNVERIFIED: how array-valued attributes are
 matched in TraceQL.
 
@@ -56,7 +57,8 @@ Domain spellings in Tempo:
 | `sahara.cycle.id` | `span.sahara.cycle.id` |
 | `sahara.environment.id` | `span.sahara.environment.id` |
 | `sahara.entity.definition` | `span.sahara.entity.definition` |
-| `sahara.entity.instance.id` | `span.sahara.entity.instance.id` |
+| `sahara.entity.id` | `span.sahara.entity.id` |
+| `sahara.retry.attempt`, on the `entity.retry` event | `event.sahara.retry.attempt` |
 | `test.nodeid_hash` | `span.test.nodeid_hash` |
 | `peer.service` | `span.peer.service` |
 | `service.name` | `resource.service.name` |
@@ -121,10 +123,10 @@ exporter:
 
 | Rule | Example |
 | --- | --- |
-| characters outside `[a-zA-Z0-9_:]` become `_`, runs of `_` collapse | `sahara.tests.duration` becomes `sahara_tests_duration` |
+| characters outside `[a-zA-Z0-9_:]` become `_`, runs of `_` collapse | `sahara.controller.poll.duration` becomes `sahara_controller_poll_duration` |
 | unit appended as a word | `s` `seconds`, `ms` `milliseconds`, `By` `bytes`, `1` `ratio` on gauges only, `{poll}` dropped, `m/s` `meters_per_second` |
 | monotonic sum gets `_total` unless it already ends in it | `sahara.controller.polls` unit `{poll}` becomes `sahara_controller_polls_total` |
-| histogram becomes `_bucket` with `le`, `_count`, `_sum` | `sahara_tests_duration_seconds_bucket{le="1.024"}` |
+| histogram becomes `_bucket` with `le`, `_count`, `_sum` | `sahara_controller_poll_duration_seconds_bucket{le="1.024"}` |
 | exponential histogram becomes a native histogram | one series, no `_bucket`; needs native histogram ingestion on |
 | summary becomes `_count`, `_sum`, and `quantile` | |
 | attribute key to label: same character rule | `sahara.entity.definition` becomes `sahara_entity_definition` |
@@ -134,7 +136,7 @@ exporter:
 
 Prometheus 3.x strategies: `UnderscoreEscapingWithSuffixes` default,
 `UnderscoreEscapingWithoutSuffixes`, `NoUTF8EscapingWithSuffixes` keeps the
-dots and quotes the name in PromQL as `{"sahara.tests.duration_seconds"}`,
+dots and quotes the name in PromQL as `{"sahara.controller.poll.duration_seconds"}`,
 `NoTranslation` experimental. Mimir: `-distributor.otel-translation-strategy`,
 experimental, plus `-distributor.otel-promote-resource-attributes`,
 `-distributor.otel-keep-identifying-resource-attributes`,
@@ -163,7 +165,8 @@ Domain spellings in Prometheus:
 
 | Vocabulary | Instrument, unit | Prometheus |
 | --- | --- | --- |
-| `sahara.tests.duration` | histogram, `s` | `sahara_tests_duration_seconds_bucket`, `_count`, `_sum` |
+| `sahara.controller.poll.duration` | histogram, `s` | `sahara_controller_poll_duration_seconds_bucket`, `_count`, `_sum` |
+| `sahara.tests.duration` | none, derived | not emitted; the test root span's duration, read from `traces_spanmetrics_latency_bucket` or a TraceQL metrics query, see `screens.md` |
 | `sahara.controller.polls` | counter, `{poll}` | `sahara_controller_polls_total` |
 | `sahara.entities.live` | updowncounter, `{entity}` | `sahara_entities_live` |
 | label `sahara.entity.definition` | | `sahara_entity_definition` |

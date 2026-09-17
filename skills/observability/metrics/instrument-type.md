@@ -1,8 +1,10 @@
 # Instrument type
 
 **Verdict you produce:** one of `counter`, `updowncounter`, `histogram`,
-`gauge`, plus `synchronous` or `observable`, plus the field it becomes in
-Elastic. It goes into the *Metrics* table of `vocabulary.md`.
+`gauge`, as the bare *Instrument* cell of the *Metrics* table in
+`vocabulary.md`, plus `synchronous` or `observable`, which goes in a note
+under the table, never in the cell. The field the metric becomes on the
+backend is in `backends/<backend>/mapping.md`.
 
 Come here only after `core/signal-choice.md` said `metric` and
 `metrics/derived-or-emitted.md` said `emit`. A value that already has a span is
@@ -57,9 +59,9 @@ and yields `Observation(value, attributes)`. Both classes come from
 `Add amount must be non-negative on Counter` and drops it. A histogram refuses
 one the same way.
 
-## What each becomes in Elastic 8.x
+## On Elastic
 
-Every OTLP metric lands in `metrics-apm.app.<service.name>-<namespace>` with
+In 8.x every OTLP metric lands in `metrics-apm.app.<service.name>-<namespace>` with
 `metricset.name: app`. The metric name becomes a top level field of that name.
 Source for these rows: `elastic/apm-data` `input/otlp/metrics.go` and the
 `metrics-apm@pipeline` ingest pipeline.
@@ -78,12 +80,35 @@ and `counts` arrays, one pair per document, not searchable, usable by the
 `values` are the midpoints of your bucket boundaries, so percentile precision
 is exactly your boundaries. See `metrics/units-and-buckets.md`.
 
+## Other backends
+
+Other backends: the verdicts do not change; the stored shape is in
+backends/<backend>/mapping.md and the differences in backends/paradigms.md.
+
 ## Verdict
 
-Write into the *Metrics* table of `vocabulary.md`:
+Write into the *Metrics* table of `vocabulary.md`, the instrument as one bare
+word:
 
 ```
-| <namespace.noun.measure> | <counter, updowncounter, histogram, gauge> <synchronous or observable> | <unit> | <labels> | no |
+| <namespace.noun.measure> | <counter, updowncounter, histogram or gauge> | <unit> | <labels> | no |
+```
+
+For the running example:
+
+```
+| sahara.entities.live | updowncounter | {entity} | sahara.entity.definition | no |
+| sahara.controller.polls | counter | {poll} | sahara.entity.definition, outcome | no |
+| sahara.controller.poll.duration | histogram | s | sahara.entity.definition | no |
+| sahara.worker.queue.depth | gauge | {test} | (none) | no |
+| sahara.tests.duration | none | s | (none) | yes, derived: see backends/<backend>/screens.md |
+```
+
+When question 5 said observable, add one line under the table, after a blank
+line, so the checker does not read it as a row:
+
+```
+observable: sahara.worker.queue.depth
 ```
 
 ## Never
@@ -112,9 +137,9 @@ Write into the *Metrics* table of `vocabulary.md`:
 
 | Value | Verdict | Why |
 | --- | --- | --- |
-| Controller status polls sent | counter, synchronous | only goes up, too frequent for spans |
-| Live entities per definition | updowncounter, synchronous | goes up on create, down on destroy, sums across definitions |
-| Tests still queued on a worker | gauge, observable | a level read from the scheduler, not summable in a useful way per worker |
-| Poll round trip time | histogram | percentiles wanted, no span around a poll |
-| Test duration | none, derived | the test is a transaction; see `metrics/derived-or-emitted.md` |
+| Controller status polls sent, `sahara.controller.polls` | counter, synchronous | only goes up, too frequent for spans |
+| Live entities per definition, `sahara.entities.live` | updowncounter, synchronous | goes up on create, down on destroy, sums across definitions |
+| Tests still queued on this worker, `sahara.worker.queue.depth` | gauge, observable | a level read from the scheduler, not summable in a useful way across workers |
+| Poll round trip time, `sahara.controller.poll.duration` | histogram, synchronous | percentiles wanted, no span around a poll |
+| Test duration, `sahara.tests.duration` | none, derived | the test is a unit of work; see `metrics/derived-or-emitted.md` |
 | Worker heap bytes | gauge, observable | read from the runtime on demand |

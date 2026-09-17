@@ -32,11 +32,12 @@ never exported, or a parent with thousands of children.
    the test that called it. The long lived thing is never the parent of those.
    If the only reason for the span was to be their parent, the verdict is
    `inferred from attributes`.
-5. **Does the backend show links?** Elastic stores links under `span.links`
-   with `trace.id` and `span.id`. UNVERIFIED: whether the Kibana APM span
-   flyout in 8.x surfaces them so a person can click through. Until verified,
-   assume the walk from a unit to the long lived thing goes through the
-   attribute filter, and put the identity key on every span either way.
+5. **Does the backend show links?** Read the links row in
+   `backends/<backend>/mapping.md`. On Elastic they are stored under
+   `span.links` with `trace.id` and `span.id`. UNVERIFIED: whether the Kibana
+   APM span flyout in 8.x surfaces them so a person can click through. Until
+   verified, assume the walk from a unit to the long lived thing goes through
+   the attribute filter, and put the identity key on every span either way.
 
 Yes to 1, 2 and 3: verdict `own linked root span`. Otherwise `inferred from
 attributes`. Both verdicts put the identity key on every span inside.
@@ -49,8 +50,11 @@ attributes`. Both verdicts put the identity key on every span inside.
   `INTERNAL`, opened in the start hook, ended in the end hook. Keep a
   reference to the span object, not to a context manager, so both hooks can
   reach it. End it with `span.end()`.
-- In Elastic a root span becomes a transaction. Give it its own
-  `transaction.type` string so it does not mix with the unit's charts.
+- A root span is what the backend aggregates over, so this one would mix
+  with the unit's charts. No OTLP attribute sets a transaction type. Tell the
+  roots apart with a bounded label attribute from the vocabulary, the same
+  `type` label `core/unit-of-work.md` question 6 uses, and filter the unit's
+  charts by it.
 - Every unit inside it carries `links=[Link(long_lived_span.get_span_context())]`
   and the identity key. The long lived span is never passed as `context=`.
 - Operations that belong to the thing itself, such as environment setup, are
@@ -76,7 +80,8 @@ Write into `vocabulary.md` under *Long lived things*:
 thing: <noun>
 verdict: own linked root span | inferred from attributes
 identity key: <attribute key>, on every span that touches it
-root span name: <name and transaction.type, or none>
+root span name: <name, or none>
+kept apart by: <label attribute key and value from the Span attributes table, or none>
 opened at / closed at: <hook or call pair, or none>
 linked from: <which spans carry a Link to it, or none>
 ```
@@ -103,11 +108,11 @@ linked from: <which spans carry a Link to it, or none>
 
 | Thing | 1 | 2 | 3 | Verdict | Identity key |
 | --- | --- | --- | --- | --- | --- |
-| pytest session on one worker | yes, `pytest_sessionstart` and `pytest_sessionfinish` | yes | yes | own linked root span `session.run`, every test root links to it | `session.id` |
-| Entity shared by many tests | no, created in one fixture, destroyed later or never | no | no | inferred from attributes; `entity.create` and `entity.destroy` are spans under the test that ran them | `entity.id`, with `entity.definition` as label |
-| Environment owned by a worker | yes, session hooks | yes | no, lives for the whole run | inferred from attributes; `environment.setup` and `environment.teardown` are children of `session.run` | `environment.id` |
+| pytest session on one worker | yes, `pytest_sessionstart` and `pytest_sessionfinish` | yes | yes | own linked root span `session.run`, every test root links to it with `link.relation=belongs_to` | `sahara.cycle.id` with `sahara.worker.id` |
+| Entity shared by many tests | no, created in one fixture, destroyed later or never | no | no | inferred from attributes; `entity.create` and `entity.destroy` are spans under the test that ran them | `sahara.entity.id`, with `sahara.entity.definition` as label |
+| Environment owned by a worker | yes, session hooks | yes | no, lives for the whole run | inferred from attributes; `environment.setup` and `environment.teardown` are children of `session.run` | `sahara.environment.id` |
 | Connection pool | yes, `__enter__` and `__exit__` | yes | no | inferred from attributes; `pool.acquire` spans under the unit, `sahara.pool.connections` as an updowncounter | `pool.name` |
-| Cycle across many hosts | no, closed by the orchestrator elsewhere | no | no | inferred from attributes | `cycle.id` |
+| Cycle across many hosts | no, closed by the orchestrator elsewhere | no | no | inferred from attributes | `sahara.cycle.id` |
 
 ## Other backends
 

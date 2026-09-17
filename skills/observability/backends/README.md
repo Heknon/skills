@@ -29,6 +29,9 @@ Elastic: `queries-dsl.md` for Elasticsearch aggregations and
 `elastic-agent.md` for APM Server under Fleet. Grafana: `queries-promql.md`
 and `collector-alloy.md`, the same collector config in Alloy syntax.
 Victoria: `vmagent.md` for relaying, relabeling and stream aggregation.
+Rungs 1 and 2 of every `verification-ladder.md`, the SDK and the collector,
+are backend independent and live once in `ladder-rungs-1-2.md`; each ladder
+points there and starts its own content at rung 3.
 
 ## This installation
 
@@ -36,30 +39,35 @@ Fill this block once and keep it current. A Query or Debug task reads it
 first, then reads the running version again, every time.
 
 ```
-backend folder:          <elastic | grafana | victoria>
+traces:                  <elastic | grafana | victoria> because <one sentence from choosing.md>
+metrics:                 <elastic | grafana | victoria> because <one sentence>
+logs:                    <elastic | grafana | victoria> because <one sentence>
 components and versions: <fill, e.g. Elasticsearch 8.17.3, Kibana 8.17.3, APM integration 8.17.3>
                          <or Grafana 11.6, Tempo 2.7, Loki 3.4, Prometheus 3.2>
                          <or VictoriaMetrics 1.115, VictoriaLogs 1.20, Grafana 11.6>
 collector in the path:   <yes | no>, <otelcol-contrib version | Alloy version>
-span metrics derived by: <APM Server | Tempo metrics-generator | collector spanmetrics connector | nothing>
+span metrics derived by: <APM Server | Tempo metrics-generator | collector connectors | nothing>
+metric temporality:      <cumulative | delta>
 ui url:                  <fill>
 verified on:             <date>
 ```
 
-The `span metrics derived by` line is the one that changes the verdicts in
-`metrics/derived-or-emitted.md`. Get it right before any metrics task.
+The three signal lines are the verdict of `choosing.md`; one folder per
+signal, and the same folder three times is the common case. The
+`span metrics derived by` line is the one that changes the verdicts in
+`metrics/derived-or-emitted.md`, and its four values are spelled exactly as
+above wherever the skill quotes them: `APM Server`, `Tempo metrics-generator`,
+`collector connectors`, `nothing`. Get it right before any metrics task. The
+`metric temporality` line is the `temporality` argument of `configure_metrics`
+in `metrics/recipes/python_meter_setup.py`: `cumulative` for Prometheus,
+Mimir and VictoriaMetrics, `delta` for Elastic APM Server.
 
 ## How to read the running version
 
-Each `overview.md` has a table with one row per component, the endpoint or
-command, and the field to read. For Elastic, the short form:
-
-| Component | Command or place | Field to read |
-| --- | --- | --- |
-| Elasticsearch | `GET /` against the Elasticsearch URL | `version.number` |
-| Kibana | `GET /api/status` against the Kibana URL | `version.number` |
-| APM Server, standalone | `apm-server version` | the printed version |
-| APM Server, under Elastic Agent | `elastic-agent version`, and Kibana **Integrations > Installed integrations > Elastic APM > Settings** | the agent version and the integration version |
+Each `overview.md` has a section *How to read the running version* with one
+row per component, the endpoint or command, and the field to read:
+`elastic/overview.md`, `grafana/overview.md`, `victoria/overview.md`. Read it
+before the file you are about to use.
 
 ## The version-stamp rule
 

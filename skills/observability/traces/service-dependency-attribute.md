@@ -6,10 +6,12 @@ in the vocabulary's `Correlation keys`. A dependency gets a `peer.service`
 value, or a `db.system` or `messaging.system` value, in the `Destination
 attribute` column of `Spans`. An attribute gets a row in `Span attributes`.
 
-Kibana has a node on the service map and a row in Dependencies for every
-distinct destination value that arrives. Nothing is registered anywhere. So
-the values that reach those two fields decide what the screen looks like, and
-an unbounded value there is a screen with ten thousand nodes.
+The backend draws a node on its service map and a row on its dependencies
+screen for every distinct destination value that arrives. Nothing is
+registered anywhere. So the values that reach the destination field decide
+what the screen looks like, and an unbounded value there is a screen with ten
+thousand nodes. Which stored field that is, per backend, is in
+`backends/<backend>/mapping.md`.
 
 ## Questions
 
@@ -33,10 +35,10 @@ an unbounded value there is a screen with ten thousand nodes.
    Put the name in a span attribute on an exit span whose `peer.service` is
    the *kind* of thing, not the instance.
 4. **Is the thing you decided is a dependency also a service?** Both can be
-   true. The caller's exit span gives it a Dependencies row and a diamond
-   from that caller's side; its own telemetry gives it a service node; the
+   true. The caller's exit span gives it a dependencies row and a node from
+   that caller's side; its own telemetry gives it a service node; the
    `traceparent` header joins the two so the map draws one edge to the
-   service node instead of a dangling diamond. Keep `peer.service` equal to
+   service node instead of a dangling node. Keep `peer.service` equal to
    the callee's `service.name` so they join.
 
 ## Verdict
@@ -44,18 +46,19 @@ an unbounded value there is a screen with ten thousand nodes.
 Write into `vocabulary.md`, `Spans` table:
 
 ```
-| <noun.verb> | CLIENT | no | <keys> | peer.service=<allowed values> |
+| <noun.verb> | CLIENT | no | <attribute keys> | peer.service | <what a failed call looks like on this span> |
 ```
 
-or `Correlation keys`:
+with the allowed values of `peer.service` as a `label` row in
+`Span attributes`, or for a service, `Correlation keys`:
 
 ```
 | service.name | string | resource | service.name | <fixed value for this process> |
 ```
 
-## What Elastic does with the fields, APM Server 8.x
+## On Elastic
 
-From `elastic/apm-data`, `input/otlp/traces.go`:
+APM Server 8.x, from `elastic/apm-data`, `input/otlp/traces.go`:
 
 - `SpanKind.SERVER`, `SpanKind.CONSUMER`, or any root span becomes a
   **transaction**. Any other kind becomes a **span**.
@@ -74,6 +77,11 @@ From `elastic/apm-data`, `input/otlp/traces.go`:
   `span.destination.service.resource`. APM Server rolls up metrics per
   distinct value of that field. Each distinct value is one node.
 - Attributes that map to none of these are `labels.*`, dots to underscores.
+
+## Other backends
+
+Other backends: the verdicts do not change; the stored shape is in
+backends/<backend>/mapping.md and the differences in backends/paradigms.md.
 
 ## Never
 
@@ -107,17 +115,8 @@ From `elastic/apm-data`, `input/otlp/traces.go`:
 | --- | --- | --- |
 | The pytest worker process | service | `service.name=sahara-harness` |
 | An entity definition, such as `tank` | dependency | `entity.create`, `CLIENT`, `peer.service=tank` |
-| An entity instance `tank-7` | attribute | `entity.id=tank-7` on the `entity.create` span |
+| An entity instance `tank-7` in environment `environment-3` | attribute | `sahara.entity.id=environment-3/tank-7/1` on the `entity.create` span |
 | The result store behind the harness, if it is Postgres | dependency | `db.system=postgresql`, `server.address=<host>` |
-| The APM Server itself | neither, it is the pipeline | do not instrument the exporter |
-| A customer-named controller method | attribute | `entity.operation=<method name>` on a span named `entity.call` |
+| The APM Server, Tempo or VictoriaTraces itself | neither, it is the pipeline | do not instrument the exporter |
+| A customer-named controller method | attribute | `sahara.entity.controller.method=<method name>` on the `entity.controller` span, whose `sahara.entity.operation` label is `controller` |
 | A second instrumented service the harness calls over HTTP | service and dependency | its own `service.name=sahara-api`; the caller's `peer.service=sahara-api` |
-
-## Other backends
-
-The section above is Elastic. For the Grafana stack read
-`backends/grafana/mapping.md` and `backends/grafana/screens.md`; for the
-Victoria stack read `backends/victoria/mapping.md` and
-`backends/victoria/screens.md`. The verdicts of this procedure do not
-change between them. What changes is which component draws the result and
-what the stored key looks like.

@@ -1,13 +1,15 @@
 # Metrics
 
 Procedures and recipes for the `metric` verdict from `core/signal-choice.md`.
-Target: opentelemetry-python 1.2x sending OTLP to Elastic Stack 8.x APM Server.
+Target: opentelemetry-python 1.2x sending OTLP to whichever backend
+`backends/README.md` names. The procedures are backend neutral; each ends with
+pointers into `backends/<backend>/mapping.md` for the stored shape.
 
 ## Files
 
 | File | Answers |
 | --- | --- |
-| `derived-or-emitted.md` | does Elastic already compute this from spans |
+| `derived-or-emitted.md` | does the backend already compute this from spans |
 | `instrument-type.md` | counter, updowncounter, histogram or gauge; synchronous or observable |
 | `labels.md` | which attributes may become metric labels, and how many series that makes |
 | `units-and-buckets.md` | UCUM unit, histogram boundaries, temporality |

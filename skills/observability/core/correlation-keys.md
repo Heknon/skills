@@ -51,15 +51,21 @@ one.
 
 ## Verdict
 
-Write into `vocabulary.md`:
+Write into the *Correlation keys* table of `vocabulary.md`, one row per key.
+The *Where* cell is exactly one of `resource`, `every span`,
+`every span except <names>`, `every log`, `every log inside a span`, or a span
+clause and a log clause joined by a comma. `trace.id` and `span.id` get no
+row; `logs/trace-correlation.md` injects them. A key that also passed
+`metrics/labels.md` appears again in the *Labels* column of the *Metrics*
+table, not here.
 
 ```
-correlation keys:
-  resource:   service.name=<value rule>, service.version=<rule>, deployment.environment=<rule>
-  every span: <key>=<type>, ...
-  every log:  <key>=<type>, ... plus trace.id and span.id when inside a span
-  metric labels drawn from these: <keys that passed metrics/labels.md>
+| <key> | string | <resource | every span | every span except <names> | every log | every log inside a span | <span clause>, <log clause>> | <stored spelling per backends/<backend>/mapping.md> | <value rule> |
 ```
+
+For the running example the rows are `sahara.cycle.id`, `sahara.environment.id`
+and `sahara.worker.id` with *Where* `every span, every log`, and
+`test.nodeid_hash` with *Where* `every span except session.run, every log inside a span`.
 
 ## How they get onto everything
 

@@ -9,8 +9,9 @@ v1.52.0 and VictoriaTraces v0.11.1 collector pages, read 2026-09-17.
 `config.yaml`, plus one line per processor that touches attributes and one
 line per connector, copied into the vocabulary. Write it under *Correlation
 keys* as `collector: <path or none>` and under *Metrics* as
-`derived by: span_metrics, service_graph` for every row those connectors
-cover.
+`derived by: collector connectors` for every row those connectors cover, the
+same value as `span metrics derived by` in `backends/README.md`; on this
+stack it is `collector connectors` or `nothing`, never the other two.
 
 ## What the collector changes and what it does not
 

@@ -50,8 +50,8 @@ Two measurements, because one moment cannot see both cases.
 - **Open:** an **observable gauge** whose callback runs at every export
   interval, walks the registry of things currently open, and reports per
   process:
-  - `<noun>.open.count`, how many are open now,
-  - `<noun>.open.age.max`, seconds since the oldest one started.
+  - `<namespace>.<noun>.open.count`, how many are open now,
+  - `<namespace>.<noun>.open.age.max`, seconds since the oldest one started.
   Both combine across processes: sum the counts, take the max of the maxima.
   Never report a percentile from the callback; percentiles do not combine.
   Never put the instance id on the gauge; the max and the count say which
@@ -97,14 +97,23 @@ answers nothing.
 
 ## Verdict
 
-Write into `vocabulary.md`:
+Two rows. One into the *Metrics* table of `vocabulary.md`, with a bare
+instrument word, `none` when the backend derives it:
 
 ```
-| <name> | <instrument> | <unit> | <labels> | <derived? no, or the screen> |
-question: <the sentence from step 1>   pattern: <pattern name>
-recorded: <the moment, e.g. "at close" or "callback each interval">
-combine across processes: <sum, max, or per process>
+| <namespace.noun.measure> | <counter, updowncounter, histogram, gauge, or none> | <UCUM unit> | <labels from the label tier, or (none)> | <no, or "yes, derived: see backends/<backend>/screens.md"> |
 ```
+
+And one into the *Changes* table, so the question survives. Never prose lines
+after a table row; the checker reads the table and stops at the first line
+that is not a row:
+
+```
+| <date> | <who> | <metric>: question "<sentence from step 1>", pattern <pattern name>, recorded <moment, e.g. at close, or callback each interval>, combine <sum|max|per process> |
+```
+
+An observable instrument is still `gauge` in the cell; name it on the
+`observable instruments:` line under the table.
 
 ## Never
 
@@ -125,8 +134,8 @@ combine across processes: <sum, max, or per process>
 
 | Question | Pattern | Measurement |
 | --- | --- | --- |
-| p95 of environment duration | Duration that may never end | histogram `environment.duration` at close, gauge `environment.open.age.max` and `environment.open.count` |
-| How many entities exist right now | Level | up down counter `entity.open.count` labelled by definition |
+| p95 of environment duration | Duration that may never end | histogram `sahara.environment.duration` in `s` at close with label `outcome` in `completed, abandoned`; observable gauges `sahara.environment.open.count` in `{environment}` and `sahara.environment.open.age.max` in `s` |
+| How many entities exist right now | Level | up down counter `sahara.entities.live` in `{entity}` labelled by `sahara.entity.definition` |
 | Tests per minute | Rate | derived from test root spans |
-| Did the nightly cycle run | Absence | counter `cycle.completed` plus a no-data alert |
+| Did the nightly cycle run | Absence | counter `sahara.cycle.completed` plus a no-data alert |
 | Why was this test slow | none, a trace question | open the test's trace |

@@ -24,6 +24,15 @@ across that line.
 | The double counting trap | emit no latency histogram of a spanned thing | generator and connector both on | connector twice, once per pipeline |
 | Where it is written | `elastic/overview.md`, `metrics/derived-or-emitted.md` | `grafana/overview.md`, `grafana/collector.md` | `victoria/overview.md`, `victoria/collector.md` |
 
+This table is the one place the skill spells out who derives span metrics;
+`metrics/derived-or-emitted.md`, `choosing.md` and `glossary.md` summarise it
+and point here. The row's value for the `span metrics derived by` line of
+`backends/README.md` is `APM Server`, `Tempo metrics-generator`,
+`collector connectors` or `nothing`. The connectors are `span_metrics` and
+`service_graph` in current collector contrib; `spanmetrics` and
+`servicegraph` are their deprecated aliases, which an older binary still
+requires and a newer one still accepts.
+
 Consequence for the verdicts: on Elastic the answer to "should I emit request
 latency" is always `derived`. On the other two it is `derived` only after
 someone enabled the component, and `stop and ask` before that.
@@ -44,7 +53,7 @@ a root kind it must change with a person's agreement.
 
 | | Elastic | Grafana stack | Victoria stack |
 | --- | --- | --- | --- |
-| On a span | non-ECS keys go under `labels.*`, dots to underscores; numbers under `numeric_labels.*` | Tempo keeps the key as sent; query it as `span."sahara.cycle.id"` | VictoriaTraces keeps it under `span_attr:` prefixes |
+| On a span | non-ECS keys go under `labels.*`, dots to underscores; numbers under `numeric_labels.*` | Tempo keeps the key as sent; query it as `span.sahara.cycle.id`, no quotes | VictoriaTraces keeps it under `span_attr:` prefixes |
 | On a metric | a field on the metrics document | Prometheus rewrites to `sahara_cycle_id`, appends the unit and `_total` per `translation_strategy` | kept as sent by default; `-opentelemetry.usePrometheusNaming` switches to the Prometheus spelling |
 | On a log line | ECS field or `labels.*` | Loki: a few keys become stream labels with dots to underscores, the rest structured metadata | VictoriaLogs keeps the key; resource attributes become stream fields |
 | Type mixing | splits into `labels.*` and `numeric_labels.*` silently | Prometheus labels are strings; Tempo keeps the type per span | labels are strings; VictoriaLogs stringifies |

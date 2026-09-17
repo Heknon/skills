@@ -37,14 +37,14 @@ numbers are exact. Compare across lanes and the numbers are NTP plus wishes.
 **Lane.** A lane is `host.name` plus `process.pid`, set once as resource
 attributes. The logical name of the worker, `PYTEST_XDIST_WORKER` such as
 `gw2`, goes on every span as the span attribute the vocabulary names, such as
-`worker.id`, because a pid is not stable across runs and a person filters by
-the name. `worker.id` is bounded by the worker count, so it may be a metric
-label; see `metrics/labels.md`.
+`sahara.worker.id`, because a pid is not stable across runs and a person
+filters by the name. `sahara.worker.id` is bounded by the worker count, so it
+may be a metric label; see `metrics/labels.md`.
 
 **Host metrics.** One emitter per host. Either the collector's `hostmetrics`
 receiver on that host, or one designated process. Never each worker. If each
 worker must report, report the worker's own use, such as its RSS, under a
-metric whose name says so, with `worker.id` as a label.
+metric whose name says so, with `sahara.worker.id` as a label.
 
 **Durations.** A span's duration is `end_time - start_time` on the process
 that owns it. It is correct as long as that host's clock did not step during
@@ -52,7 +52,7 @@ the span. A negative or absurd duration means the clock stepped. Check the
 host with `timedatectl` or `chronyc tracking` before blaming the code.
 
 **Starts.** A start time is a wall clock reading and is comparable to another
-start time only inside the same lane. The waterfall in Kibana orders spans by
+start time only inside the same lane. The backend's waterfall orders spans by
 timestamp. A child drawn before its parent, or a gap that is exactly the
 clock offset, is the observable symptom of skew across lanes. Fix the clock.
 Do not adjust the timestamps in code.
@@ -76,7 +76,7 @@ Write into `vocabulary.md` under *Lanes and time*:
 
 ```
 lane: host.name + process.pid, resource attributes
-worker key: <span attribute key, e.g. worker.id> = <value rule, e.g. PYTEST_XDIST_WORKER>
+worker key: <span attribute key, e.g. sahara.worker.id> = <value rule, e.g. PYTEST_XDIST_WORKER>
 host metrics emitted by: <collector hostmetrics receiver on each host | the process named here>
 clock source: <ntp or chrony, and the command that shows it>
 compare timestamps: within one lane only; across lanes by structure
@@ -93,7 +93,8 @@ cross process spans: none; hand offs are two spans joined by a Link and <key>
 - Never pass `start_time=` or `end_time=` taken from another process into
   `start_span` or `end()`.
 - Never put `process.pid` or `host.name` in a span name or a metric label
-  that is meant to be compared across runs. `worker.id` is the stable one.
+  that is meant to be compared across runs. `sahara.worker.id` is the stable
+  one.
 - Never adjust timestamps in code to hide skew.
 
 ## Stop and ask
@@ -109,9 +110,9 @@ cross process spans: none; hand offs are two spans joined by a Link and <key>
 
 | Situation | Rule | What to write |
 | --- | --- | --- |
-| Four xdist workers on one host | lane per worker, one host emitter | `worker.id=gw0..gw3` on every span; `hostmetrics` receiver once |
-| Workers on eight hosts in one cycle | compare within a lane | cycle duration by query on `cycle.id`, read with skew caveat |
+| Four xdist workers on one host | lane per worker, one host emitter | `sahara.worker.id=gw0..gw3` on every span; `hostmetrics` receiver once |
+| Workers on eight hosts in one cycle | compare within a lane | cycle duration by query on `sahara.cycle.id`, read with skew caveat |
 | Each worker emits `system.memory.usage` | host metric per worker, forbidden | move to the collector; keep `sahara.worker.rss` per worker if needed |
 | Test span shows `-3ms` duration | clock stepped | `chronyc tracking` on that host; no code change |
-| Orchestrator opens the cycle span, worker should close it | cross process span, forbidden | orchestrator span `cycle.dispatch`; each session root links to it; `cycle.id` on both |
+| Orchestrator opens the cycle span, worker should close it | cross process span, forbidden | orchestrator span `cycle.dispatch`; each session root links to it; `sahara.cycle.id` on both |
 | Child span starts 2s before its parent in the waterfall | skew across lanes | check the two hosts' offsets; order by structure |
