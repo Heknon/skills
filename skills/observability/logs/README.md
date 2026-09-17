@@ -10,7 +10,7 @@ OTLP through APM Server.
 | File | Answers |
 | --- | --- |
 | `log-or-span-event.md` | is this moment a log line at all, or a span event |
-| `levels.md` | `ERROR`, `WARNING`, `INFO` or `DEBUG`, and what to do with exceptions |
+| `levels.md` | `ERROR`, `WARN`, `INFO` or `DEBUG`, and what to do with exceptions |
 | `structure.md` | the message template, the ECS field names, JSON to stdout or a file |
 | `trace-correlation.md` | how `trace.id`, `span.id` and the run level keys get onto every line |
 | `recipes/python_logging_setup.py` | `configure_logging(...)` for JSON lines and `configure_logging_otlp(...)` for OTLP |

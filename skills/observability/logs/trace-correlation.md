@@ -83,9 +83,9 @@ What Elastic 8.x APM Server does with it, from `elastic/apm-data`
 | `exception.type`, `exception.message`, `exception.stacktrace` | `error.exception.*`, and the record becomes an error document in `logs-apm.error-<namespace>` with `event.type: error` |
 | everything else | `logs-apm.app.<service.name>-<namespace>` |
 
-Limits in 8.x: Elastic marks OTLP logs intake "technical preview", and "The
-application logs data stream (`app_logs`) has dynamic mapping disabled", so
-a field that is not `labels.*`, `numeric_labels.*` or a mapped ECS field is
+Limits in 8.x: Elastic marks OTLP logs intake "technical preview", and
+states that the `app_logs` data stream "has dynamic mapping disabled", so a
+field that is not `labels.*`, `numeric_labels.*` or a mapped ECS field is
 stored but not searchable. Keep custom fields under `labels.` by sending
 them as attributes.
 
