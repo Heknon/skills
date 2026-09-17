@@ -1,0 +1,155 @@
+{
+  "resourceMetrics": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "sahara-harness"
+            }
+          },
+          {
+            "key": "service.version",
+            "value": {
+              "stringValue": "1.4.0"
+            }
+          },
+          {
+            "key": "deployment.environment",
+            "value": {
+              "stringValue": "ci"
+            }
+          }
+        ]
+      },
+      "scopeMetrics": [
+        {
+          "scope": {
+            "name": "sahara.harness",
+            "version": "1.4.0"
+          },
+          "metrics": [
+            {
+              "name": "sahara.tests.duration",
+              "description": "",
+              "unit": "s",
+              "histogram": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "test.outcome",
+                        "value": {
+                          "stringValue": "passed"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1789603200000000000",
+                    "timeUnixNano": "1789603260000000000",
+                    "count": "3",
+                    "sum": 1.9,
+                    "bucketCounts": [
+                      "0",
+                      "2",
+                      "1",
+                      "0"
+                    ],
+                    "explicitBounds": [
+                      0.1,
+                      1.0,
+                      5.0
+                    ],
+                    "min": 0.4,
+                    "max": 0.9
+                  }
+                ],
+                "aggregationTemporality": 2
+              }
+            },
+            {
+              "name": "sahara.entity.operations",
+              "description": "",
+              "unit": "",
+              "sum": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "sahara.cycle.id",
+                        "value": {
+                          "stringValue": "cycle-2026-09-17-0007"
+                        }
+                      },
+                      {
+                        "key": "sahara.entity.id",
+                        "value": {
+                          "stringValue": "tank-00123456"
+                        }
+                      },
+                      {
+                        "key": "sahara.entity.definition",
+                        "value": {
+                          "stringValue": "boiler"
+                        }
+                      }
+                    ],
+                    "timeUnixNano": "1789603260000000000",
+                    "startTimeUnixNano": "1789603200000000000",
+                    "asInt": "5"
+                  }
+                ],
+                "aggregationTemporality": 2,
+                "isMonotonic": true
+              }
+            },
+            {
+              "name": "sahara.environment.entities",
+              "description": "",
+              "unit": "{entity}",
+              "sum": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "sahara.entity.definition",
+                        "value": {
+                          "stringValue": "tank"
+                        }
+                      },
+                      {
+                        "key": "sahara.worker.id",
+                        "value": {
+                          "stringValue": "gw0"
+                        }
+                      }
+                    ],
+                    "timeUnixNano": "1789603260000000000",
+                    "startTimeUnixNano": "1789603200000000000",
+                    "asInt": "3"
+                  }
+                ],
+                "aggregationTemporality": 2,
+                "isMonotonic": true
+              }
+            },
+            {
+              "name": "sahara.worker.heap",
+              "description": "",
+              "unit": "MiBy",
+              "gauge": {
+                "dataPoints": [
+                  {
+                    "attributes": [],
+                    "timeUnixNano": "1789603260000000000",
+                    "asDouble": 700.0
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

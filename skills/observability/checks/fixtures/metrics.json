@@ -1,0 +1,106 @@
+{
+  "resourceMetrics": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "sahara-harness"
+            }
+          },
+          {
+            "key": "service.version",
+            "value": {
+              "stringValue": "1.4.0"
+            }
+          },
+          {
+            "key": "deployment.environment",
+            "value": {
+              "stringValue": "ci"
+            }
+          }
+        ]
+      },
+      "scopeMetrics": [
+        {
+          "scope": {
+            "name": "sahara.harness",
+            "version": "1.4.0"
+          },
+          "metrics": [
+            {
+              "name": "sahara.environment.entities",
+              "description": "entities alive in the environment",
+              "unit": "{entity}",
+              "sum": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "sahara.entity.definition",
+                        "value": {
+                          "stringValue": "tank"
+                        }
+                      }
+                    ],
+                    "timeUnixNano": "1789603260000000000",
+                    "startTimeUnixNano": "1789603200000000000",
+                    "asInt": "3"
+                  },
+                  {
+                    "attributes": [
+                      {
+                        "key": "sahara.entity.definition",
+                        "value": {
+                          "stringValue": "valve"
+                        }
+                      }
+                    ],
+                    "timeUnixNano": "1789603260000000000",
+                    "startTimeUnixNano": "1789603200000000000",
+                    "asInt": "1"
+                  }
+                ],
+                "aggregationTemporality": 2,
+                "isMonotonic": false
+              }
+            },
+            {
+              "name": "sahara.worker.heap",
+              "description": "worker heap in use",
+              "unit": "By",
+              "gauge": {
+                "dataPoints": [
+                  {
+                    "attributes": [],
+                    "timeUnixNano": "1789603260000000000",
+                    "asInt": "734003200"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "sahara.cycle.tests.pending",
+              "description": "",
+              "unit": "{test}",
+              "sum": {
+                "dataPoints": [
+                  {
+                    "attributes": [],
+                    "timeUnixNano": "1789603260000000000",
+                    "startTimeUnixNano": "1789603200000000000",
+                    "asInt": "12"
+                  }
+                ],
+                "aggregationTemporality": 2,
+                "isMonotonic": false
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

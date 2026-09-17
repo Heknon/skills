@@ -1,0 +1,122 @@
+{
+    "resource_metrics": [
+        {
+            "resource": {
+                "attributes": {
+                    "service.name": "sahara-harness"
+                },
+                "schema_url": ""
+            },
+            "scope_metrics": [
+                {
+                    "scope": {
+                        "name": "sahara.harness",
+                        "version": "1.4.0",
+                        "schema_url": ""
+                    },
+                    "metrics": [
+                        {
+                            "name": "sahara.environment.entities",
+                            "description": "",
+                            "unit": "{entity}",
+                            "data": {
+                                "data_points": [
+                                    {
+                                        "attributes": {
+                                            "sahara.entity.definition": "tank"
+                                        },
+                                        "start_time_unix_nano": 1789603200000000000,
+                                        "time_unix_nano": 1789603260000000000,
+                                        "value": 3,
+                                        "exemplars": []
+                                    }
+                                ],
+                                "aggregation_temporality": 2,
+                                "is_monotonic": false
+                            }
+                        },
+                        {
+                            "name": "sahara.worker.heap",
+                            "description": "",
+                            "unit": "By",
+                            "data": {
+                                "data_points": [
+                                    {
+                                        "attributes": {},
+                                        "start_time_unix_nano": null,
+                                        "time_unix_nano": 1789603260000000000,
+                                        "value": 734003200,
+                                        "exemplars": []
+                                    }
+                                ]
+                            }
+                        }
+                    ],
+                    "schema_url": ""
+                }
+            ],
+            "schema_url": ""
+        }
+    ]
+}
+{
+    "resource_metrics": [
+        {
+            "resource": {
+                "attributes": {
+                    "service.name": "sahara-harness"
+                },
+                "schema_url": ""
+            },
+            "scope_metrics": [
+                {
+                    "scope": {
+                        "name": "sahara.harness",
+                        "version": "1.4.0",
+                        "schema_url": ""
+                    },
+                    "metrics": [
+                        {
+                            "name": "sahara.environment.entities",
+                            "description": "",
+                            "unit": "{entity}",
+                            "data": {
+                                "data_points": [
+                                    {
+                                        "attributes": {
+                                            "sahara.entity.definition": "tank"
+                                        },
+                                        "start_time_unix_nano": 1789603200000000000,
+                                        "time_unix_nano": 1789603260000000000,
+                                        "value": 3,
+                                        "exemplars": []
+                                    }
+                                ],
+                                "aggregation_temporality": 2,
+                                "is_monotonic": false
+                            }
+                        },
+                        {
+                            "name": "sahara.worker.heap",
+                            "description": "",
+                            "unit": "By",
+                            "data": {
+                                "data_points": [
+                                    {
+                                        "attributes": {},
+                                        "start_time_unix_nano": null,
+                                        "time_unix_nano": 1789603260000000000,
+                                        "value": 734003200,
+                                        "exemplars": []
+                                    }
+                                ]
+                            }
+                        }
+                    ],
+                    "schema_url": ""
+                }
+            ],
+            "schema_url": ""
+        }
+    ]
+}
