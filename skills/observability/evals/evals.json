@@ -129,5 +129,47 @@
         "Writes the verdict block per signal with one sentence each"
       ]
     }
+  ],
+  "runs": [
+    {
+      "date": "2026-09-17",
+      "model": "claude-haiku-4-5 as a stand-in for a small offline model",
+      "setup": "each scenario as a fresh agent with only the skill folder readable, no web; answers graded by hand against the expectations",
+      "before_answer_template": {
+        "pass": [
+          1,
+          2,
+          3,
+          6,
+          7
+        ],
+        "partial": [
+          0,
+          8
+        ],
+        "fail": [
+          5
+        ],
+        "contaminated": [
+          4
+        ],
+        "notes": "5 invented a span name under 'just pick a good name'; 0 narrated instead of writing the verdict block and called each xdist worker a service; 8 wrote flags and connector keys from memory; 4 read this evals file to learn the expected shape"
+      },
+      "after_answer_template": {
+        "rerun": [
+          0,
+          5,
+          8
+        ],
+        "pass": [
+          0,
+          5
+        ],
+        "partial": [
+          8
+        ],
+        "notes": "0 writes the verdict block with instance key and outer root; 5 stops and asks with one candidate row; 8 uses the real retention flag from victoria/overview.md but drops traces entirely, reading 'which job' as a metrics label question"
+      }
+    }
   ]
 }
