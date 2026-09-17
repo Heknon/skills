@@ -52,10 +52,13 @@ DURATION_BOUNDARIES_SECONDS = (
 ```
 
 Sixteen boundaries make seventeen buckets. Add a boundary at every threshold
-you will alert on, because Elastic reports a percentile as the midpoint of the
-bucket that contains it. Source: `histogramSample` in `elastic/apm-data`
-`input/otlp/metrics.go`: the first bucket is reported at half its upper
-bound, the last at its lower bound, every other at its midpoint.
+you will alert on, because a backend that stores explicit buckets can place a
+percentile no more precisely than the bucket that contains it. On Elastic the
+percentile is reported at the bucket's midpoint. Source: `histogramSample` in
+`elastic/apm-data` `input/otlp/metrics.go`: the first bucket is reported at
+half its upper bound, the last at its lower bound, every other at its
+midpoint. Prometheus style stores interpolate inside the bucket instead; the
+boundary is still the precision.
 
 Install them with a View. `opentelemetry-python` 1.2x:
 
@@ -79,22 +82,30 @@ the setup recipe next to the vocabulary, not at a call site.
 
 ## Temporality
 
-Elastic documents: "Ingestion of OpenTelemetry metrics with the type Histogram
-is only supported with delta temporality" and "Histograms with cumulative
-temporality are dropped before being ingested into Elasticsearch." The SDK
-default is cumulative. Set one of these, once, in the setup recipe:
+Temporality is the `temporality=` argument of `configure_metrics(...)` in
+`recipes/python_meter_setup.py`, one of `cumulative` or `delta`. Which one
+this installation wants is the `metric temporality` line of the installation
+block in `backends/README.md`; read it, do not guess.
 
-- `OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta`, which the OTLP
-  exporter reads and turns into delta for `Counter`, `ObservableCounter` and
-  `Histogram`, cumulative for `UpDownCounter`, `ObservableUpDownCounter` and
-  `ObservableGauge`.
-- or `OTLPMetricExporter(preferred_temporality={Histogram: AggregationTemporality.DELTA, ...})`
-  with the same table, which `recipes/python_meter_setup.py` does.
+- `cumulative`, the default of the SDK and of the recipe. Prometheus, Mimir
+  and VictoriaMetrics want it: a cumulative series survives a lost scrape or
+  a lost export, and `rate()` is defined over it.
+- `delta`. Elastic APM Server needs it, stated in
+  `backends/elastic/overview.md`. Elastic documents: "Ingestion of
+  OpenTelemetry metrics with the type Histogram is only supported with delta
+  temporality" and "Histograms with cumulative temporality are dropped
+  before being ingested into Elasticsearch."
+
+Passing `temporality="delta"` builds the same table the OTLP exporter builds
+for `OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta`: delta for
+`Counter`, `ObservableCounter` and `Histogram`, cumulative for
+`UpDownCounter`, `ObservableUpDownCounter` and `ObservableGauge`. Setting it
+in code means the environment cannot silently turn it back.
 
 UNVERIFIED: that a self managed 8.x APM Server drops a cumulative histogram
 rather than storing its growing counts. `metrics.go` on `main` has no
-temporality check. Either way delta is the setting that works. If a
-collector sits in between and the SDK cannot be changed, the
+temporality check. Either way delta is the setting that works on Elastic. If
+a collector sits in between and the SDK cannot be changed, the
 `cumulativetodelta` processor converts "monotonic sum, histogram, and
 exponential histogram metrics from cumulative to delta".
 
@@ -119,10 +130,17 @@ a self managed 9.x APM Server.
 
 ## Verdict
 
+The *Metrics* table row:
+
 ```
-| sahara.controller.poll.duration | histogram synchronous | s | entity.definition | no |
+| sahara.controller.poll.duration | histogram | s | sahara.entity.definition | no |
+```
+
+and, in the `## Volume` section of `vocabulary.md`:
+
+```
 histogram boundaries: sahara.controller.poll.duration = DURATION_BOUNDARIES_SECONDS
-temporality: delta for histograms and counters, set in python_meter_setup.py
+temporality: <cumulative | delta>, from the metric temporality line of backends/README.md, passed to configure_metrics
 ```
 
 ## Never
@@ -132,7 +150,9 @@ temporality: delta for histograms and counters, set in python_meter_setup.py
 - Never ship a histogram with the default boundaries.
 - Never change boundaries without a vocabulary change. Documents before and
   after do not merge into one percentile.
-- Never leave the temporality at the default when the backend is Elastic.
+- Never leave the temporality unstated. It is one line in `backends/README.md`
+  and one argument to `configure_metrics`; on Elastic the default
+  `cumulative` drops every histogram.
 
 ## Stop and ask
 
