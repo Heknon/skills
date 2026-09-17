@@ -100,6 +100,20 @@
         "States that a span alone cannot answer it because a span that never ends is never exported",
         "Writes the verdict rows in the vocabulary format"
       ]
+    },
+    {
+      "id": 7,
+      "name": "same-question-other-paradigm",
+      "prompt": "We moved from Elastic to Grafana with Tempo, Loki and Prometheus. Our entity.create spans still have peer.service set. Where is the dependencies view now, and do we need to emit latency metrics ourselves?",
+      "expected_output": "Uses backends/README.md, backends/paradigms.md and backends/grafana/: on the Grafana stack nothing derives span metrics or a service graph unless Tempo's metrics-generator or the collector's spanmetrics and servicegraph connectors are enabled; picks one, never both; names the metric series and the Grafana panel that renders the service graph; says not to emit latency histograms by hand once the generator runs; notes the label key rewrite in Prometheus naming.",
+      "expectations": [
+        "States that on the Grafana stack span metrics and the service graph are derived by an enabled component, not automatically as on Elastic",
+        "Names the two options, Tempo metrics-generator or the collector's spanmetrics and servicegraph connectors, and says to enable exactly one",
+        "Names the series the service graph reads, such as traces_service_graph_request_total, and the Grafana panel or data source feature that draws it",
+        "Says the verdict for latency per entity definition is derived once the generator runs, and stop and ask rather than emit if nothing derives",
+        "Mentions that Prometheus style naming rewrites dots in label names and points at backends/grafana/mapping.md for the stored spelling",
+        "Does not use Elastic field names such as span.destination.service.resource or labels.* in the answer"
+      ]
     }
   ]
 }
