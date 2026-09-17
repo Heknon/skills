@@ -49,11 +49,14 @@ outer roots: file, root span "file.process", own trace, linked from each record 
 | ledger.worker.id | string | resource | labels.ledger_worker_id | `coordinator`, or `worker-0` to `worker-7`, set at process start |
 | ledger.batch.id | string | every span, every log | labels.ledger_batch_id | `<date>-<coordinator start unix seconds>`, e.g. `2026-09-17-1789610400` |
 | ledger.file.key | string | every span, every log | labels.ledger_file_key | the object key; `-` in the coordinator before a file is chosen |
-| ledger.record.id | string | every span, every log | labels.ledger_record_id | `record_id` from the file, record traces only |
+| ledger.record.id | string | every span except batch.run file.process object.list object.get, every log inside a span | labels.ledger_record_id | `record_id` from the file, record traces only |
 
 The worker id is a resource attribute here because each worker is its own
 process with its own SDK and never changes role. A logical worker that shares
-a process goes on the span instead, per `core/correlation-keys.md`.
+a process goes on the span instead, per `core/correlation-keys.md`. The
+record id is on every span of a record trace and on nothing above it: the
+batch and file spans and the calls made directly under them are named in the
+Where clause, so the checker requires the key everywhere else.
 
 ## 4. Signal choice
 
@@ -91,10 +94,12 @@ keys, byte counts and row counts are attributes.
 
 ## 6. Parent or link decisions
 
-- `record.process` has no parent. It links to `file.process`: the file is
-  what it belongs to, and a file trace with a million children cannot open.
-- `file.process` has no parent. It links to `batch.run`, which is in the
-  coordinator process; a link crosses that without propagation.
+- `record.process` has no parent. It links to `file.process` with
+  `link.relation=belongs_to`: the file is what it belongs to, and a file
+  trace with a million children cannot open.
+- `file.process` has no parent. It links to `batch.run` with
+  `link.relation=belongs_to`; the batch root is in the coordinator process,
+  and a link crosses that without propagation.
 - `object.put` for a dead letter is a child of the record that failed. It ran
   there and it belongs there.
 - `object.list` is a child of `batch.run`. The coordinator does it once.
@@ -110,17 +115,20 @@ keys, byte counts and row counts are attributes.
 - Attributes: record id, file key, object key, byte size, row count,
   dead-letter key, poison and cancelled counts on the batch root.
 - Labels: `ledger.record.outcome`, `ledger.file.schema_version`,
-  `ledger.batch.outcome`.
+  `ledger.batch.outcome`, `peer.service`, `db.system`.
 
 ## 8. Errors
 
+Status is set by the span wrapper: `OK` on clean exit, `ERROR` with the
+exception recorded when the block raised. See `core/errors-and-status.md`.
+
 | Failure | Recorded as |
 | --- | --- |
-| Poison record, schema violation | `record.validate` status ERROR with `record_exception`; `record.process` status ERROR, description is the message, `ledger.record.outcome=poisoned`. `file.process` and `batch.run` stay UNSET; `ledger.batch.records_poisoned` counts it. |
-| Insert timed out once, then succeeded | `warehouse.retry` event on `warehouse.insert`, `ledger.retry.attempt=1`; status UNSET |
+| Poison record, schema violation | `record.validate` status ERROR with `record_exception`; `record.process` status ERROR, description is the message, `ledger.record.outcome=poisoned`. `file.process` and `batch.run` end OK; `ledger.batch.records_poisoned` counts it. |
+| Insert timed out once, then succeeded | `warehouse.retry` event on `warehouse.insert`, `ledger.retry.attempt=1`, `ledger.retry.reason=timeout`; status OK |
 | Insert failed all attempts | `warehouse.insert` ERROR with exception; `record.process` ERROR; outcome `failed` is not a value, the record is re-queued and its next attempt is a new trace with the same `ledger.record.id` |
-| Duplicate record already in the warehouse | `ledger.record.outcome=skipped_duplicate`, status UNSET. Not an error. |
-| Run cancelled midway | `batch.cancel_requested` event on `batch.run` with `ledger.cancel.signal=SIGTERM`; `batch.run` status ERROR, description `cancelled by SIGTERM`, `ledger.batch.outcome=cancelled`; every in-flight `record.process` ends with status ERROR, description `cancelled`, and the `CancelledError` recorded; queued files get no span. |
+| Duplicate record already in the warehouse | `ledger.record.outcome=skipped_duplicate`, status OK. Not an error. |
+| Run cancelled midway | `batch.cancel_requested` event on `batch.run` with `ledger.cancel.signal=SIGTERM`; `batch.run` status ERROR, description `cancelled by SIGTERM`, `ledger.batch.outcome=cancelled`; every in-flight `record.process` ends with status ERROR, description `cancelled`, `ledger.record.outcome=cancelled` and the `CancelledError` recorded; queued files get no span. |
 | Worker crashes | its open spans are lost; `ledger.batch.files_unprocessed` on the batch root counts keys never taken. See `core/errors-and-status.md`. |
 
 ## 9. The vocabulary
@@ -148,32 +156,33 @@ outer roots: file, root span "file.process", own trace, linked from each record 
 | ledger.worker.id | string | resource | labels.ledger_worker_id | coordinator, worker-0 to worker-7 |
 | ledger.batch.id | string | every span, every log | labels.ledger_batch_id | <date>-<coordinator start unix seconds> |
 | ledger.file.key | string | every span, every log | labels.ledger_file_key | object key; "-" before a file is chosen |
-| ledger.record.id | string | every span, every log | labels.ledger_record_id | record_id from the file; record traces only |
+| ledger.record.id | string | every span except batch.run file.process object.list object.get, every log inside a span | labels.ledger_record_id | record_id from the file; record traces only |
 
 ## Spans
 
-| Name | Kind | Root | Required attributes | Destination attribute (CLIENT and PRODUCER only) |
-| --- | --- | --- | --- | --- |
-| batch.run | INTERNAL | yes | ledger.batch.outcome, ledger.batch.files, ledger.batch.records_poisoned, ledger.batch.files_unprocessed | none |
-| file.process | INTERNAL | yes | ledger.file.schema_version, ledger.file.records | none |
-| record.process | INTERNAL | yes | ledger.record.outcome | none |
-| record.validate | INTERNAL | no | ledger.file.schema_version | none |
-| object.list | CLIENT | no | ledger.object.bucket, ledger.object.prefix | peer.service=object-store |
-| object.get | CLIENT | no | ledger.object.bucket, ledger.object.key, ledger.object.size_bytes | peer.service=object-store |
-| object.put | CLIENT | no | ledger.object.bucket, ledger.object.key, ledger.object.size_bytes | peer.service=object-store |
-| SELECT accounts | CLIENT | no | db.statement, db.name | db.system=postgresql |
-| warehouse.insert | CLIENT | no | ledger.warehouse.table, ledger.warehouse.attempts | peer.service=ledger-warehouse |
+| Name | Kind | Root | Required attributes | Destination attribute | Fails when |
+| --- | --- | --- | --- | --- | --- |
+| batch.run | INTERNAL | yes | ledger.batch.outcome, ledger.batch.files, ledger.batch.records_poisoned, ledger.batch.files_unprocessed | none | the coordinator raised or the run was cancelled |
+| file.process | INTERNAL | yes | ledger.file.schema_version, ledger.file.records | none | the download or the file loop raised |
+| record.process | INTERNAL | yes | ledger.record.outcome | none | poisoned, insert failed, or cancelled |
+| record.validate | INTERNAL | no | ledger.file.schema_version | none | the schema check raised |
+| object.list | CLIENT | no | ledger.object.bucket, ledger.object.prefix | peer.service | the store raised |
+| object.get | CLIENT | no | ledger.object.bucket, ledger.object.key, ledger.object.size_bytes | peer.service | the store raised |
+| object.put | CLIENT | no | ledger.object.bucket, ledger.object.key, ledger.object.size_bytes | peer.service | the store raised |
+| SELECT accounts | CLIENT | no | db.statement, db.name | db.system | the driver raised |
+| warehouse.insert | CLIENT | no | ledger.warehouse.table, ledger.warehouse.attempts | peer.service | all attempts failed |
 
 ## Span attributes
 
 | Key | Type | Tier | Allowed values | Backend spelling |
 | --- | --- | --- | --- | --- |
 | ledger.batch.outcome | string | label | completed, cancelled, failed | labels.ledger_batch_outcome |
-| ledger.record.outcome | string | label | written, skipped_duplicate, poisoned | labels.ledger_record_outcome |
+| ledger.record.outcome | string | label | written, skipped_duplicate, poisoned, cancelled | labels.ledger_record_outcome |
 | ledger.file.schema_version | string | label | v1, v2 | labels.ledger_file_schema_version |
-| ledger.batch.id | string | attribute | unbounded | labels.ledger_batch_id |
-| ledger.file.key | string | attribute | unbounded | labels.ledger_file_key |
-| ledger.record.id | string | attribute | unbounded | labels.ledger_record_id |
+| ledger.cancel.signal | string | label | SIGTERM, SIGINT | event attribute |
+| ledger.retry.reason | string | label | timeout, connection_error | event attribute |
+| peer.service | string | label | object-store, ledger-warehouse | per backends/elastic/mapping.md |
+| db.system | string | label | postgresql | per backends/elastic/mapping.md |
 | ledger.batch.files | int | attribute | unbounded | labels.ledger_batch_files |
 | ledger.batch.records_poisoned | int | attribute | unbounded | labels.ledger_batch_records_poisoned |
 | ledger.batch.files_unprocessed | int | attribute | unbounded | labels.ledger_batch_files_unprocessed |
@@ -185,35 +194,70 @@ outer roots: file, root span "file.process", own trace, linked from each record 
 | ledger.warehouse.table | string | attribute | unbounded | labels.ledger_warehouse_table |
 | ledger.warehouse.attempts | int | attribute | unbounded | labels.ledger_warehouse_attempts |
 | ledger.retry.attempt | int | attribute | unbounded | event attribute |
-| ledger.cancel.signal | string | label | SIGTERM, SIGINT | event attribute |
-| db.system, db.name, db.statement, peer.service | as emitted | attribute | per semantic conventions | per backends/elastic/mapping.md |
+| db.name | string | attribute | unbounded | per backends/elastic/mapping.md |
+| db.statement | string | attribute | unbounded | per backends/elastic/mapping.md |
 
 ## Span events
 
 | Name | On which spans | Attributes |
 | --- | --- | --- |
-| warehouse.retry | warehouse.insert | ledger.retry.attempt |
+| exception | any | exception.type, exception.message, exception.stacktrace, exception.escaped |
+| warehouse.retry | warehouse.insert | ledger.retry.attempt, ledger.retry.reason |
 | batch.cancel_requested | batch.run | ledger.cancel.signal |
+
+## Links
+
+| From span | To span | link.relation |
+| --- | --- | --- |
+| record.process | file.process | belongs_to |
+| file.process | batch.run | belongs_to |
 
 ## Metrics
 
 | Name | Instrument | Unit | Labels | Derived by backend instead |
 | --- | --- | --- | --- | --- |
-| ledger.queue.depth | gauge | {file} | none | no |
-| records per second, record failure rate | none | none | none | yes, Transactions screen in backends/elastic/screens.md |
-| insert latency, insert failure rate | none | none | none | yes, Dependencies screen in backends/elastic/screens.md |
+| ledger.queue.depth | gauge | {file} | (none) | no |
+| ledger.record.duration | none | s | (none) | yes, derived: see backends/elastic/screens.md |
+| ledger.warehouse.insert.duration | none | s | (none) | yes, derived: see backends/elastic/screens.md |
 
 ## Logs
 
 | Message template | Level | Fields | When it is outside any span |
 | --- | --- | --- | --- |
 | worker started | info | ledger.batch.id, ledger.worker.id | yes |
-| record quarantined | warning | ledger.record.id, ledger.file.key, ledger.batch.id, ledger.dead_letter.key, trace.id, span.id | no |
+| record quarantined | warn | ledger.record.id, ledger.file.key, ledger.batch.id, ledger.dead_letter.key, trace.id, span.id | no |
+
+## Boundaries
+
+Nothing is propagated between processes: the coordinator and the eight
+workers each start their own traces, and a file root reaches the batch root
+by a link, not by continuing its trace. Inside a worker the trace stays on
+one thread. The object store, Postgres and the warehouse receive no
+traceparent that matters; their spans, if any, are theirs.
+
+## Long lived things
+
+The run outlives every record and every file and spans nine processes:
+batch.run is its span in the coordinator, and ledger.batch.id is on
+everything. A file left in the queue at SIGTERM has no span;
+ledger.batch.files_unprocessed on the batch root counts it.
+
+## Lanes and time
+
+Eight workers, each its own process and SDK; ledger.worker.id on the resource
+tells the lanes apart. ledger.queue.depth is emitted by the coordinator only,
+so it is one series and needs no combining. One VM, one clock.
+
+## Volume
+
+Millions of record traces a night. record.process traces are head sampled to
+1 in 100 once the run is healthy; file.process and batch.run are never
+sampled. record quarantined is a log so it survives sampling.
 
 ## Forbidden
 
-record ids, file keys, object keys, dates, SQL literals, record payloads, in
-any span name, metric name, metric label or log template.
+- `ledger.record.field.*`, `ledger.record.payload*`
+- record ids, file keys, object keys, calendar dates, SQL literals and record payloads never appear in a span name, metric name, metric label or log template
 
 ## Changes
 
@@ -224,49 +268,96 @@ any span name, metric name, metric label or log template.
 
 ## 10. Golden trace
 
+Every line is what `traces/recipes/python_file_exporter.py` writes for one
+span. Status is `OK` on clean exit, `ERROR` where an exception was recorded
+or the run was cancelled.
+
 ```jsonl
 // Batch root, own trace, in the coordinator. Cancelled midway: ERROR status, cancel event, outcome label. The poison record below does not make it an error.
 {"name":"batch.run","trace_id":"b0b0b0b0b0b0b0b0b0b0b0b0b0b0b001","span_id":"b00000000000a001","parent_span_id":null,"kind":"INTERNAL","start_time_unix_nano":1789610400000000000,"end_time_unix_nano":1789612230000000000,"status":{"code":"ERROR","description":"cancelled by SIGTERM"},"attributes":{"ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"-","ledger.batch.outcome":"cancelled","ledger.batch.files":214,"ledger.batch.records_poisoned":1,"ledger.batch.files_unprocessed":57},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"coordinator"},"events":[{"name":"batch.cancel_requested","time_unix_nano":1789612200000000000,"attributes":{"ledger.cancel.signal":"SIGTERM"}}],"links":[]}
 // The one listing call, child of the batch root.
-{"name":"object.list","trace_id":"b0b0b0b0b0b0b0b0b0b0b0b0b0b0b001","span_id":"b00000000000a002","parent_span_id":"b00000000000a001","kind":"CLIENT","start_time_unix_nano":1789610400010000000,"end_time_unix_nano":1789610400930000000,"status":{"code":"UNSET","description":null},"attributes":{"peer.service":"object-store","ledger.object.bucket":"ledger-drops","ledger.object.prefix":"drops/2026-09-17/","ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"-"},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"coordinator"},"events":[],"links":[]}
-// File root, own trace, in worker-3. No parent; a link to the batch root. Worker id comes from the resource.
-{"name":"file.process","trace_id":"f11ef11ef11ef11ef11ef11ef11ef103","span_id":"f00000000000a003","parent_span_id":null,"kind":"INTERNAL","start_time_unix_nano":1789610401000000000,"end_time_unix_nano":1789610470000000000,"status":{"code":"UNSET","description":null},"attributes":{"ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"drops/2026-09-17/accounts-03.ndjson","ledger.file.schema_version":"v2","ledger.file.records":5000},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-3"},"events":[],"links":[{"trace_id":"b0b0b0b0b0b0b0b0b0b0b0b0b0b0b001","span_id":"b00000000000a001","attributes":{}}]}
+{"name":"object.list","trace_id":"b0b0b0b0b0b0b0b0b0b0b0b0b0b0b001","span_id":"b00000000000a002","parent_span_id":"b00000000000a001","kind":"CLIENT","start_time_unix_nano":1789610400010000000,"end_time_unix_nano":1789610400930000000,"status":{"code":"OK","description":null},"attributes":{"peer.service":"object-store","ledger.object.bucket":"ledger-drops","ledger.object.prefix":"drops/2026-09-17/","ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"-"},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"coordinator"},"events":[],"links":[]}
+// File root, own trace, in worker-3. No parent; a link to the batch root with link.relation=belongs_to. Worker id comes from the resource.
+{"name":"file.process","trace_id":"f11ef11ef11ef11ef11ef11ef11ef103","span_id":"f00000000000a003","parent_span_id":null,"kind":"INTERNAL","start_time_unix_nano":1789610401000000000,"end_time_unix_nano":1789610470000000000,"status":{"code":"OK","description":null},"attributes":{"ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"drops/2026-09-17/accounts-03.ndjson","ledger.file.schema_version":"v2","ledger.file.records":5000},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-3"},"events":[],"links":[{"trace_id":"b0b0b0b0b0b0b0b0b0b0b0b0b0b0b001","span_id":"b00000000000a001","attributes":{"link.relation":"belongs_to"}}]}
 // Download, child of the file root.
-{"name":"object.get","trace_id":"f11ef11ef11ef11ef11ef11ef11ef103","span_id":"f00000000000a004","parent_span_id":"f00000000000a003","kind":"CLIENT","start_time_unix_nano":1789610401001000000,"end_time_unix_nano":1789610401870000000,"status":{"code":"UNSET","description":null},"attributes":{"peer.service":"object-store","ledger.object.bucket":"ledger-drops","ledger.object.key":"drops/2026-09-17/accounts-03.ndjson","ledger.object.size_bytes":4183920,"ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"drops/2026-09-17/accounts-03.ndjson"},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-3"},"events":[],"links":[]}
+{"name":"object.get","trace_id":"f11ef11ef11ef11ef11ef11ef11ef103","span_id":"f00000000000a004","parent_span_id":"f00000000000a003","kind":"CLIENT","start_time_unix_nano":1789610401001000000,"end_time_unix_nano":1789610401870000000,"status":{"code":"OK","description":null},"attributes":{"peer.service":"object-store","ledger.object.bucket":"ledger-drops","ledger.object.key":"drops/2026-09-17/accounts-03.ndjson","ledger.object.size_bytes":4183920,"ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"drops/2026-09-17/accounts-03.ndjson"},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-3"},"events":[],"links":[]}
 // Record unit, a good one. Own trace; link to the file root; instance key on every span in the trace.
-{"name":"record.process","trace_id":"7f317f317f317f317f317f317f317f31","span_id":"7f31000000000001","parent_span_id":null,"kind":"INTERNAL","start_time_unix_nano":1789610402000000000,"end_time_unix_nano":1789610402048000000,"status":{"code":"UNSET","description":null},"attributes":{"ledger.record.id":"7f31","ledger.record.outcome":"written","ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"drops/2026-09-17/accounts-03.ndjson"},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-3"},"events":[],"links":[{"trace_id":"f11ef11ef11ef11ef11ef11ef11ef103","span_id":"f00000000000a003","attributes":{}}]}
+{"name":"record.process","trace_id":"7f317f317f317f317f317f317f317f31","span_id":"7f31000000000001","parent_span_id":null,"kind":"INTERNAL","start_time_unix_nano":1789610402000000000,"end_time_unix_nano":1789610402048000000,"status":{"code":"OK","description":null},"attributes":{"ledger.record.id":"7f31","ledger.record.outcome":"written","ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"drops/2026-09-17/accounts-03.ndjson"},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-3"},"events":[],"links":[{"trace_id":"f11ef11ef11ef11ef11ef11ef11ef103","span_id":"f00000000000a003","attributes":{"link.relation":"belongs_to"}}]}
 // Validation phase.
-{"name":"record.validate","trace_id":"7f317f317f317f317f317f317f317f31","span_id":"7f31000000000002","parent_span_id":"7f31000000000001","kind":"INTERNAL","start_time_unix_nano":1789610402000100000,"end_time_unix_nano":1789610402000900000,"status":{"code":"UNSET","description":null},"attributes":{"ledger.file.schema_version":"v2","ledger.record.id":"7f31","ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"drops/2026-09-17/accounts-03.ndjson"},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-3"},"events":[],"links":[]}
+{"name":"record.validate","trace_id":"7f317f317f317f317f317f317f317f31","span_id":"7f31000000000002","parent_span_id":"7f31000000000001","kind":"INTERNAL","start_time_unix_nano":1789610402000100000,"end_time_unix_nano":1789610402000900000,"status":{"code":"OK","description":null},"attributes":{"ledger.file.schema_version":"v2","ledger.record.id":"7f31","ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"drops/2026-09-17/accounts-03.ndjson"},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-3"},"events":[],"links":[]}
 // Reference lookup. Child of the record root, not of validate.
-{"name":"SELECT accounts","trace_id":"7f317f317f317f317f317f317f317f31","span_id":"7f31000000000003","parent_span_id":"7f31000000000001","kind":"CLIENT","start_time_unix_nano":1789610402001000000,"end_time_unix_nano":1789610402004000000,"status":{"code":"UNSET","description":null},"attributes":{"db.system":"postgresql","db.name":"reference","db.statement":"SELECT code, name, currency FROM accounts WHERE code = $1","ledger.record.id":"7f31","ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"drops/2026-09-17/accounts-03.ndjson"},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-3"},"events":[],"links":[]}
-// Warehouse insert. One timeout retried as an event, then success; attempts on the span.
-{"name":"warehouse.insert","trace_id":"7f317f317f317f317f317f317f317f31","span_id":"7f31000000000004","parent_span_id":"7f31000000000001","kind":"CLIENT","start_time_unix_nano":1789610402005000000,"end_time_unix_nano":1789610402047000000,"status":{"code":"UNSET","description":null},"attributes":{"peer.service":"ledger-warehouse","ledger.warehouse.table":"ledger_staging","ledger.warehouse.attempts":2,"ledger.record.id":"7f31","ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"drops/2026-09-17/accounts-03.ndjson"},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-3"},"events":[{"name":"warehouse.retry","time_unix_nano":1789610402025000000,"attributes":{"ledger.retry.attempt":1}}],"links":[]}
-// Poison record. ERROR on the record root and the validate span. The file root and the batch root above are not errors.
-{"name":"record.process","trace_id":"9c029c029c029c029c029c029c029c02","span_id":"9c02000000000001","parent_span_id":null,"kind":"INTERNAL","start_time_unix_nano":1789610402050000000,"end_time_unix_nano":1789610402061000000,"status":{"code":"ERROR","description":"SchemaError: field 'amount' is not a number"},"attributes":{"ledger.record.id":"9c02","ledger.record.outcome":"poisoned","ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"drops/2026-09-17/accounts-03.ndjson"},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-3"},"events":[],"links":[{"trace_id":"f11ef11ef11ef11ef11ef11ef11ef103","span_id":"f00000000000a003","attributes":{}}]}
+{"name":"SELECT accounts","trace_id":"7f317f317f317f317f317f317f317f31","span_id":"7f31000000000003","parent_span_id":"7f31000000000001","kind":"CLIENT","start_time_unix_nano":1789610402001000000,"end_time_unix_nano":1789610402004000000,"status":{"code":"OK","description":null},"attributes":{"db.system":"postgresql","db.name":"reference","db.statement":"SELECT code, name, currency FROM accounts WHERE code = $1","ledger.record.id":"7f31","ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"drops/2026-09-17/accounts-03.ndjson"},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-3"},"events":[],"links":[]}
+// Warehouse insert. One timeout retried as an event, then success; attempts on the span; status OK.
+{"name":"warehouse.insert","trace_id":"7f317f317f317f317f317f317f317f31","span_id":"7f31000000000004","parent_span_id":"7f31000000000001","kind":"CLIENT","start_time_unix_nano":1789610402005000000,"end_time_unix_nano":1789610402047000000,"status":{"code":"OK","description":null},"attributes":{"peer.service":"ledger-warehouse","ledger.warehouse.table":"ledger_staging","ledger.warehouse.attempts":2,"ledger.record.id":"7f31","ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"drops/2026-09-17/accounts-03.ndjson"},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-3"},"events":[{"name":"warehouse.retry","time_unix_nano":1789610402025000000,"attributes":{"ledger.retry.attempt":1,"ledger.retry.reason":"timeout"}}],"links":[]}
+// Poison record. ERROR on the record root and the validate span. The file root and the batch root above are not errors because of it.
+{"name":"record.process","trace_id":"9c029c029c029c029c029c029c029c02","span_id":"9c02000000000001","parent_span_id":null,"kind":"INTERNAL","start_time_unix_nano":1789610402050000000,"end_time_unix_nano":1789610402061000000,"status":{"code":"ERROR","description":"SchemaError: field 'amount' is not a number"},"attributes":{"ledger.record.id":"9c02","ledger.record.outcome":"poisoned","ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"drops/2026-09-17/accounts-03.ndjson"},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-3"},"events":[],"links":[{"trace_id":"f11ef11ef11ef11ef11ef11ef11ef103","span_id":"f00000000000a003","attributes":{"link.relation":"belongs_to"}}]}
 // The span the exception was raised in carries record_exception.
-{"name":"record.validate","trace_id":"9c029c029c029c029c029c029c029c02","span_id":"9c02000000000002","parent_span_id":"9c02000000000001","kind":"INTERNAL","start_time_unix_nano":1789610402050100000,"end_time_unix_nano":1789610402051000000,"status":{"code":"ERROR","description":"SchemaError: field 'amount' is not a number"},"attributes":{"ledger.file.schema_version":"v2","ledger.record.id":"9c02","ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"drops/2026-09-17/accounts-03.ndjson"},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-3"},"events":[{"name":"exception","time_unix_nano":1789610402051000000,"attributes":{"exception.type":"ledger.schema.SchemaError","exception.message":"field 'amount' is not a number","exception.stacktrace":"Traceback (most recent call last): ..."}}],"links":[]}
+{"name":"record.validate","trace_id":"9c029c029c029c029c029c029c029c02","span_id":"9c02000000000002","parent_span_id":"9c02000000000001","kind":"INTERNAL","start_time_unix_nano":1789610402050100000,"end_time_unix_nano":1789610402051000000,"status":{"code":"ERROR","description":"SchemaError: field 'amount' is not a number"},"attributes":{"ledger.file.schema_version":"v2","ledger.record.id":"9c02","ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"drops/2026-09-17/accounts-03.ndjson"},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-3"},"events":[{"name":"exception","time_unix_nano":1789610402051000000,"attributes":{"exception.type":"ledger.schema.SchemaError","exception.message":"field 'amount' is not a number","exception.stacktrace":"Traceback (most recent call last): ...","exception.escaped":"True"}}],"links":[]}
 // Dead letter write, child of the poison record. The write itself succeeded.
-{"name":"object.put","trace_id":"9c029c029c029c029c029c029c029c02","span_id":"9c02000000000003","parent_span_id":"9c02000000000001","kind":"CLIENT","start_time_unix_nano":1789610402052000000,"end_time_unix_nano":1789610402060000000,"status":{"code":"UNSET","description":null},"attributes":{"peer.service":"object-store","ledger.object.bucket":"ledger-drops","ledger.object.key":"dead-letter/2026-09-17/9c02.json","ledger.object.size_bytes":412,"ledger.record.id":"9c02","ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"drops/2026-09-17/accounts-03.ndjson"},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-3"},"events":[],"links":[]}
-// A record in flight when SIGTERM arrived, on worker-5, linked to a file root not shown here. ERROR with the cancellation recorded; no outcome label, because it had none.
-{"name":"record.process","trace_id":"e4d3e4d3e4d3e4d3e4d3e4d3e4d3e4d3","span_id":"e4d3000000000001","parent_span_id":null,"kind":"INTERNAL","start_time_unix_nano":1789612199990000000,"end_time_unix_nano":1789612200004000000,"status":{"code":"ERROR","description":"cancelled"},"attributes":{"ledger.record.id":"e4d3","ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"drops/2026-09-17/journal-88.ndjson"},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-5"},"events":[{"name":"exception","time_unix_nano":1789612200004000000,"attributes":{"exception.type":"asyncio.CancelledError","exception.message":"","exception.stacktrace":"Traceback (most recent call last): ..."}}],"links":[{"trace_id":"a5a5a5a5a5a5a5a5a5a5a5a5a5a5a588","span_id":"a50000000000a088","attributes":{}}]}
+{"name":"object.put","trace_id":"9c029c029c029c029c029c029c029c02","span_id":"9c02000000000003","parent_span_id":"9c02000000000001","kind":"CLIENT","start_time_unix_nano":1789610402052000000,"end_time_unix_nano":1789610402060000000,"status":{"code":"OK","description":null},"attributes":{"peer.service":"object-store","ledger.object.bucket":"ledger-drops","ledger.object.key":"dead-letter/2026-09-17/9c02.json","ledger.object.size_bytes":412,"ledger.record.id":"9c02","ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"drops/2026-09-17/accounts-03.ndjson"},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-3"},"events":[],"links":[]}
+// A record in flight when SIGTERM arrived, on worker-5, linked to a file root not shown here. ERROR with the cancellation recorded and outcome cancelled.
+{"name":"record.process","trace_id":"e4d3e4d3e4d3e4d3e4d3e4d3e4d3e4d3","span_id":"e4d3000000000001","parent_span_id":null,"kind":"INTERNAL","start_time_unix_nano":1789612199990000000,"end_time_unix_nano":1789612200004000000,"status":{"code":"ERROR","description":"cancelled"},"attributes":{"ledger.record.id":"e4d3","ledger.record.outcome":"cancelled","ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"drops/2026-09-17/journal-88.ndjson"},"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-5"},"events":[{"name":"exception","time_unix_nano":1789612200004000000,"attributes":{"exception.type":"asyncio.CancelledError","exception.message":"","exception.stacktrace":"Traceback (most recent call last): ...","exception.escaped":"True"}}],"links":[{"trace_id":"a5a5a5a5a5a5a5a5a5a5a5a5a5a5a588","span_id":"a50000000000a088","attributes":{"link.relation":"belongs_to"}}]}
 ```
 
-```jsonl
-// Metric data point from the coordinator. Files still queued. No batch id label: a run id is never a metric label.
-{"name":"ledger.queue.depth","unit":"{file}","instrument":"gauge","data_points":[{"attributes":{},"time_unix_nano":1789610460000000000,"value":183}],"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"coordinator"}}
+The golden metric is one OTLP/JSON document, what the collector `file`
+exporter writes, from the coordinator: files still queued. No batch id label,
+because a run id is never a metric label.
+
+```json
+{
+  "resourceMetrics": [
+    {
+      "resource": {
+        "attributes": [
+          {"key": "service.name", "value": {"stringValue": "ledger-ingest"}},
+          {"key": "service.version", "value": {"stringValue": "0.9.3"}},
+          {"key": "deployment.environment", "value": {"stringValue": "production"}},
+          {"key": "ledger.worker.id", "value": {"stringValue": "coordinator"}}
+        ]
+      },
+      "scopeMetrics": [
+        {
+          "scope": {"name": "ledger_ingest", "version": "0.9.3"},
+          "metrics": [
+            {
+              "name": "ledger.queue.depth",
+              "unit": "{file}",
+              "gauge": {
+                "dataPoints": [
+                  {"attributes": [], "timeUnixNano": "1789610460000000000", "asInt": "183"}
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
 ```
 
+The golden logs are ECS lines, what the handler in `logs/recipes/` writes:
+`@timestamp`, `log.level` in upper case, `message`, the correlation keys by
+their OpenTelemetry names, and `trace.id` plus `span.id` when the line was
+written inside a span. The worker id is also written as a field, from the
+process's own configuration, so a log search does not depend on the
+resource. The index-side names after the shipper's renames are in
+`backends/elastic/mapping.md`.
+
 ```jsonl
-// Log line inside the poison record's span: the audit fact. trace_id and span_id injected; index-side names are in backends/elastic/mapping.md.
-{"body":"record quarantined","severity_text":"WARNING","attributes":{"ledger.record.id":"9c02","ledger.file.key":"drops/2026-09-17/accounts-03.ndjson","ledger.batch.id":"2026-09-17-1789610400","ledger.dead_letter.key":"dead-letter/2026-09-17/9c02.json"},"trace_id":"9c029c029c029c029c029c029c029c02","span_id":"9c02000000000001","resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-3"}}
-// Log line outside any span, at worker start. The batch id is set by the logging filter from the vocabulary module; the worker id is on the resource.
-{"body":"worker started","severity_text":"INFO","attributes":{"ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"-"},"trace_id":null,"span_id":null,"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-3"}}
+// Inside the poison record's span: the audit fact. The handler added the keys and the trace ids.
+{"@timestamp":"2026-09-17T02:00:02.052Z","log.level":"WARN","message":"record quarantined","ecs.version":"8.11.0","log.logger":"ledger_ingest.records","ledger.record.id":"9c02","ledger.file.key":"drops/2026-09-17/accounts-03.ndjson","ledger.batch.id":"2026-09-17-1789610400","ledger.worker.id":"worker-3","ledger.dead_letter.key":"dead-letter/2026-09-17/9c02.json","trace.id":"9c029c029c029c029c029c029c029c02","span.id":"9c02000000000001"}
+// Outside any span, at worker start. No trace.id, no span.id, no record id. The batch id comes from the logging filter, from the vocabulary module.
+{"@timestamp":"2026-09-17T02:00:00.900Z","log.level":"INFO","message":"worker started","ecs.version":"8.11.0","log.logger":"ledger_ingest.worker","ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"-","ledger.worker.id":"worker-3"}
 ```
 
 ## 11. What Kibana shows
 
-Screen names are from `backends/elastic/screens.md`; it has the path
-and the grouping field of each.
+This example's backend is Elastic. On another backend the verdicts above do
+not change; the screens are in `backends/<backend>/screens.md` and the
+differences in `backends/paradigms.md`. Screen names here are from
+`backends/elastic/screens.md`; it has the path and the grouping field of
+each.
 
 1. Services lists one service, `ledger-ingest`; filter on
    `labels.ledger_worker_id` to see one worker.
