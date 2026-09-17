@@ -206,7 +206,7 @@ outer roots: session, root span "session.run", own trace, one per worker, linked
 | test.parameter_id | string | attribute | unbounded | labels.test_parameter_id |
 | test.parameter.<name> | string | attribute | unbounded; always a string, even for numbers | labels.test_parameter_<name> |
 | test.fixture.name | string | attribute | unbounded | labels.test_fixture_name |
-| http.request.method, url.full, server.address, http.response.status_code, peer.service | as emitted | attribute | per semantic conventions | per backends/elastic/apm-server-mapping.md |
+| http.request.method, url.full, server.address, http.response.status_code, peer.service | as emitted | attribute | per semantic conventions | per backends/elastic/mapping.md |
 
 ## Span events
 
@@ -219,8 +219,8 @@ outer roots: session, root span "session.run", own trace, one per worker, linked
 | Name | Instrument | Unit | Labels | Derived by backend instead |
 | --- | --- | --- | --- | --- |
 | sahara.entities.alive | gauge | {entity} | sahara.entity.definition, sahara.worker.id | no |
-| test duration, tests per minute, failure rate | none | none | none | yes, Transactions screen in backends/elastic/kibana-screens.md |
-| entity operation latency per definition | none | none | none | yes, Dependencies screen in backends/elastic/kibana-screens.md |
+| test duration, tests per minute, failure rate | none | none | none | yes, Transactions screen in backends/elastic/screens.md |
+| entity operation latency per definition | none | none | none | yes, Dependencies screen in backends/elastic/screens.md |
 
 ## Logs
 
@@ -279,7 +279,7 @@ label or log template. Customer field names never become keys.
 ```
 
 ```jsonl
-// Log line from test code, inside test.call. Body is the author's text; the filter added the keys; trace_id and span_id injected. Index-side names are in backends/elastic/apm-server-mapping.md.
+// Log line from test code, inside test.call. Body is the author's text; the filter added the keys; trace_id and span_id injected. Index-side names are in backends/elastic/mapping.md.
 {"body":"tank level 40 after fill","severity_text":"INFO","attributes":{"sahara.cycle.id":"c-2026-09-17-0412","sahara.environment.id":"env-eu1-07","sahara.worker.id":"gw2","test.nodeid_hash":"3f1c9d0e7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3a2b1c0d"},"trace_id":"7e577e577e577e577e577e577e570042","span_id":"7e57000000000006","resource":{"service.name":"sahara-harness","service.version":"3.2.0","deployment.environment":"lab-eu1"}}
 // Log line outside any span, before the first test. This is how option B records the environment's start.
 {"body":"environment acquired","severity_text":"INFO","attributes":{"sahara.cycle.id":"c-2026-09-17-0412","sahara.environment.id":"env-eu1-07","sahara.worker.id":"gw2"},"trace_id":null,"span_id":null,"resource":{"service.name":"sahara-harness","service.version":"3.2.0","deployment.environment":"lab-eu1"}}
@@ -287,7 +287,7 @@ label or log template. Customer field names never become keys.
 
 ## 11. What Kibana shows
 
-Screen names are from `backends/elastic/kibana-screens.md`; it has the path
+Screen names are from `backends/elastic/screens.md`; it has the path
 and the grouping field of each.
 
 1. Services lists `sahara-harness` and `product-api`; filter on

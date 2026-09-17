@@ -35,7 +35,7 @@
       "id": 2,
       "name": "dots-to-underscores",
       "prompt": "We send an attribute sahara.cycle.id on every span but in Kibana we can only find labels.sahara_cycle_id. Is the collector broken?",
-      "expected_output": "Uses backends/elastic/apm-server-mapping.md and the verification ladder: APM Server, not the collector, rewrites dots in non-ECS attribute keys to underscores under labels.*; this is documented behavior; the vocabulary's Backend spelling column records labels.sahara_cycle_id; the model shows how to confirm at rung 3 with a search by span.id.",
+      "expected_output": "Uses backends/elastic/mapping.md and the verification ladder: APM Server, not the collector, rewrites dots in non-ECS attribute keys to underscores under labels.*; this is documented behavior; the vocabulary's Backend spelling column records labels.sahara_cycle_id; the model shows how to confirm at rung 3 with a search by span.id.",
       "expectations": [
         "States that APM Server performs the rewrite, and that the collector does not rewrite keys",
         "Gives the exact index spelling labels.sahara_cycle_id",
@@ -62,7 +62,7 @@
       "id": 4,
       "name": "dependency-row-missing",
       "prompt": "I set peer.service on my entity.create spans but the Dependencies tab is empty. Traces show the spans fine.",
-      "expected_output": "Uses backends/elastic/kibana-screens.md and verification-ladder.md: checks span kind is CLIENT or PRODUCER (INTERNAL is the usual cause), checks span.destination.service.resource on the indexed document, checks the service_destination metrics data stream, checks sampling; gives the exact searches.",
+      "expected_output": "Uses backends/elastic/screens.md and verification-ladder.md: checks span kind is CLIENT or PRODUCER (INTERNAL is the usual cause), checks span.destination.service.resource on the indexed document, checks the service_destination metrics data stream, checks sampling; gives the exact searches.",
       "expectations": [
         "First suspect named is SpanKind INTERNAL instead of CLIENT or PRODUCER",
         "Gives the Elasticsearch search by span.id and names the field span.destination.service.resource to look for",

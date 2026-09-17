@@ -116,3 +116,12 @@ limit chosen on purpose; `traces/recipes/python_otel_setup.py` sets one.
 | The controller raised | `record_exception` | `exception` | |
 | Rows returned by a query | attribute | `db.response.returned_rows` | int |
 | Worker heap size sampled each second | neither, it is a metric | | |
+
+## Other backends
+
+The section above is Elastic. For the Grafana stack read
+`backends/grafana/mapping.md` and `backends/grafana/screens.md`; for the
+Victoria stack read `backends/victoria/mapping.md` and
+`backends/victoria/screens.md`. The verdicts of this procedure do not
+change between them. What changes is which component draws the result and
+what the stored key looks like.

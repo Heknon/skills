@@ -186,7 +186,7 @@ outer roots: file, root span "file.process", own trace, linked from each record 
 | ledger.warehouse.attempts | int | attribute | unbounded | labels.ledger_warehouse_attempts |
 | ledger.retry.attempt | int | attribute | unbounded | event attribute |
 | ledger.cancel.signal | string | label | SIGTERM, SIGINT | event attribute |
-| db.system, db.name, db.statement, peer.service | as emitted | attribute | per semantic conventions | per backends/elastic/apm-server-mapping.md |
+| db.system, db.name, db.statement, peer.service | as emitted | attribute | per semantic conventions | per backends/elastic/mapping.md |
 
 ## Span events
 
@@ -200,8 +200,8 @@ outer roots: file, root span "file.process", own trace, linked from each record 
 | Name | Instrument | Unit | Labels | Derived by backend instead |
 | --- | --- | --- | --- | --- |
 | ledger.queue.depth | gauge | {file} | none | no |
-| records per second, record failure rate | none | none | none | yes, Transactions screen in backends/elastic/kibana-screens.md |
-| insert latency, insert failure rate | none | none | none | yes, Dependencies screen in backends/elastic/kibana-screens.md |
+| records per second, record failure rate | none | none | none | yes, Transactions screen in backends/elastic/screens.md |
+| insert latency, insert failure rate | none | none | none | yes, Dependencies screen in backends/elastic/screens.md |
 
 ## Logs
 
@@ -257,7 +257,7 @@ any span name, metric name, metric label or log template.
 ```
 
 ```jsonl
-// Log line inside the poison record's span: the audit fact. trace_id and span_id injected; index-side names are in backends/elastic/apm-server-mapping.md.
+// Log line inside the poison record's span: the audit fact. trace_id and span_id injected; index-side names are in backends/elastic/mapping.md.
 {"body":"record quarantined","severity_text":"WARNING","attributes":{"ledger.record.id":"9c02","ledger.file.key":"drops/2026-09-17/accounts-03.ndjson","ledger.batch.id":"2026-09-17-1789610400","ledger.dead_letter.key":"dead-letter/2026-09-17/9c02.json"},"trace_id":"9c029c029c029c029c029c029c029c02","span_id":"9c02000000000001","resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-3"}}
 // Log line outside any span, at worker start. The batch id is set by the logging filter from the vocabulary module; the worker id is on the resource.
 {"body":"worker started","severity_text":"INFO","attributes":{"ledger.batch.id":"2026-09-17-1789610400","ledger.file.key":"-"},"trace_id":null,"span_id":null,"resource":{"service.name":"ledger-ingest","service.version":"0.9.3","deployment.environment":"production","ledger.worker.id":"worker-3"}}
@@ -265,7 +265,7 @@ any span name, metric name, metric label or log template.
 
 ## 11. What Kibana shows
 
-Screen names are from `backends/elastic/kibana-screens.md`; it has the path
+Screen names are from `backends/elastic/screens.md`; it has the path
 and the grouping field of each.
 
 1. Services lists one service, `ledger-ingest`; filter on

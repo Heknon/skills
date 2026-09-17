@@ -108,3 +108,12 @@ linked from: <which spans carry a Link to it, or none>
 | Environment owned by a worker | yes, session hooks | yes | no, lives for the whole run | inferred from attributes; `environment.setup` and `environment.teardown` are children of `session.run` | `environment.id` |
 | Connection pool | yes, `__enter__` and `__exit__` | yes | no | inferred from attributes; `pool.acquire` spans under the unit, `sahara.pool.connections` as an updowncounter | `pool.name` |
 | Cycle across many hosts | no, closed by the orchestrator elsewhere | no | no | inferred from attributes | `cycle.id` |
+
+## Other backends
+
+The criteria above do not change. What changes is question 5, whether the
+backend shows links. Elastic stores them under `span.links`. Tempo stores
+them and TraceQL can query them through the `link:` scope. VictoriaTraces
+stores what OTLP sends and shows it through its Jaeger compatible API. Read
+the links row in `backends/<backend>/mapping.md` before choosing `own linked
+root span`, because a link nobody can see is a link nobody follows.

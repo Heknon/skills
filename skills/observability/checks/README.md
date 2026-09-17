@@ -68,4 +68,4 @@ task is done.
 Elastic APM stores span attributes that are not ECS fields under `labels.*`
 with dots replaced by underscores. The `dotted-keys-note` rule lists the keys
 this applies to. Record the stored spelling in the vocabulary's Backend
-spelling column. Details: `backends/elastic/apm-server-mapping.md`.
+spelling column. Details: `backends/elastic/mapping.md`.

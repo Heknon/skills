@@ -4,12 +4,29 @@
 field that already shows it, or `emit`. It goes into the last column of the
 *Metrics* table in `vocabulary.md`.
 
-Elastic APM Server computes a fixed set of metrics from the spans it receives.
-Emitting one of them again from the SDK is two copies of one fact, with two
-names and two rounding rules, and the Kibana APM screens read only the copy the
-server made. Invariant 8.
+Some component in the path may already compute metrics from the spans it
+receives. Emitting one of them again from the SDK is two copies of one fact,
+with two names and two rounding rules, and the screens read only the copy the
+pipeline made. Invariant 8.
 
-## Questions
+## First, which component derives on this backend
+
+This is the paradigm difference between the stacks. Answer it before the
+questions below, from `backends/README.md`.
+
+| Backend | Who derives span metrics and dependencies | On by default | Where the names live |
+| --- | --- | --- | --- |
+| Elastic | APM Server, from every span it receives | yes | `backends/elastic/overview.md` and the questions below |
+| Grafana stack | Tempo's metrics-generator, or the collector's `spanmetrics` and `servicegraph` connectors. One of them, never both. | no, must be enabled | `backends/grafana/screens.md` and `backends/grafana/collector.md` |
+| Victoria stack | only the collector's `spanmetrics` and `servicegraph` connectors writing into VictoriaMetrics; VictoriaMetrics derives nothing from traces | no, must be enabled | `backends/victoria/collector.md` |
+
+On the Grafana and Victoria stacks, if no deriving component is enabled the
+verdict for a count, a rate or a latency of a spanned thing is not `emit`. It
+is **stop and ask**: enabling the connector is one config change and gives
+every span its metrics, while emitting by hand gives one metric and a second
+copy later. A person decides which.
+
+## Questions, on Elastic
 
 Answer in order. The first yes is `derived`.
 

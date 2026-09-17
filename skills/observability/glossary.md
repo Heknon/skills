@@ -88,3 +88,18 @@ it where Elastic uses a different word. Use these words and no synonyms.
 | stop and ask | Writing down what is missing and asking a person instead of inventing. |
 | checker | A script in `checks/` that judges an export against the vocabulary. |
 | rung | One hop in the verification ladder with a command and an expected output. |
+
+## The same thing in each stack
+
+| Concept | Elastic | Grafana stack | Victoria stack |
+| --- | --- | --- | --- |
+| root span | transaction | trace root in Tempo | trace root in VictoriaTraces |
+| span attribute | `labels.*` or `numeric_labels.*` | `span.*` in TraceQL | span tag through the Jaeger API |
+| resource attribute | `service.*`, `host.*`, `labels.*` | `resource.*` in TraceQL; `target_info` and `job`/`instance` in Prometheus | `target_info` and labels in VictoriaMetrics |
+| metric label | dimension on a metrics document | Prometheus label, dots to underscores | VictoriaMetrics label |
+| log field | ECS field | stream label or structured metadata in Loki | field in VictoriaLogs |
+| span metrics | made by APM Server, always on | made by Tempo's metrics-generator or the collector's `spanmetrics` connector, must be enabled | made only by the collector's `spanmetrics` connector |
+| dependency view | Dependencies tab and service map | service graph from `servicegraph` connector or metrics-generator | node graph over `servicegraph` series, if any |
+| metric to trace | not through exemplars | exemplars in Prometheus, opened in Tempo | exemplars are limited; use the trace id label or time range |
+| trace to logs | `trace.id` on the log document | derived field or `trace_id` structured metadata in Loki | `trace_id` field in VictoriaLogs |
+| trace query | KQL over `traces-apm*` | TraceQL | Jaeger API search or LogsQL over the trace store |

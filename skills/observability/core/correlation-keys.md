@@ -42,9 +42,12 @@ dead end.
 | logical worker id | no | every span | every line | only if bounded |
 | `trace.id`, `span.id` | no | implicit | injected | no, exemplars only |
 
-Elastic renames dotted keys that are not ECS fields; see
-`backends/elastic/apm-server-mapping.md` before deciding on the spelling that
-reaches the index. The vocabulary records both spellings.
+Every backend rewrites some keys on the way in. Elastic rewrites dots to
+underscores under `labels.*`, Prometheus style stores rewrite dots in metric
+and label names, Tempo keeps dots and Loki keeps them only in structured
+metadata. Read `backends/<backend>/mapping.md` before deciding on the
+spelling, and record the stored spelling in the vocabulary beside the sent
+one.
 
 ## Verdict
 

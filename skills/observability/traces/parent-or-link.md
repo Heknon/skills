@@ -111,3 +111,12 @@ and in `Span attributes`:
 | `job.run` in a consumer | the consumer's poll span | the producer's `job.enqueue` span | `produced_by` |
 | `entity.create` second attempt | the current test span | the first `entity.create` span | `retries` |
 | session root span | none | the cycle root span, if one exists | `belongs_to` |
+
+## Other backends
+
+The section above is Elastic. For the Grafana stack read
+`backends/grafana/mapping.md` and `backends/grafana/screens.md`; for the
+Victoria stack read `backends/victoria/mapping.md` and
+`backends/victoria/screens.md`. The verdicts of this procedure do not
+change between them. What changes is which component draws the result and
+what the stored key looks like.

@@ -11,7 +11,7 @@ Rules for filling it in:
 - Every value has a type from `string`, `int`, `float`, `bool`.
 - A label lists its allowed values. An attribute says `unbounded`.
 - Keep the *Backend spelling* column current. It is what the index holds after
-  the pipeline's renames, from `backends/<backend>/apm-server-mapping.md`.
+  the pipeline's renames, from `backends/<backend>/mapping.md`.
 - Change it only through a person. Record who and when at the bottom.
 
 ---
@@ -35,9 +35,9 @@ outer roots: <list, or none>
 | --- | --- | --- | --- | --- |
 | service.name | string | resource | service.name | <rule> |
 | service.version | string | resource | service.version | <rule> |
-| deployment.environment | string | resource | service.environment | <rule> |
-| <run level key> | string | every span, every log | labels.<spelling> | <rule> |
-| <instance key> | string | every span, every log | labels.<spelling> | <rule> |
+| deployment.environment | string | resource | <stored spelling per backends/<backend>/mapping.md> | <rule> |
+| <run level key> | string | every span, every log | <stored spelling per backends/<backend>/mapping.md> | <rule> |
+| <instance key> | string | every span, every log | <stored spelling per backends/<backend>/mapping.md> | <rule> |
 
 ## Spans
 
@@ -49,8 +49,8 @@ outer roots: <list, or none>
 
 | Key | Type | Tier | Allowed values | Backend spelling |
 | --- | --- | --- | --- | --- |
-| <key> | string | label | a, b, c | labels.<spelling> |
-| <key> | string | attribute | unbounded | labels.<spelling> |
+| <key> | string | label | a, b, c | <stored spelling> |
+| <key> | string | attribute | unbounded | <stored spelling> |
 
 ## Span events
 

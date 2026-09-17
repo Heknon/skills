@@ -107,3 +107,11 @@ fields from the same records; `logs/trace-correlation.md` says when to use it.
 | `f"could not load {path}: {exception}"` | `configuration load failed` | `file.path`, `error.type`, `error.message`, `error.stack_trace` |
 | `"tank-7 create failed"` | `entity create failed` | `labels.entity_definition`, `labels.entity_id` |
 | `print("done")` | `cycle finished` | `labels.cycle_id`, `sahara.tests.passed`, `sahara.tests.failed` |
+
+## Other backends
+
+The field names above are ECS, which is what Elastic indexes. Loki keeps a
+small set of stream labels and puts the rest, including `trace_id` and
+`span_id`, in structured metadata. VictoriaLogs stores every field by name
+with `_msg`, `_time` and `_stream` as the fixed ones. Emit the same line
+either way and let `backends/<backend>/mapping.md` say what it becomes.

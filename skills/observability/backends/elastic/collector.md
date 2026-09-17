@@ -15,7 +15,7 @@ nothing a document holds.
 
 - It does **not** rename keys. `cycle.id` leaves the collector as `cycle.id`.
   APM Server is what writes it as `labels.cycle_id`. The rename map is in
-  `apm-server-mapping.md`.
+  `mapping.md`.
 - It does **not** drop or add attributes unless a processor says so.
 - It **does** re-batch. A span leaves the collector up to `batch.timeout`
   after it arrived.

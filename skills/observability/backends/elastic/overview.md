@@ -120,7 +120,7 @@ regardless of the sampling decision.
 
 The `service_destination` metrics exist only for spans that carry
 `span.destination.service.resource`. Everything the Dependencies screen shows
-is a query over those metrics. See `kibana-screens.md`.
+is a query over those metrics. See `screens.md`.
 
 ## Never
 

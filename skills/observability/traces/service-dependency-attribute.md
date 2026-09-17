@@ -112,3 +112,12 @@ From `elastic/apm-data`, `input/otlp/traces.go`:
 | The APM Server itself | neither, it is the pipeline | do not instrument the exporter |
 | A customer-named controller method | attribute | `entity.operation=<method name>` on a span named `entity.call` |
 | A second instrumented service the harness calls over HTTP | service and dependency | its own `service.name=sahara-api`; the caller's `peer.service=sahara-api` |
+
+## Other backends
+
+The section above is Elastic. For the Grafana stack read
+`backends/grafana/mapping.md` and `backends/grafana/screens.md`; for the
+Victoria stack read `backends/victoria/mapping.md` and
+`backends/victoria/screens.md`. The verdicts of this procedure do not
+change between them. What changes is which component draws the result and
+what the stored key looks like.

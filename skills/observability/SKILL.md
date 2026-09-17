@@ -1,6 +1,6 @@
 ---
 name: observability
-description: Design, instrument, verify and debug traces, metrics and logs for any system, end to end from the OpenTelemetry SDK through the collector and Elastic APM to the Kibana screen. Use for every observability question, including which signal to emit, what a transaction or dependency is, how to name things, why data is missing in Kibana, and how to set up a new project's instrumentation. Written so the answer comes from a procedure and a check, not from judgment.
+description: Design, instrument, verify and debug traces, metrics and logs for any system, end to end from the OpenTelemetry SDK through the collector to the backend in use, whether that is Elastic APM and Kibana, the Grafana stack (Tempo, Loki, Prometheus or Mimir) or the Victoria stack (VictoriaMetrics, VictoriaLogs, VictoriaTraces). Use for every observability question, including which signal to emit, what a transaction or dependency is, how to name things, why data is missing in Kibana, and how to set up a new project's instrumentation. Written so the answer comes from a procedure and a check, not from judgment.
 ---
 
 # Observability
@@ -22,8 +22,8 @@ Decide which one you have. If it is none of them, stop and ask.
 | **Design** | model a new system or a new part of one | `core/unit-of-work.md`, `core/correlation-keys.md`, `core/signal-choice.md`, `core/naming-and-cardinality.md`, then the nearest `examples/` |
 | **Measure** | answer a question someone asked with a number, such as a percentile, a count or "is it stuck" | `core/question-to-measurement.md`, then the signal folder it names |
 | **Instrument** | add or change instrumentation at one place | `core/signal-choice.md`, then the signal folder's procedures, then its `recipes/` |
-| **Query** | build a dashboard, a chart or a search | `backends/README.md`, then the backend's `kibana-screens.md` and `queries.md` |
-| **Debug** | find out why data is missing, wrong or duplicated | `backends/elastic/verification-ladder.md`, then the hop it fails at |
+| **Query** | build a dashboard, a chart or a search | `backends/README.md` to pick the backend, then `backends/<backend>/screens.md` and `queries.md` |
+| **Debug** | find out why data is missing, wrong or duplicated | `backends/README.md` to pick the backend, then `backends/<backend>/verification-ladder.md`, then the hop it fails at |
 | **Choose** | pick between two approaches | the one procedure that names the dilemma; the list is below |
 
 Every task that changes code ends with the matching `checks/` script run on a
@@ -125,9 +125,15 @@ shape before you change anything.
 ## The backend
 
 `backends/README.md` says which backend this installation runs and which
-version. Read the version from the running system first, every time, and
-compare it with the stamp on the file you are about to use. If the major
-version differs, stop and ask before trusting a field name.
+version. Three are documented, each in its own folder with the same file
+names: `elastic/`, `grafana/` and `victoria/`. They are three paradigms, not
+three spellings of one. Where span metrics and dependencies come from, how
+keys are flattened, and whether a metric can open a trace all differ, and
+`backends/paradigms.md` answers those questions side by side. Read the
+version from the running system first, every time, and compare it with the
+stamp on the file you are about to use. If the major version differs, stop
+and ask before trusting a field name. Never use a field name from one
+backend's folder on another backend.
 
 ## What you say when you finish
 

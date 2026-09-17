@@ -127,3 +127,12 @@ Write into the *Spans* table of `vocabulary.md`, one cell per span name:
 | Test marked xfail fails | pytest reports `xfailed` | expected, no error, `test.outcome=xfailed` |
 | `entity.get` returns 404 and the caller treats it as absent | inside the caller | expected, no error, `http.response.status_code=404` |
 | Plugin cannot parse its config file | before `pytest_sessionstart` | error log line |
+
+## Other backends
+
+The recording rules above are the same everywhere; only the stored shape
+differs. Tempo keeps the `exception` event on the span and TraceQL filters
+on `status = error` and `event:name = "exception"`. Loki and VictoriaLogs see
+an exception only if a log line is written, which the rules above forbid
+inside a span. Read the status, events and exceptions rows in
+`backends/<backend>/mapping.md`.

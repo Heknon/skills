@@ -1,7 +1,7 @@
 # KQL queries to paste
 
 verified against: Kibana 8.17 KQL reference, Elasticsearch 8.17 mapping API
-reference, field names from `apm-server-mapping.md`. Aggregations that KQL
+reference, field names from `mapping.md`. Aggregations that KQL
 cannot express are in `queries-dsl.md`.
 
 Rename before pasting: the label keys `labels.sahara_cycle_id`,
@@ -103,7 +103,7 @@ Expected: `labels.sahara_cycle_id` of type `keyword`, and no
 
 ## Spans that can become a dependency
 
-Link 3 of the Dependencies chain in `kibana-screens.md`:
+Link 3 of the Dependencies chain in `screens.md`:
 
 ```
 processor.event : "span" and span.destination.service.resource : *
@@ -170,4 +170,4 @@ Discover before building a dashboard on it.
 
 ## Stop and ask
 
-- A query needs a field that no row of `apm-server-mapping.md` produces.
+- A query needs a field that no row of `mapping.md` produces.

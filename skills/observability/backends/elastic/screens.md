@@ -8,7 +8,7 @@ Metrics page. Rows marked UNVERIFIED name the part that no page states.
 
 Read this before a Query task. Column "empty when" lists the conditions that
 make the screen blank or wrong. Every one of them has a row in
-`apm-server-mapping.md`.
+`mapping.md`.
 
 ## Index patterns behind every screen
 

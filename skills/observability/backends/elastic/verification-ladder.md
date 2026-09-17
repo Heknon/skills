@@ -110,7 +110,7 @@ GET traces-apm*/_search
 
 For one document use `{"term": {"transaction.id": "00f067aa0ba902b7"}}` for
 the root and `{"term": {"span.id": "..."}}` for the CLIENT span. The spellings
-are the ones in `apm-server-mapping.md`; check these fields in `_source`:
+are the ones in `mapping.md`; check these fields in `_source`:
 
 - root: `processor.event: transaction`, `transaction.name` equal to the span
   name, `transaction.type`, `event.outcome: success|failure|unknown`,
@@ -154,7 +154,7 @@ the too-large event line.
 
 ## Rung 4: Kibana
 
-The screen names and menu paths are in `kibana-screens.md`. For this ladder:
+The screen names and menu paths are in `screens.md`. For this ladder:
 the service's **Transactions** tab lists `transaction.name`, and the trace
 explorer takes KQL. Narrow to the one span with:
 
@@ -175,7 +175,7 @@ sampling rate, never lost data.
 | --- | --- | --- |
 | transaction missing entirely | 1 | span never ended, or process exited before `force_flush`; then 3 for `Unauthenticated` |
 | span present, no dependency row | 3, the metrics query | not `SpanKind.CLIENT`, or no `peer.service`, or under two minutes old |
-| label present under a different name | 3 | dotted key underscored to `labels.<a_b>`; the vocabulary's spelling column is stale, see `apm-server-mapping.md` |
+| label present under a different name | 3 | dotted key underscored to `labels.<a_b>`; the vocabulary's spelling column is stale, see `mapping.md` |
 | label present in `labels.*` on one doc and `numeric_labels.*` on another | 1 | the value is a string in one place and a number in another; invariant 7 |
 | document rejected, `mapper_parsing_exception`, `failed to parse field [<field>] of type [<type>] in document with id` | 3 | a value of a second type on a field the index already mapped; usually a log field or an object sent as an attribute |
 | trace split in two, root and CLIENT span have different `trace.id` | 1 | context not propagated across a thread, a process or an HTTP call; `core/context-propagation.md` |

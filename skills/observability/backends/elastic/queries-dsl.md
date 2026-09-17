@@ -2,7 +2,7 @@
 
 verified against: Elasticsearch 8.17 references for the `terms`,
 `percentiles`, `date_histogram`, `filter` and `cardinality` aggregations and
-the `_ignored` field. Field names from `apm-server-mapping.md`.
+the `_ignored` field. Field names from `mapping.md`.
 
 Rename before pasting: the label keys and every value in angle brackets, as
 in `queries.md`. Paste each body in **Dev Tools > Console** after the `GET`
@@ -202,5 +202,5 @@ Dependencies screen shows.
 
 - The cardinality check returns more than a few hundred for a key the
   vocabulary calls a label.
-- An aggregation needs a field that no row of `apm-server-mapping.md`
+- An aggregation needs a field that no row of `mapping.md`
   produces.

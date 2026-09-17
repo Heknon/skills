@@ -118,3 +118,11 @@ them as attributes.
 | `entity create failed` at `DEBUG` | inside `entity.create` | `trace.id`, `span.id`, `labels.cycle_id`, `labels.environment_id` |
 | `worker assigned environment` | outside any span | `labels.cycle_id`, `labels.environment_id`, `labels.worker_id`, no `trace.id` |
 | `configuration loaded` | before the SDK starts | `labels.cycle_id` if known, nothing else |
+
+## Other backends
+
+The field names above are ECS, which is what Elastic indexes. Loki keeps a
+small set of stream labels and puts the rest, including `trace_id` and
+`span_id`, in structured metadata. VictoriaLogs stores every field by name
+with `_msg`, `_time` and `_stream` as the fixed ones. Emit the same line
+either way and let `backends/<backend>/mapping.md` say what it becomes.

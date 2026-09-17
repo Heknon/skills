@@ -530,7 +530,7 @@ def rule_links_resolve(spans: list[Span]) -> Result:
 
 def rule_dotted_keys_note(spans: list[Span]) -> Result:
     keys = sorted({key for span in spans for key in span.attributes if "." in key and not is_known_dotted_key(key)})
-    note = "Elastic APM stores span attributes that are not ECS fields under labels.* with dots replaced by underscores; record that spelling in the vocabulary's Backend spelling column. See backends/elastic/apm-server-mapping.md."
+    note = "dotted keys are stored differently per backend: Elastic rewrites dots to underscores under labels.*, Prometheus style stores rewrite dots in metric and label names, Tempo keeps them; record the stored spelling in the vocabulary's Backend spelling column from backends/<backend>/mapping.md."
     return Result("dotted-keys-note", INFO, len(keys), keys[:5], note if keys else "no dotted keys outside known prefixes")
 
 

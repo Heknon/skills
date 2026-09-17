@@ -1,7 +1,7 @@
 # Unit of work
 
-**Verdict you produce:** the name of the thing that becomes a root span (a
-transaction in Elastic), and the attribute that identifies one instance of it.
+**Verdict you produce:** the name of the thing that becomes a root span, which
+Elastic calls a transaction and Tempo and Jaeger call a trace root, and the attribute that identifies one instance of it.
 Both go into `vocabulary.md` under *Unit of work*.
 
 Everything the backend aggregates, latency distribution, failure rate,

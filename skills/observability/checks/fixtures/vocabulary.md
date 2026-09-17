@@ -83,4 +83,4 @@ outer roots: session
 | Date | Who | What |
 | --- | --- | --- |
 | 2026-09-17 | checks fixture | first version |
-| 2026-09-17 | checks fixture | UNVERIFIED: peer.service backend spelling span.destination.service.resource, confirm in backends/elastic/apm-server-mapping.md |
+| 2026-09-17 | checks fixture | UNVERIFIED: peer.service backend spelling span.destination.service.resource, confirm in backends/elastic/mapping.md |

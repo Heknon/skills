@@ -154,7 +154,7 @@ outer roots: none
 | orders.job.run_id | string | every span, every log | labels.orders_job_run_id | <job type>-<start RFC3339>, job unit only |
 
 UNVERIFIED: http.request.id is also an ECS field name; whether APM Server keeps it as
-http.request.id or writes labels.http_request_id is in backends/elastic/apm-server-mapping.md.
+http.request.id or writes labels.http_request_id is in backends/elastic/mapping.md.
 
 ## Spans
 
@@ -186,7 +186,7 @@ http.request.id or writes labels.http_request_id is in backends/elastic/apm-serv
 | orders.partner.attempts | int | attribute | unbounded | labels.orders_partner_attempts |
 | orders.retry.attempt | int | attribute | unbounded | event attribute |
 | orders.retry.reason | string | label | timeout, status_5xx, connection_error | event attribute |
-| http.request.method, http.route, http.response.status_code, url.path, url.full, db.system, db.name, db.statement, peer.service | as emitted | attribute | per semantic conventions | per backends/elastic/apm-server-mapping.md |
+| http.request.method, http.route, http.response.status_code, url.path, url.full, db.system, db.name, db.statement, peer.service | as emitted | attribute | per semantic conventions | per backends/elastic/mapping.md |
 
 ## Span events
 
@@ -200,8 +200,8 @@ http.request.id or writes labels.http_request_id is in backends/elastic/apm-serv
 | Name | Instrument | Unit | Labels | Derived by backend instead |
 | --- | --- | --- | --- | --- |
 | orders.reconcile.backlog | gauge | {order} | none | no |
-| request latency, throughput, failure rate | none | none | none | yes, Transactions screen in backends/elastic/kibana-screens.md |
-| partner latency and failure rate | none | none | none | yes, Dependencies screen in backends/elastic/kibana-screens.md |
+| request latency, throughput, failure rate | none | none | none | yes, Transactions screen in backends/elastic/screens.md |
+| partner latency and failure rate | none | none | none | yes, Dependencies screen in backends/elastic/screens.md |
 
 ## Logs
 
@@ -252,7 +252,7 @@ payloads, in any span name, metric name, metric label or log template.
 ```
 
 ```jsonl
-// Log line inside a span: the audit fact from POST /orders. trace_id and span_id injected by the logging setup; the index-side names are in backends/elastic/apm-server-mapping.md.
+// Log line inside a span: the audit fact from POST /orders. trace_id and span_id injected by the logging setup; the index-side names are in backends/elastic/mapping.md.
 {"body":"order created","severity_text":"INFO","attributes":{"orders.order.id":"8f2a","orders.tenant.id":"acme","http.request.id":"c3d4e5f6-0a1b-4c2d-8e3f-4a5b6c7d8e9f","orders.unit.type":"request"},"trace_id":"c0ffee0000000000000000000000abcd","span_id":"a3b4c5d6e7f80910","resource":{"service.name":"orders-api","service.version":"2.14.0","deployment.environment":"production"}}
 // Log line outside any span: no trace ids exist, so the correlation keys are set by the logging filter from the vocabulary module.
 {"body":"reconcile run skipped, previous run still active","severity_text":"WARNING","attributes":{"orders.job.run_id":"orders.reconcile-2026-09-17T10:05:00Z","orders.tenant.id":"-","orders.unit.type":"job"},"trace_id":null,"span_id":null,"resource":{"service.name":"orders-api","service.version":"2.14.0","deployment.environment":"production"}}
@@ -260,7 +260,7 @@ payloads, in any span name, metric name, metric label or log template.
 
 ## 11. What Kibana shows
 
-Screen names are from `backends/elastic/kibana-screens.md`; it has the path
+Screen names are from `backends/elastic/screens.md`; it has the path
 and the grouping field of each.
 
 1. Services lists one service, `orders-api`, per `service.environment`.

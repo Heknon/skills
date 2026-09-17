@@ -1,7 +1,7 @@
 # traces
 
 Procedures and recipes for the `span` verdict of `core/signal-choice.md`.
-Target: opentelemetry-python 1.2x sending OTLP to Elastic Stack 8.x.
+Target: opentelemetry-python 1.2x sending OTLP to whichever backend `backends/README.md` names. The procedures are backend neutral; each ends with pointers into `backends/<backend>/mapping.md` for the stored shape.
 
 ## Files
 

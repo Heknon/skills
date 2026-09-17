@@ -154,3 +154,13 @@ retention: traces <days>, metrics <days>, errors <days> ; questions past trace r
 | Controller response body, 400 KB | stored as a run artifact, `artifact.url` on `entity.create` |
 | Failure rate per test over a quarter | derived metric in `metrics-apm-*`, checked against its retention |
 | Retry loop adding 300 events to one span | 128 kept, 172 dropped; make each attempt a child span instead |
+
+## Other backends
+
+Sampling changes derived metrics differently per stack. Elastic weights by
+the sampling rate as described above. Tempo's metrics-generator counts only
+the spans that reached Tempo, so head sampling before Tempo divides every
+derived rate by the sampling factor unless the generator is told the rate.
+The collector's `spanmetrics` connector counts what the collector saw, so
+place it before any sampler. VictoriaMetrics derives nothing from traces and
+is unaffected. Read the sampling section of `backends/<backend>/overview.md`.
