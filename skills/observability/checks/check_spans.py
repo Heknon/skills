@@ -419,25 +419,55 @@ def exception_events(span: Span) -> list[dict[str, Any]]:
     return [event for event in span.events if event.get("name") == "exception"]
 
 
-def rule_errors_are_recorded(spans: list[Span]) -> Result:
+def descendants_with_exception(span: Span, spans_by_parent: dict[str, list[Span]]) -> bool:
+    """True when any span below this one in the same trace carries an exception event."""
+    pending = list(spans_by_parent.get(span.span_id, []))
+    while pending:
+        child = pending.pop()
+        if exception_events(child):
+            return True
+        pending.extend(spans_by_parent.get(child.span_id, []))
+    return False
+
+
+def rule_errors_are_recorded(spans: list[Span]) -> tuple[Result, Result]:
+    """An ERROR needs either the exception that caused it or a description saying why.
+
+    core/errors-and-status.md allows a parent to end ERROR with only a
+    description when a child recorded the exception and the unit's contract no
+    longer holds, and allows an ERROR with a description and no exception at
+    all for a cancellation. So the FAIL is reserved for an ERROR that explains
+    nothing, and the rest is a WARN for a person to glance at.
+    """
+    spans_by_parent: dict[str, list[Span]] = {}
+    for span in spans:
+        if span.parent_span_id:
+            spans_by_parent.setdefault(span.parent_span_id, []).append(span)
     offenders: list[str] = []
-    without_description = 0
+    unexplained: list[str] = []
     for span in spans:
         if span.status_code != "ERROR":
             continue
-        if not span.status_description:
-            without_description += 1
         events = exception_events(span)
         if not events:
-            offenders.append(f"{span.label()} is ERROR with no exception event; call span.record_exception(error)")
+            if not span.status_description:
+                offenders.append(f"{span.label()} is ERROR with no exception event and no description; call span.record_exception(error) or set_status(StatusCode.ERROR, reason)")
+            elif not descendants_with_exception(span, spans_by_parent):
+                unexplained.append(f"{span.label()} is ERROR with description {span.status_description!r} and no exception anywhere below it")
             continue
         for event in events:
             attributes = event.get("attributes", {})
             missing = [key for key in ("exception.type", "exception.message") if key not in attributes]
             if missing:
                 offenders.append(f"{span.label()} exception event missing {', '.join(missing)}")
-    note = f"{without_description} ERROR spans have no status description; set_status(StatusCode.ERROR, str(error))" if without_description else ""
-    return verdict("errors-are-recorded", offenders, note=note, passing_note=note)
+    recorded = verdict("errors-are-recorded", offenders)
+    explained = verdict(
+        "errors-without-exception",
+        unexplained,
+        failing_status=WARN,
+        note="allowed for a cancellation or a contract failure per core/errors-and-status.md; confirm each one is deliberate",
+    )
+    return recorded, explained
 
 
 def rule_exceptions_set_status(spans: list[Span]) -> Result:
@@ -524,7 +554,7 @@ def run(spans: list[Span], vocabulary: Vocabulary | None, limit: int, tolerance_
         rule_label_values(spans, vocabulary),
         rule_forbidden(spans, vocabulary),
         rule_exit_spans(spans, vocabulary),
-        rule_errors_are_recorded(spans),
+        *rule_errors_are_recorded(spans),
         rule_exceptions_set_status(spans),
         time_sane,
         children,

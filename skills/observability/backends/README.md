@@ -59,7 +59,8 @@ the Elasticsearch exporter in OTel mapping mode, stores span attributes under
 | `elastic/overview.md` | you need to know which hop a signal passes, which data stream it lands in, or why one OTLP span became a transaction and another a span | this folder |
 | `elastic/apm-server-mapping.md` | you need the exact field name an attribute becomes, the spelling of a label key, or the type a value will have in the index | this folder |
 | `elastic/kibana-screens.md` | you are asked to make a Kibana screen show something, or to explain why a screen is empty | this folder |
-| `elastic/queries.md` | you need a KQL or Elasticsearch DSL query to paste | this folder |
+| `elastic/queries.md` | you need a KQL query to paste into the APM search bar or Discover | this folder |
+| `elastic/queries-dsl.md` | a KQL query is not enough and you need an Elasticsearch aggregation to paste into Dev Tools | this folder |
 | `elastic/collector.md` | there is a Collector between the SDK and APM Server | another writer |
 | `elastic/elastic-agent.md` | you configure or inspect APM Server under Elastic Agent | another writer |
 | `elastic/verification-ladder.md` | data is missing, wrong or duplicated, and you must find the hop where it stops | another writer |

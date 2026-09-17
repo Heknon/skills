@@ -23,9 +23,12 @@ TRACE_CONSOLE_EXPORT=1 python -m pytest tests/test_one.py -q 2>&1 | grep -A40 '"
 ```
 
 `traces/recipes/python_otel_setup.py` reads `TRACE_CONSOLE_EXPORT=1` and adds
-`ConsoleSpanExporter` next to the OTLP exporter. `traces/recipes/python_file_exporter.py`
-writes the same JSON to a file instead when stdout is noisy. One JSON object
-per span, in the shape of `ReadableSpan.to_json()`:
+`ConsoleSpanExporter` next to the OTLP exporter. When stdout is noisy, use
+`traces/recipes/python_file_exporter.py` instead; it writes one JSON object per
+span to `TRACE_EXPORT_FILE` in the checker's own shape, which is documented at
+the bottom of that recipe and is what `checks/check_spans.py` reads directly.
+The console exporter prints one JSON object per span in the shape of
+`ReadableSpan.to_json()`, which the checker also accepts:
 
 ```json
 {

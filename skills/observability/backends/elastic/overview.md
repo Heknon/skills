@@ -8,7 +8,7 @@ from source rather than a guide page are marked `source:`.
 
 ```
 OpenTelemetry SDK --OTLP--> [Collector, optional] --OTLP--> APM Server
-   (under Elastic Agent, port 8200, gRPC and HTTP on the same port)
+   under Elastic Agent, port 8200, gRPC and HTTP on the same port
    --> Elasticsearch data streams --> Kibana APM app
 ```
 
@@ -49,8 +49,8 @@ OpenTelemetry SDK --OTLP--> [Collector, optional] --OTLP--> APM Server
 
 `<interval>` is `1m`, `10m` or `60m`. All three are produced since 8.7 and the
 aggregation streams are hidden. In the `<service.name>` position the name is
-lowercased and `\ / * ? " < > | space , # : -` become `_` (source:
-`model/modelprocessor/datastream.go`).
+lowercased and `\ / * ? " < > | space , # : -` become `_`. source:
+`model/modelprocessor/datastream.go`.
 
 ## The four document kinds
 
