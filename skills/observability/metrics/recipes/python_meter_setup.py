@@ -18,14 +18,21 @@ How to call it, once, at process start, right after configure_tracing():
 
     from python_meter_setup import configure_metrics
     provider = configure_metrics(
-        service_name="sahara-runner",
+        service_name="sahara-harness",
         service_version="1.4.0",
         deployment_environment="ci",
+        temporality="cumulative",
         console=False,
     )
 
+temporality is "cumulative" or "delta", copied from the `metric temporality`
+line of the installation block in backends/README.md. cumulative is the
+default and what Prometheus, Mimir and VictoriaMetrics want; Elastic APM
+Server needs delta (backends/elastic/overview.md), or every histogram is
+dropped. metrics/units-and-buckets.md, section Temporality.
+
 Endpoint and credentials come from the environment, read by the exporter:
-    OTEL_EXPORTER_OTLP_ENDPOINT=https://<apm-server-host>:8200
+    OTEL_EXPORTER_OTLP_ENDPOINT=https://<otlp-host>:<port>
     OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer <secret token>
 or  OTEL_EXPORTER_OTLP_HEADERS=Authorization=ApiKey <api key>
 The metrics path v1/metrics is appended by the exporter. OTEL_METRIC_EXPORT_INTERVAL
@@ -58,7 +65,7 @@ from opentelemetry.sdk.metrics.export import (
 from opentelemetry.sdk.metrics.view import ExplicitBucketHistogramAggregation, View
 from opentelemetry.sdk.resources import Resource
 
-DEFAULT_SERVICE_NAME = "sahara-runner"
+DEFAULT_SERVICE_NAME = "sahara-harness"
 METER_NAME = "sahara.instruments"
 
 # Boundaries in seconds, for durations between 5 ms and 10 minutes.
@@ -73,10 +80,18 @@ HISTOGRAM_BOUNDARIES: Mapping[str, Sequence[float]] = {
     "sahara.controller.poll.duration": DURATION_BOUNDARIES_SECONDS,
 }
 
-# Elastic APM Server accepts histograms only with delta temporality. This is
-# the table the exporter builds itself for
-# OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta. Setting it in code
-# means the environment cannot silently turn it back to cumulative.
+# The two temporality tables the OTLP exporter builds itself for
+# OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=cumulative and =delta.
+# Passing one in code means the environment cannot silently switch it.
+# cumulative: Prometheus, Mimir, VictoriaMetrics. delta: Elastic APM Server.
+CUMULATIVE_TEMPORALITY: Mapping[type, AggregationTemporality] = {
+    Counter: AggregationTemporality.CUMULATIVE,
+    ObservableCounter: AggregationTemporality.CUMULATIVE,
+    Histogram: AggregationTemporality.CUMULATIVE,
+    UpDownCounter: AggregationTemporality.CUMULATIVE,
+    ObservableUpDownCounter: AggregationTemporality.CUMULATIVE,
+    ObservableGauge: AggregationTemporality.CUMULATIVE,
+}
 DELTA_TEMPORALITY: Mapping[type, AggregationTemporality] = {
     Counter: AggregationTemporality.DELTA,
     ObservableCounter: AggregationTemporality.DELTA,
@@ -85,6 +100,21 @@ DELTA_TEMPORALITY: Mapping[type, AggregationTemporality] = {
     ObservableUpDownCounter: AggregationTemporality.CUMULATIVE,
     ObservableGauge: AggregationTemporality.CUMULATIVE,
 }
+TEMPORALITY_TABLES: Mapping[str, Mapping[type, AggregationTemporality]] = {
+    "cumulative": CUMULATIVE_TEMPORALITY,
+    "delta": DELTA_TEMPORALITY,
+}
+
+
+def temporality_preference(temporality: str) -> dict[type, AggregationTemporality]:
+    """The preferred_temporality table for "cumulative" or "delta"; raises on anything else."""
+    try:
+        return dict(TEMPORALITY_TABLES[temporality])
+    except KeyError:
+        raise ValueError(
+            f"temporality must be one of {sorted(TEMPORALITY_TABLES)}, got {temporality!r}; "
+            "copy it from the metric temporality line of backends/README.md"
+        ) from None
 
 
 def build_resource(
@@ -131,6 +161,7 @@ def configure_metrics(
     export_interval_millis: float | None = None,
     console: bool = False,
     boundaries_by_metric: Mapping[str, Sequence[float]] = HISTOGRAM_BOUNDARIES,
+    temporality: str = "cumulative",
 ) -> MeterProvider:
     """Create the MeterProvider, register it globally and flush it at exit.
 
@@ -141,14 +172,17 @@ def configure_metrics(
     OTEL_EXPORTER_OTLP_HEADERS.
     console True: also print every export to stdout as JSON, for comparing
     with the shape at the bottom of this file. Never leave it on in CI.
+    temporality: "cumulative" (default; Prometheus, Mimir, VictoriaMetrics)
+    or "delta" (Elastic APM Server), from backends/README.md.
     """
     if resource is None:
         resource = build_resource(service_name, service_version, deployment_environment)
+    preferred_temporality = temporality_preference(temporality)
 
     otlp_exporter = OTLPMetricExporter(
         endpoint=endpoint,
         headers=dict(headers) if headers else None,
-        preferred_temporality=dict(DELTA_TEMPORALITY),
+        preferred_temporality=preferred_temporality,
     )
     readers: list[MetricReader] = [
         PeriodicExportingMetricReader(
@@ -157,7 +191,7 @@ def configure_metrics(
         )
     ]
     if console or os.environ.get("SAHARA_METRICS_CONSOLE", "").lower() == "true":
-        console_exporter = ConsoleMetricExporter(preferred_temporality=dict(DELTA_TEMPORALITY))
+        console_exporter = ConsoleMetricExporter(preferred_temporality=dict(preferred_temporality))
         readers.append(
             PeriodicExportingMetricReader(
                 console_exporter,
@@ -192,7 +226,7 @@ if __name__ == "__main__":
         unit="s",
         description="Poll round trip time in seconds",
     )
-    demonstration_histogram.record(0.042, {"entity.definition": "tank"})
+    demonstration_histogram.record(0.042, {"sahara.entity.definition": "tank"})
     time.sleep(1.5)
     configured_provider.shutdown()
 
@@ -200,12 +234,13 @@ if __name__ == "__main__":
 # Shape of one export as ConsoleMetricExporter prints it, which is
 # MetricsData.to_json(). The OTLP request carries the same tree in protobuf.
 # The histogram data point shows the View took effect: explicit_bounds is
-# DURATION_BOUNDARIES_SECONDS, and aggregation_temporality 1 is DELTA.
+# DURATION_BOUNDARIES_SECONDS. aggregation_temporality 2 is CUMULATIVE, the
+# default; with temporality="delta" this histogram prints 1, DELTA.
 #
 # {
 #   "resource_metrics": [{
 #     "resource": {"attributes": {
-#       "service.name": "sahara-runner", "service.version": "0.0.0",
+#       "service.name": "sahara-harness", "service.version": "0.0.0",
 #       "deployment.environment": "development",
 #       "telemetry.sdk.language": "python", "telemetry.sdk.name": "opentelemetry",
 #       "telemetry.sdk.version": "1.2x.0"}},
@@ -217,23 +252,25 @@ if __name__ == "__main__":
 #         "unit": "s",
 #         "data": {
 #           "data_points": [{
-#             "attributes": {"entity.definition": "tank"},
+#             "attributes": {"sahara.entity.definition": "tank"},
 #             "start_time_unix_nano": 1789000000000000000,
 #             "time_unix_nano": 1789000001000000000,
 #             "count": 1, "sum": 0.042, "min": 0.042, "max": 0.042,
 #             "bucket_counts": [0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
 #             "explicit_bounds": [0.005,0.01,0.025,0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0,30.0,60.0,120.0,300.0,600.0]
 #           }],
-#           "aggregation_temporality": 1
+#           "aggregation_temporality": 2
 #         }
 #       }]
 #     }]
 #   }]
 # }
 #
-# What Elastic 8.x writes for it, in metrics-apm.app.sahara_runner-default:
+# What the backend stores is in backends/<backend>/mapping.md. What Elastic
+# 8.x writes for it, with temporality="delta", in
+# metrics-apm.app.sahara_harness-default:
 #   "metricset.name": "app"
 #   "sahara.controller.poll.duration": {"values": [0.0375], "counts": [1]}
-#   "labels": {"entity.definition": "tank"}     spelling UNVERIFIED, see labels.md
-#   "service.name": "sahara-runner", "service.environment": "development"
+#   "labels": {"sahara.entity.definition": "tank"}     spelling UNVERIFIED, see labels.md
+#   "service.name": "sahara-harness", "service.environment": "development"
 # 0.0375 is the midpoint of the bucket (0.025, 0.05].

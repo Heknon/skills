@@ -4,14 +4,15 @@
 uses, and the exact field names each log line carries as a result. It goes
 into the *Correlation keys* table of `vocabulary.md`, *Where* column.
 
-A log line is correlated when Kibana can walk from it to the trace and back.
-That needs `trace.id` and `span.id` on the line, spelled that way, plus the
-run level keys for lines written outside any span. Nobody types these at a
-call site. Invariant 9.
+A log line is correlated when the backend can walk from it to the trace and
+back. That needs `trace.id` and `span.id` on the line, spelled that way, plus
+the run level keys for lines written outside any span. Nobody types these at
+a call site. Invariant 9.
 
 ## Questions
 
-1. **Are lines shipped as files or stdout by Filebeat or Elastic Agent?**
+1. **Are lines shipped as files or stdout by a log shipper?** The shipper is
+   whichever `backends/<backend>/collector.md` names for this installation.
    Yes: **mechanism A**, the logging filter. `configure_logging(...)` in
    `recipes/python_logging_setup.py`.
 2. **Is the SDK already exporting spans over OTLP and nothing ships files?**
@@ -29,8 +30,12 @@ call site. Invariant 9.
 The filter reads `trace.get_current_span().get_span_context()`. When
 `is_valid`, it sets `trace.id = format(context.trace_id, "032x")` and
 `span.id = format(context.span_id, "016x")`. When not, it sets neither. It
-also sets `labels.cycle_id` and `labels.environment_id` from the vocabulary
-module on every record. The JSON formatter writes them as they are.
+also sets `sahara.cycle.id`, `sahara.environment.id` and `sahara.worker.id`
+from the vocabulary module on every record, and copies `test.nodeid_hash`
+from the current span when that span carries it. The JSON formatter writes
+them as they are, in the OTel spelling; whatever the shipper or the backend
+renames them to is its own doing, recorded in the *Backend spelling* column
+from `backends/<backend>/mapping.md`.
 
 ## Mechanism B: `LoggingInstrumentor`
 
@@ -65,12 +70,14 @@ default path `v1/logs`, environment `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` then
 
 The handler takes `trace_id`, `span_id` and `trace_flags` from the current
 span itself. It turns every non standard attribute of the record into an
-OTLP attribute, so a filter that sets `record.__dict__["cycle.id"]` ships it.
-It sets `code.file.path`, `code.function.name`, `code.line.number`, and for
-`exc_info` the attributes `exception.type`, `exception.message`,
-`exception.stacktrace`.
+OTLP attribute, so a filter that sets `record.__dict__["sahara.cycle.id"]`
+ships it. It sets `code.file.path`, `code.function.name`,
+`code.line.number`, and for `exc_info` the attributes `exception.type`,
+`exception.message`, `exception.stacktrace`.
 
-What Elastic 8.x APM Server does with it, from `elastic/apm-data`
+### On Elastic
+
+What APM Server 8.x does with an OTLP log record, from `elastic/apm-data`
 `input/otlp/logs.go`:
 
 | OTLP | Elastic field |
@@ -79,21 +86,29 @@ What Elastic 8.x APM Server does with it, from `elastic/apm-data`
 | `severity_text` | `log.level`, so `WARN` not `WARNING` |
 | `severity_number` | `event.severity` |
 | trace id, span id | `trace.id`, `span.id` |
-| attribute `cycle.id` | `labels.cycle_id`, dots to underscores, strings; numbers go to `numeric_labels.*` |
+| attribute `sahara.cycle.id` | `labels.sahara_cycle_id`, dots to underscores, strings; numbers go to `numeric_labels.*` |
 | `exception.type`, `exception.message`, `exception.stacktrace` | `error.exception.*`, and the record becomes an error document in `logs-apm.error-<namespace>` with `event.type: error` |
 | everything else | `logs-apm.app.<service.name>-<namespace>` |
 
 Limits in 8.x: Elastic marks OTLP logs intake "technical preview", and
 states that the `app_logs` data stream "has dynamic mapping disabled", so a
 field that is not `labels.*`, `numeric_labels.*` or a mapped ECS field is
-stored but not searchable. Keep custom fields under `labels.` by sending
-them as attributes.
+stored but not searchable. Keep custom fields as record attributes, which
+land under `labels.`.
+
+## Other backends
+
+Other backends: the verdicts do not change; the stored shape is in
+backends/<backend>/mapping.md and the differences in backends/paradigms.md.
 
 ## Verdict
 
+Rows of the *Correlation keys* table:
+
 ```
-| trace.id, span.id | string | every log inside a span | trace.id, span.id | mechanism A filter |
-| cycle.id | string | every span, every log | labels.cycle_id | filter copies from vocabulary module |
+| trace.id, span.id | string | every log inside a span | <stored spelling per backends/<backend>/mapping.md> | mechanism A filter, from the current span |
+| sahara.cycle.id | string | every span, every log | <stored spelling per backends/<backend>/mapping.md> | filter copies it from the vocabulary module |
+| test.nodeid_hash | string | every span except session.run, every log inside a span | <stored spelling per backends/<backend>/mapping.md> | filter copies it from the current span |
 ```
 
 ## Never
@@ -101,6 +116,9 @@ them as attributes.
 - Never pass `trace_id` through `extra=` at a call site.
 - Never write `"0"` into `trace.id`. Absent is correct outside a span.
 - Never spell it `traceId`, `trace_id` or `otelTraceID` in a shipped line.
+- Never write a backend spelling such as `labels.sahara_cycle_id` into a
+  shipped line. The line carries `sahara.cycle.id`; the rename is the
+  shipper's or the backend's, never the recipe's.
 - Never ship the same line by mechanism A and mechanism C. Two documents.
 - Never attach the OTLP handler to a logger the SDK itself logs through at
   `DEBUG`; the exporter's own logging then feeds the exporter.
@@ -115,14 +133,6 @@ them as attributes.
 
 | Line | Where written | Fields it carries |
 | --- | --- | --- |
-| `entity create failed` at `DEBUG` | inside `entity.create` | `trace.id`, `span.id`, `labels.cycle_id`, `labels.environment_id` |
-| `worker assigned environment` | outside any span | `labels.cycle_id`, `labels.environment_id`, `labels.worker_id`, no `trace.id` |
-| `configuration loaded` | before the SDK starts | `labels.cycle_id` if known, nothing else |
-
-## Other backends
-
-The field names above are ECS, which is what Elastic indexes. Loki keeps a
-small set of stream labels and puts the rest, including `trace_id` and
-`span_id`, in structured metadata. VictoriaLogs stores every field by name
-with `_msg`, `_time` and `_stream` as the fixed ones. Emit the same line
-either way and let `backends/<backend>/mapping.md` say what it becomes.
+| `entity create failed` at `debug` | inside `entity.create` | `trace.id`, `span.id`, `test.nodeid_hash`, `sahara.cycle.id`, `sahara.environment.id`, `sahara.worker.id` |
+| `worker assigned environment` | outside any span | `sahara.cycle.id`, `sahara.environment.id`, `sahara.worker.id`, no `trace.id` |
+| `configuration loaded` | before the SDK starts | `sahara.cycle.id` if known, nothing else |

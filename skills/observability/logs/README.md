@@ -1,16 +1,18 @@
 # Logs
 
 Procedures and recipes for the `log` verdict from `core/signal-choice.md`.
-Target: Python `logging` on opentelemetry-python 1.2x, shipped to Elastic
-Stack 8.x either as JSON lines through Filebeat or Elastic Agent, or over
-OTLP through APM Server.
+Target: Python `logging` on opentelemetry-python 1.2x, shipped to whichever
+backend `backends/README.md` names, either as JSON lines through that
+backend's log shipper or over OTLP. The procedures are backend neutral; the
+line carries the vocabulary's keys as they are, and what the shipper and the
+backend rename them to is in `backends/<backend>/mapping.md`.
 
 ## Files
 
 | File | Answers |
 | --- | --- |
 | `log-or-span-event.md` | is this moment a log line at all, or a span event |
-| `levels.md` | `ERROR`, `WARN`, `INFO` or `DEBUG`, and what to do with exceptions |
+| `levels.md` | `error`, `warn`, `info` or `debug`, and what to do with exceptions |
 | `structure.md` | the message template, the ECS field names, JSON to stdout or a file |
 | `trace-correlation.md` | how `trace.id`, `span.id` and the run level keys get onto every line |
 | `recipes/python_logging_setup.py` | `configure_logging(...)` for JSON lines and `configure_logging_otlp(...)` for OTLP |

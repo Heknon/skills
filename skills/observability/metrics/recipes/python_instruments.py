@@ -7,10 +7,21 @@ before that, every call below goes to a no-op meter and is silently lost.
 Rename before use:
   - LABEL_VALUES: copy the allowed values of every label tier key from the
     Span attributes table of vocabulary.md. Nothing else may be a key here.
-  - The four metric names and units: exact strings from the Metrics table.
-  - queue_depth_by_worker: replace the body with a read of your scheduler.
+  - The four metric names and units: exact strings from the Metrics table,
+    which for the running example is
+      | sahara.entities.live | updowncounter | {entity} | sahara.entity.definition | no |
+      | sahara.controller.polls | counter | {poll} | sahara.entity.definition, outcome | no |
+      | sahara.controller.poll.duration | histogram | s | sahara.entity.definition | no |
+      | sahara.worker.queue.depth | gauge | {test} | (none) | no |
+      | sahara.tests.duration | none | s | (none) | yes, derived: see backends/<backend>/screens.md |
+    sahara.tests.duration is derived by the backend and has no instrument
+    here, on purpose.
+  - queue_depth: replace the body with a read of your scheduler.
 Delete the instruments you do not have a vocabulary row for. Never add a
 label key here without adding it to vocabulary.md first.
+
+Label keys are passed with a double underscore for each dot:
+label_set(sahara__entity__definition="tank") is the key sahara.entity.definition.
 """
 
 from __future__ import annotations
@@ -23,18 +34,19 @@ from python_meter_setup import METER_NAME
 
 # Label tier only. Every value a label may take, spelled exactly.
 LABEL_VALUES: Mapping[str, frozenset[str]] = {
-    "entity.definition": frozenset({"tank", "pump", "valve", "sensor"}),
-    "entity.operation": frozenset({"create", "tag", "revert", "destroy", "call"}),
-    "outcome": frozenset({"success", "failure"}),
-    "worker.id": frozenset({"gw0", "gw1", "gw2", "gw3", "gw4", "gw5", "gw6", "gw7"}),
+    "sahara.entity.definition": frozenset({"tank", "valve", "pump"}),
+    "sahara.entity.operation": frozenset({"create", "tag", "revert", "destroy", "controller"}),
+    "outcome": frozenset({"ok", "timeout", "error"}),
 }
 
 
 def label_set(**labels: str) -> dict[str, str]:
     """Return the labels as a dict, or raise. A bad label never reaches the SDK.
 
-    Values are strings, always: Elastic stores a numeric attribute in a
-    different field, numeric_labels.<key>, than a string one, labels.<key>.
+    Values are strings, always: a backend that stores a numeric attribute in
+    a different field than a string one splits the series in two. Elastic
+    does, numeric_labels.<key> against labels.<key>; see
+    backends/<backend>/mapping.md for the one in use. Invariant 7.
     """
     checked: dict[str, str] = {}
     for key, value in labels.items():
@@ -77,13 +89,15 @@ controller_poll_duration = meter.create_histogram(
 
 # observable gauge: a level read on demand. The SDK calls the callback once
 # per export interval, from the exporter's thread. Keep it fast and never let
-# it raise; return nothing instead.
-QueueDepthReader = Callable[[], Mapping[str, int]]
+# it raise; return nothing instead. It carries no labels: each worker process
+# has its own MeterProvider and resource, and sahara.worker.id is a
+# correlation key, never a metric label (metrics/labels.md).
+QueueDepthReader = Callable[[], int]
 
 
-def queue_depth_by_worker() -> Mapping[str, int]:
-    """Replace with a read of the scheduler. Keys are worker ids, values counts."""
-    return {"gw0": 12, "gw1": 7}
+def queue_depth() -> int:
+    """Replace with a read of the scheduler: tests still queued on this worker."""
+    return 12
 
 
 def make_queue_depth_callback(
@@ -91,45 +105,38 @@ def make_queue_depth_callback(
 ) -> Callable[[CallbackOptions], Iterable[Observation]]:
     def observe_queue_depth(options: CallbackOptions) -> Iterable[Observation]:
         try:
-            depths = reader()
+            depth = reader()
         except Exception:  # noqa: BLE001  a callback that raises stops the export
             return []
-        observations: list[Observation] = []
-        for worker_id, depth in depths.items():
-            if worker_id not in LABEL_VALUES["worker.id"]:
-                continue
-            observations.append(Observation(depth, label_set(worker__id=worker_id)))
-        return observations
+        return [Observation(depth)]
 
     return observe_queue_depth
 
 
 worker_queue_depth = meter.create_observable_gauge(
     "sahara.worker.queue.depth",
-    callbacks=[make_queue_depth_callback(queue_depth_by_worker)],
+    callbacks=[make_queue_depth_callback(queue_depth)],
     unit="{test}",
-    description="Tests still queued on the worker",
+    description="Tests still queued on this worker",
 )
 
 
 # Call sites. Only these four shapes exist; label_set is the only way in.
 
-def record_poll(definition: str, operation: str, succeeded: bool, elapsed_seconds: float) -> None:
-    labels = label_set(
-        entity__definition=definition,
-        entity__operation=operation,
-        outcome="success" if succeeded else "failure",
+def record_poll(definition: str, outcome: str, elapsed_seconds: float) -> None:
+    """outcome is one of ok, timeout, error, from the vocabulary."""
+    controller_polls.add(1, label_set(sahara__entity__definition=definition, outcome=outcome))
+    controller_poll_duration.record(
+        elapsed_seconds, label_set(sahara__entity__definition=definition)
     )
-    controller_polls.add(1, labels)
-    controller_poll_duration.record(elapsed_seconds, label_set(entity__definition=definition))
 
 
 def record_entity_created(definition: str) -> None:
-    entities_live.add(1, label_set(entity__definition=definition))
+    entities_live.add(1, label_set(sahara__entity__definition=definition))
 
 
 def record_entity_destroyed(definition: str) -> None:
-    entities_live.add(-1, label_set(entity__definition=definition))
+    entities_live.add(-1, label_set(sahara__entity__definition=definition))
 
 
 if __name__ == "__main__":
@@ -139,8 +146,8 @@ if __name__ == "__main__":
 
     provider = configure_metrics(console=True, export_interval_millis=1000)
     record_entity_created("tank")
-    record_poll("tank", "create", True, 0.042)
-    record_poll("tank", "create", True, 0.061)
+    record_poll("tank", "ok", 0.042)
+    record_poll("tank", "ok", 0.061)
     record_entity_destroyed("tank")
     time.sleep(1.5)
     provider.shutdown()
@@ -148,33 +155,37 @@ if __name__ == "__main__":
 
 # OTLP data point each instrument produces, as MetricsData.to_json() prints it.
 # Only the "data" object differs; resource and scope are as in
-# python_meter_setup.py. Temporality 1 is DELTA, 2 is CUMULATIVE.
+# python_meter_setup.py. aggregation_temporality 2 is CUMULATIVE, the default;
+# with configure_metrics(temporality="delta") counters and histograms print 1,
+# DELTA, and the updowncounter and gauge stay 2.
 #
 # sahara.controller.polls, counter:
-#   "data": {"data_points": [{"attributes": {"entity.definition": "tank",
-#             "entity.operation": "create", "outcome": "success"},
+#   "data": {"data_points": [{"attributes": {"sahara.entity.definition": "tank",
+#             "outcome": "ok"},
 #             "start_time_unix_nano": ..., "time_unix_nano": ..., "value": 2}],
-#            "aggregation_temporality": 1, "is_monotonic": true}
-#   Elastic: field "sahara.controller.polls": 2.0   (increments in this interval)
+#            "aggregation_temporality": 2, "is_monotonic": true}
 #
 # sahara.entities.live, updowncounter:
-#   "data": {"data_points": [{"attributes": {"entity.definition": "tank"},
+#   "data": {"data_points": [{"attributes": {"sahara.entity.definition": "tank"},
 #             "start_time_unix_nano": ..., "time_unix_nano": ..., "value": 0}],
 #            "aggregation_temporality": 2, "is_monotonic": false}
-#   Elastic: field "sahara.entities.live": 0.0      (current level)
 #
 # sahara.controller.poll.duration, histogram:
-#   "data": {"data_points": [{"attributes": {"entity.definition": "tank"},
+#   "data": {"data_points": [{"attributes": {"sahara.entity.definition": "tank"},
 #             "count": 2, "sum": 0.103, "min": 0.042, "max": 0.061,
 #             "bucket_counts": [0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0],
 #             "explicit_bounds": [0.005,0.01,0.025,0.05,0.1,0.25,0.5,1.0,2.5,5.0,10.0,30.0,60.0,120.0,300.0,600.0]}],
-#            "aggregation_temporality": 1}
-#   Elastic: field "sahara.controller.poll.duration": {"values": [0.0375, 0.075], "counts": [1, 1]}
+#            "aggregation_temporality": 2}
 #
-# sahara.worker.queue.depth, observable gauge:
-#   "data": {"data_points": [{"attributes": {"worker.id": "gw0"}, "time_unix_nano": ..., "value": 12},
-#                            {"attributes": {"worker.id": "gw1"}, "time_unix_nano": ..., "value": 7}]}
-#   Elastic: two documents, one per label set, field "sahara.worker.queue.depth": 12.0 and 7.0
+# sahara.worker.queue.depth, observable gauge, no attributes:
+#   "data": {"data_points": [{"attributes": {}, "time_unix_nano": ..., "value": 12}]}
 #
+# What the backend stores each one as is in backends/<backend>/mapping.md.
+# On Elastic 8.x, with temporality="delta":
+#   "sahara.controller.polls": 2.0                    increments in this interval
+#   "sahara.entities.live": 0.0                       current level
+#   "sahara.controller.poll.duration": {"values": [0.0375, 0.075], "counts": [1, 1]}
+#   "sahara.worker.queue.depth": 12.0                 one document per label set, here one
 # Label spelling in the Elastic document is UNVERIFIED between
-# labels.entity.definition and labels.entity_definition; see metrics/labels.md.
+# labels.sahara.entity.definition and labels.sahara_entity_definition; see
+# metrics/labels.md.

@@ -37,11 +37,13 @@ from check_common import (  # noqa: E402
     looks_unbounded,
     print_report,
     read_documents,
+    rule_vocabulary_sane,
     skipped,
     verdict,
 )
 
-ALLOWED_LEVELS = ("error", "warning", "warn", "info", "debug")
+ALLOWED_LEVELS = ("error", "warn", "info", "debug")
+LEVEL_SPELLINGS = {"warning": "warn"}  # read as warn; the vocabulary and the shipped value spell it warn / WARN
 LEVEL_ALIASES = ("log.level", "level", "levelname", "severity", "severity_text", "log_level")
 TIMESTAMP_ALIASES = ("@timestamp", "timestamp", "time", "asctime", "ts")
 MESSAGE_ALIASES = ("message", "msg", "event")
@@ -92,7 +94,8 @@ def level_of(line: Line) -> str | None:
     alias = first_present(line.fields, LEVEL_ALIASES)
     if alias is None:
         return None
-    return str(line.fields[alias]).strip().lower()
+    level = str(line.fields[alias]).strip().lower()
+    return LEVEL_SPELLINGS.get(level, level)
 
 
 def template_pattern(template: str) -> re.Pattern[str]:
@@ -132,7 +135,7 @@ def rule_level_values(lines: list[Line]) -> Result:
         level = level_of(line)
         if level is not None and level not in ALLOWED_LEVELS:
             offenders.append(f"{line.label()} level {level!r} not in {list(ALLOWED_LEVELS)}")
-    return verdict("level-values", offenders, note="levels are error, warning, info, debug; see logs/levels.md")
+    return verdict("level-values", offenders, note="levels are ERROR, WARN, INFO, DEBUG (warning is read as warn); see logs/levels.md")
 
 
 def rule_message_templates(lines: list[Line], vocabulary: Vocabulary | None, max_messages: int) -> Result:
@@ -150,8 +153,9 @@ def rule_message_templates(lines: list[Line], vocabulary: Vocabulary | None, max
                 offenders.append(f"{line.label()} matches no vocabulary message template")
                 continue
             level = level_of(line)
-            if level is not None and level not in {row.level for row in matched} and not (level == "warn" and "warning" in {row.level for row in matched}):
-                offenders.append(f"{line.label()} level {level!r}, vocabulary template {matched[0].template!r} says {matched[0].level!r}")
+            allowed_levels = {level for row in matched for level in row.levels}
+            if level is not None and level not in allowed_levels:
+                offenders.append(f"{line.label()} level {level!r}, vocabulary template {matched[0].template!r} says {', '.join(matched[0].levels)}")
             missing = [key for key in matched[0].fields if key not in line.fields]
             if missing:
                 offenders.append(f"{line.label()} missing template fields {', '.join(missing)}")
@@ -193,7 +197,7 @@ def rule_trace_correlation(lines: list[Line], span_trace_ids: set[str] | None) -
     if span_trace_ids is None:
         second = skipped("trace-ids-in-spans", "no --spans given")
     else:
-        second = verdict("trace-ids-in-spans", unknown, failing_status=WARN, note="a trace id that no span carries may be a sampled trace or a wrong injection; open one in Kibana to tell")
+        second = verdict("trace-ids-in-spans", unknown, failing_status=WARN, note="a trace id that no span carries may be a sampled trace or a wrong injection; open one in the backend to tell, see backends/<backend>/queries.md")
     return first, second
 
 
@@ -260,6 +264,7 @@ def run(lines: list[Line], vocabulary: Vocabulary | None, span_trace_ids: set[st
     correlation, in_spans = rule_trace_correlation(lines, span_trace_ids)
     return [
         input_not_empty("log lines", len(lines)),
+        rule_vocabulary_sane(vocabulary),
         rule_fields_present(lines),
         rule_level_values(lines),
         rule_message_templates(lines, vocabulary, max_messages),
@@ -286,7 +291,7 @@ def main(argv: list[str] | None = None) -> int:
     span_trace_ids = load_span_trace_ids(arguments.spans)
     results = run(lines, vocabulary, span_trace_ids, arguments.max_messages)
     if vocabulary is None:
-        results.insert(0, Result("vocabulary", SKIP, 0, [], "no --vocabulary: skipped message templates, required-fields, forbidden-keys"))
+        results.insert(0, Result("vocabulary", SKIP, 0, [], "no --vocabulary: skipped vocabulary-sane, message templates, required-fields, forbidden-keys"))
     summary = {
         "lines": len(lines),
         "distinct_messages": len({str(line.fields.get("message")) for line in lines}),

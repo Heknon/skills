@@ -31,7 +31,7 @@
           },
           "metrics": [
             {
-              "name": "sahara.environment.entities",
+              "name": "sahara.entities.live",
               "description": "entities alive in the environment",
               "unit": "{entity}",
               "sum": {
@@ -68,34 +68,122 @@
               }
             },
             {
-              "name": "sahara.worker.heap",
-              "description": "worker heap in use",
-              "unit": "By",
+              "name": "sahara.controller.polls",
+              "description": "controller polls of the product API",
+              "unit": "{poll}",
+              "sum": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "sahara.entity.definition",
+                        "value": {
+                          "stringValue": "tank"
+                        }
+                      },
+                      {
+                        "key": "outcome",
+                        "value": {
+                          "stringValue": "ok"
+                        }
+                      }
+                    ],
+                    "timeUnixNano": "1789603260000000000",
+                    "startTimeUnixNano": "1789603200000000000",
+                    "asInt": "41"
+                  },
+                  {
+                    "attributes": [
+                      {
+                        "key": "sahara.entity.definition",
+                        "value": {
+                          "stringValue": "tank"
+                        }
+                      },
+                      {
+                        "key": "outcome",
+                        "value": {
+                          "stringValue": "timeout"
+                        }
+                      }
+                    ],
+                    "timeUnixNano": "1789603260000000000",
+                    "startTimeUnixNano": "1789603200000000000",
+                    "asInt": "2"
+                  },
+                  {
+                    "attributes": [
+                      {
+                        "key": "sahara.entity.definition",
+                        "value": {
+                          "stringValue": "valve"
+                        }
+                      },
+                      {
+                        "key": "outcome",
+                        "value": {
+                          "stringValue": "ok"
+                        }
+                      }
+                    ],
+                    "timeUnixNano": "1789603260000000000",
+                    "startTimeUnixNano": "1789603200000000000",
+                    "asInt": "9"
+                  }
+                ],
+                "aggregationTemporality": 2,
+                "isMonotonic": true
+              }
+            },
+            {
+              "name": "sahara.controller.poll.duration",
+              "description": "one controller poll, from request to answer",
+              "unit": "s",
+              "histogram": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "sahara.entity.definition",
+                        "value": {
+                          "stringValue": "tank"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1789603200000000000",
+                    "timeUnixNano": "1789603260000000000",
+                    "count": "43",
+                    "sum": 8.6,
+                    "bucketCounts": [
+                      "30",
+                      "11",
+                      "2",
+                      "0"
+                    ],
+                    "explicitBounds": [
+                      0.1,
+                      0.5,
+                      2.0
+                    ],
+                    "min": 0.04,
+                    "max": 1.9
+                  }
+                ],
+                "aggregationTemporality": 2
+              }
+            },
+            {
+              "name": "sahara.worker.queue.depth",
+              "description": "tests queued for this worker",
+              "unit": "{test}",
               "gauge": {
                 "dataPoints": [
                   {
                     "attributes": [],
                     "timeUnixNano": "1789603260000000000",
-                    "asInt": "734003200"
-                  }
-                ]
-              }
-            },
-            {
-              "name": "sahara.cycle.tests.pending",
-              "description": "",
-              "unit": "{test}",
-              "sum": {
-                "dataPoints": [
-                  {
-                    "attributes": [],
-                    "timeUnixNano": "1789603260000000000",
-                    "startTimeUnixNano": "1789603200000000000",
                     "asInt": "12"
                   }
-                ],
-                "aggregationTemporality": 2,
-                "isMonotonic": false
+                ]
               }
             }
           ]

@@ -42,6 +42,7 @@ from check_common import (  # noqa: E402
     otlp_attributes,
     print_report,
     read_documents,
+    rule_vocabulary_sane,
     skipped,
     verdict,
 )
@@ -171,11 +172,12 @@ def rule_instrument_type(metrics: list[Metric], vocabulary: Vocabulary | None) -
         if row is None:
             continue
         expected = row.instrument.replace(" ", "").replace("-", "").replace("_", "")
-        if expected in ("updowncounter",) and metric.instrument == "updowncounter":
+        if expected == "none":
+            offenders.append(f"{metric.name} arrives as {metric.instrument}, vocabulary says none: the backend derives it, do not emit it (metrics/derived-or-emitted.md)")
             continue
         if expected and metric.instrument != expected:
             offenders.append(f"{metric.name} arrives as {metric.instrument}, vocabulary says {row.instrument}")
-    return verdict("instrument-type", offenders, note="sum monotonic is counter, sum non monotonic is updowncounter; gauge and histogram map to themselves")
+    return verdict("instrument-type", offenders, note="sum monotonic is counter, sum non monotonic is updowncounter; gauge and histogram map to themselves; none means derived")
 
 
 def rule_unit(metrics: list[Metric], vocabulary: Vocabulary | None) -> Result:
@@ -187,7 +189,7 @@ def rule_unit(metrics: list[Metric], vocabulary: Vocabulary | None) -> Result:
         row = vocabulary.metrics.get(metric.name) if vocabulary else None
         if row is not None and row.unit and row.unit != metric.unit:
             offenders.append(f"{metric.name} has unit {metric.unit!r}, vocabulary says {row.unit!r}")
-    return verdict("unit-present", offenders, note="units are UCUM strings such as s, ms, By, 1, {entity}")
+    return verdict("unit-present", offenders, note="units are UCUM strings such as s, By, 1, {entity}; see metrics/units-and-buckets.md")
 
 
 def rule_labels_allowed(metrics: list[Metric], vocabulary: Vocabulary | None) -> Result:
@@ -263,7 +265,7 @@ def rule_derived(metrics: list[Metric], vocabulary: Vocabulary | None) -> Result
             continue
         for label, pattern in DERIVED_NAME_PATTERNS:
             if pattern.search(metric.name):
-                offenders.append(f"{metric.name} looks like the Elastic derived metric {label}; do not emit it")
+                offenders.append(f"{metric.name} looks like a metric the backend derives from spans ({label}); do not emit it, see backends/paradigms.md")
                 break
         else:
             if metric.instrument == "histogram" and DURATION_SUFFIX.search(metric.name):
@@ -277,6 +279,7 @@ def rule_derived(metrics: list[Metric], vocabulary: Vocabulary | None) -> Result
 def run(metrics: list[Metric], vocabulary: Vocabulary | None, limit: int) -> list[Result]:
     return [
         input_not_empty("metrics", len(metrics)),
+        rule_vocabulary_sane(vocabulary),
         rule_names_in_vocabulary(metrics, vocabulary),
         rule_name_shape(metrics),
         rule_instrument_type(metrics, vocabulary),
@@ -301,7 +304,7 @@ def main(argv: list[str] | None = None) -> int:
     metrics = load_metrics(arguments.metrics)
     results = run(metrics, vocabulary, arguments.max_series)
     if vocabulary is None:
-        results.insert(0, Result("vocabulary", SKIP, 0, [], "no --vocabulary: skipped names-in-vocabulary, instrument-type, labels-allowed and the vocabulary unit check"))
+        results.insert(0, Result("vocabulary", SKIP, 0, [], "no --vocabulary: skipped vocabulary-sane, names-in-vocabulary, instrument-type, labels-allowed and the vocabulary unit check"))
     instruments = Counter(metric.instrument for metric in metrics)
     summary = {
         "metrics": len(metrics),

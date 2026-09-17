@@ -46,7 +46,7 @@
               "traceId": "0af7651916cd43dd8448eb211c80319c",
               "spanId": "b7ad6b7169203331",
               "parentSpanId": "",
-              "name": "pytest.session",
+              "name": "session.run",
               "kind": 1,
               "startTimeUnixNano": "1789603200000000000",
               "endTimeUnixNano": "1789603205000000000",
@@ -73,7 +73,7 @@
               "events": [],
               "links": [],
               "status": {
-                "code": 0
+                "code": 1
               }
             },
             {
@@ -129,9 +129,9 @@
                   "spanId": "b7ad6b7169203331",
                   "attributes": [
                     {
-                      "key": "sahara.link.kind",
+                      "key": "link.relation",
                       "value": {
-                        "stringValue": "session"
+                        "stringValue": "belongs_to"
                       }
                     }
                   ]
@@ -181,6 +181,12 @@
                   }
                 },
                 {
+                  "key": "sahara.entity.operation",
+                  "value": {
+                    "stringValue": "create"
+                  }
+                },
+                {
                   "key": "sahara.entity.definition",
                   "value": {
                     "stringValue": "tank"
@@ -189,7 +195,13 @@
                 {
                   "key": "sahara.entity.id",
                   "value": {
-                    "stringValue": "tank-7"
+                    "stringValue": "environment-3/tank-7/1"
+                  }
+                },
+                {
+                  "key": "sahara.entity.fields_json",
+                  "value": {
+                    "stringValue": "{\"capacity\": 100}"
                   }
                 }
               ],
@@ -203,13 +215,19 @@
                       "value": {
                         "intValue": "1"
                       }
+                    },
+                    {
+                      "key": "sahara.retry.reason",
+                      "value": {
+                        "stringValue": "timeout"
+                      }
                     }
                   ]
                 }
               ],
               "links": [],
               "status": {
-                "code": 0
+                "code": 1
               }
             },
             {
@@ -252,6 +270,12 @@
                   }
                 },
                 {
+                  "key": "sahara.entity.operation",
+                  "value": {
+                    "stringValue": "controller"
+                  }
+                },
+                {
                   "key": "sahara.entity.definition",
                   "value": {
                     "stringValue": "tank"
@@ -260,11 +284,11 @@
                 {
                   "key": "sahara.entity.id",
                   "value": {
-                    "stringValue": "tank-7"
+                    "stringValue": "environment-3/tank-7/1"
                   }
                 },
                 {
-                  "key": "sahara.entity.operation",
+                  "key": "sahara.entity.controller.method",
                   "value": {
                     "stringValue": "fill"
                   }
@@ -273,7 +297,7 @@
               "events": [],
               "links": [],
               "status": {
-                "code": 0
+                "code": 1
               }
             },
             {
@@ -316,6 +340,12 @@
                   }
                 },
                 {
+                  "key": "sahara.entity.operation",
+                  "value": {
+                    "stringValue": "destroy"
+                  }
+                },
+                {
                   "key": "sahara.entity.definition",
                   "value": {
                     "stringValue": "tank"
@@ -324,14 +354,14 @@
                 {
                   "key": "sahara.entity.id",
                   "value": {
-                    "stringValue": "tank-7"
+                    "stringValue": "environment-3/tank-7/1"
                   }
                 }
               ],
               "events": [],
               "links": [],
               "status": {
-                "code": 0
+                "code": 1
               }
             },
             {
@@ -400,7 +430,7 @@
                     {
                       "key": "exception.escaped",
                       "value": {
-                        "boolValue": true
+                        "stringValue": "True"
                       }
                     }
                   ]
@@ -412,9 +442,9 @@
                   "spanId": "b7ad6b7169203331",
                   "attributes": [
                     {
-                      "key": "sahara.link.kind",
+                      "key": "link.relation",
                       "value": {
-                        "stringValue": "session"
+                        "stringValue": "belongs_to"
                       }
                     }
                   ]
@@ -465,6 +495,12 @@
                   }
                 },
                 {
+                  "key": "sahara.entity.operation",
+                  "value": {
+                    "stringValue": "create"
+                  }
+                },
+                {
                   "key": "sahara.entity.definition",
                   "value": {
                     "stringValue": "valve"
@@ -473,7 +509,13 @@
                 {
                   "key": "sahara.entity.id",
                   "value": {
-                    "stringValue": "valve-2"
+                    "stringValue": "environment-3/valve-2/1"
+                  }
+                },
+                {
+                  "key": "sahara.entity.fields_json",
+                  "value": {
+                    "stringValue": "{\"bore\": 40}"
                   }
                 }
               ],
@@ -523,6 +565,12 @@
                   }
                 },
                 {
+                  "key": "sahara.entity.operation",
+                  "value": {
+                    "stringValue": "controller"
+                  }
+                },
+                {
                   "key": "sahara.entity.definition",
                   "value": {
                     "stringValue": "valve"
@@ -531,11 +579,11 @@
                 {
                   "key": "sahara.entity.id",
                   "value": {
-                    "stringValue": "valve-2"
+                    "stringValue": "environment-3/valve-2/1"
                   }
                 },
                 {
-                  "key": "sahara.entity.operation",
+                  "key": "sahara.entity.controller.method",
                   "value": {
                     "stringValue": "open"
                   }
@@ -567,7 +615,7 @@
                     {
                       "key": "exception.escaped",
                       "value": {
-                        "boolValue": true
+                        "stringValue": "True"
                       }
                     }
                   ]

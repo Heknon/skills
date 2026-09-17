@@ -47,6 +47,7 @@ from check_common import (  # noqa: E402
     otlp_attributes,
     print_report,
     read_documents,
+    rule_vocabulary_sane,
     skipped,
     verdict,
 )
@@ -243,25 +244,6 @@ def rule_ids_well_formed(spans: list[Span]) -> Result:
         if count > 1:
             offenders.append(f"span_id {span_id} appears {count} times")
     return verdict("ids-well-formed", offenders, note="ids are lower case hex: 32 for a trace, 16 for a span, unique per span")
-
-
-def rule_vocabulary_sane(vocabulary: Vocabulary | None) -> Result:
-    """The vocabulary itself must be consistent before it can judge anything.
-
-    A key of tier label with no allowed list is the tier confusion that lets
-    an unbounded id become a metric dimension. Catch it here, in the file,
-    rather than later in a series count.
-    """
-    if vocabulary is None or not vocabulary.has("span attributes"):
-        return skipped("vocabulary-sane", "no vocabulary Span attributes table")
-    offenders: list[str] = []
-    for attribute in vocabulary.attributes.values():
-        tier = attribute.tier.lower()
-        if tier == "label" and attribute.allowed_values is None:
-            offenders.append(f"{attribute.key} is tier label but allowed values say unbounded; a label lists its values, an unbounded key is tier attribute")
-        if tier not in ("label", "attribute", "name"):
-            offenders.append(f"{attribute.key} has tier {attribute.tier!r}; use label or attribute")
-    return verdict("vocabulary-sane", offenders, note="core/naming-and-cardinality.md, the three tiers")
 
 
 def rule_roots_are_units(spans: list[Span], vocabulary: Vocabulary | None, limit: int) -> Result:
@@ -596,7 +578,7 @@ def main(argv: list[str] | None = None) -> int:
     spans, formats = load_spans(arguments.spans)
     results = run(spans, vocabulary, arguments.max_name_cardinality, arguments.time_tolerance_ms)
     if vocabulary is None:
-        results.insert(0, Result("vocabulary", SKIP, 0, [], "no --vocabulary: skipped roots-are-units, names-in-vocabulary, kind-matches-vocabulary, required-attributes, label-values, forbidden list, vocabulary attribute types"))
+        results.insert(0, Result("vocabulary", SKIP, 0, [], "no --vocabulary: skipped vocabulary-sane, names-in-vocabulary, kind-matches-vocabulary, required-attributes, label-values, forbidden list, vocabulary attribute types; roots-are-units only counts root names"))
     summary = {
         "spans": len(spans),
         "traces": len({span.trace_id for span in spans}),

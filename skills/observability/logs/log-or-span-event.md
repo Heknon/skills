@@ -22,16 +22,16 @@ span does. One fact gets one of them. Invariant 8.
    interlock. **Yes: `log`.**
 3. **Must a person find it without any trace, across all cycles, by its
    words?** For example a security team searching logs for one sentence with
-   no APM access. **Yes: `log`.**
+   no access to traces. **Yes: `log`.**
 4. **Is it the exception that ends this span?** **Neither.** It is
    `span.record_exception` plus status `ERROR`, from
    `core/errors-and-status.md`. Not a log line.
 5. Otherwise: **`span event`**. `span.add_event(name, attributes)` with the
    name from the vocabulary.
 
-## What Elastic 8.x does with each
+## On Elastic
 
-Source: `elastic/apm-data` `input/otlp/traces.go` and `logs.go`.
+Source, 8.x: `elastic/apm-data` `input/otlp/traces.go` and `logs.go`.
 
 - A span event that is not named `exception` becomes a document with
   `event.kind: event`, `message` set to the event name, its attributes as
@@ -47,35 +47,40 @@ Source: `elastic/apm-data` `input/otlp/traces.go` and `logs.go`.
 - A log line sent over OTLP lands in `logs-apm.app.<service.name>-<namespace>`
   with `trace.id` and `span.id` set when the record was made inside a span.
 
-So the two are searchable alike. The difference is sampling, the level, and
-who owns the moment: a span event belongs to a span; a log line belongs to a
-process.
+So on Elastic the two are searchable alike. The difference is sampling, the
+level, and who owns the moment: a span event belongs to a span; a log line
+belongs to a process.
+
+## Other backends
+
+Other backends: the verdicts do not change; the stored shape is in
+backends/<backend>/mapping.md and the differences in backends/paradigms.md.
 
 ## Verdict
 
 Span event:
 
 ```
-| retry | entity.create, entity.call | attempt, wait_seconds |
+| entity.retry | entity.create, entity.controller | sahara.retry.attempt, sahara.retry.reason |
 ```
 
 Log:
 
 ```
-| configuration loaded | INFO | file.path, labels.cycle_id | yes |
+| configuration loaded | info | file.path, sahara.cycle.id, sahara.environment.id, sahara.worker.id | yes |
 ```
 
 ## Never
 
-- Never log a moment that is inside a span at `INFO` or above. If it must be
+- Never log a moment that is inside a span at `info` or above. If it must be
   a log line, it passed question 2 or 3 and the vocabulary says why.
 - Never add a span event and a log line for the same moment.
 - Never log an exception that `record_exception` already recorded, except at
-  `DEBUG`. See `logs/levels.md`.
+  `debug`. See `logs/levels.md`.
 - Never use a span event for something with a duration. That is a child
   span.
 - Never put a value that changes per occurrence in the event name. The name
-  is fixed; `attempt` is an attribute.
+  is fixed, `entity.retry`; `sahara.retry.attempt` is an attribute.
 
 ## Stop and ask
 
@@ -88,10 +93,10 @@ Log:
 
 | Moment | Verdict | Why |
 | --- | --- | --- |
-| Create retried, attempt 2 | span event `retry` | inside `entity.create`, nobody needs it without the trace |
+| Create retried, attempt 2 | span event `entity.retry` | inside `entity.create`, nobody needs it without the trace |
 | Plugin read `sahara.toml` | log | before any span exists |
 | Worker `gw3` was assigned environment `env-3` | log | outside the test unit; needed for every cycle |
-| Controller returned a warning field | span event `controller.warning` | inside `entity.call` |
-| Cycle interrupted by signal | log, `WARN` | must exist even when the last test's trace was sampled away |
+| Controller returned a warning field | span event `controller.warning` | inside `entity.controller` |
+| Cycle interrupted by signal | log, `warn` | must exist even when the last test's trace was sampled away |
 | Test assertion failed | neither | status `ERROR` and `record_exception` on the test span |
-| Revert restored tag `T` | span with `tag` attribute | it has a duration, see `core/signal-choice.md` |
+| Revert restored tag `T` | span with `sahara.entity.tag` attribute | it has a duration, see `core/signal-choice.md` |

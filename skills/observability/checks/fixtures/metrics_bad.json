@@ -104,7 +104,7 @@
               }
             },
             {
-              "name": "sahara.environment.entities",
+              "name": "sahara.entities.live",
               "description": "",
               "unit": "{entity}",
               "sum": {
@@ -134,15 +134,15 @@
               }
             },
             {
-              "name": "sahara.worker.heap",
+              "name": "sahara.worker.queue.depth",
               "description": "",
-              "unit": "MiBy",
+              "unit": "1",
               "gauge": {
                 "dataPoints": [
                   {
                     "attributes": [],
                     "timeUnixNano": "1789603260000000000",
-                    "asDouble": 700.0
+                    "asDouble": 12.0
                   }
                 ]
               }

@@ -16,7 +16,7 @@
                     },
                     "metrics": [
                         {
-                            "name": "sahara.environment.entities",
+                            "name": "sahara.entities.live",
                             "description": "",
                             "unit": "{entity}",
                             "data": {
@@ -36,16 +36,37 @@
                             }
                         },
                         {
-                            "name": "sahara.worker.heap",
+                            "name": "sahara.controller.polls",
                             "description": "",
-                            "unit": "By",
+                            "unit": "{poll}",
+                            "data": {
+                                "data_points": [
+                                    {
+                                        "attributes": {
+                                            "sahara.entity.definition": "tank",
+                                            "outcome": "ok"
+                                        },
+                                        "start_time_unix_nano": 1789603200000000000,
+                                        "time_unix_nano": 1789603260000000000,
+                                        "value": 41,
+                                        "exemplars": []
+                                    }
+                                ],
+                                "aggregation_temporality": 2,
+                                "is_monotonic": true
+                            }
+                        },
+                        {
+                            "name": "sahara.worker.queue.depth",
+                            "description": "",
+                            "unit": "{test}",
                             "data": {
                                 "data_points": [
                                     {
                                         "attributes": {},
                                         "start_time_unix_nano": null,
                                         "time_unix_nano": 1789603260000000000,
-                                        "value": 734003200,
+                                        "value": 12,
                                         "exemplars": []
                                     }
                                 ]
@@ -77,7 +98,7 @@
                     },
                     "metrics": [
                         {
-                            "name": "sahara.environment.entities",
+                            "name": "sahara.entities.live",
                             "description": "",
                             "unit": "{entity}",
                             "data": {
@@ -88,7 +109,7 @@
                                         },
                                         "start_time_unix_nano": 1789603200000000000,
                                         "time_unix_nano": 1789603260000000000,
-                                        "value": 3,
+                                        "value": 4,
                                         "exemplars": []
                                     }
                                 ],
@@ -97,16 +118,37 @@
                             }
                         },
                         {
-                            "name": "sahara.worker.heap",
+                            "name": "sahara.controller.polls",
                             "description": "",
-                            "unit": "By",
+                            "unit": "{poll}",
+                            "data": {
+                                "data_points": [
+                                    {
+                                        "attributes": {
+                                            "sahara.entity.definition": "tank",
+                                            "outcome": "ok"
+                                        },
+                                        "start_time_unix_nano": 1789603200000000000,
+                                        "time_unix_nano": 1789603260000000000,
+                                        "value": 41,
+                                        "exemplars": []
+                                    }
+                                ],
+                                "aggregation_temporality": 2,
+                                "is_monotonic": true
+                            }
+                        },
+                        {
+                            "name": "sahara.worker.queue.depth",
+                            "description": "",
+                            "unit": "{test}",
                             "data": {
                                 "data_points": [
                                     {
                                         "attributes": {},
                                         "start_time_unix_nano": null,
                                         "time_unix_nano": 1789603260000000000,
-                                        "value": 734003200,
+                                        "value": 11,
                                         "exemplars": []
                                     }
                                 ]

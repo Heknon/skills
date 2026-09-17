@@ -128,6 +128,11 @@ a self managed 9.x APM Server.
 | each individual value, to look at one | a span attribute, or a span event |
 | fewer than about ten values per export | a span attribute; the histogram would be noise |
 
+## Other backends
+
+Other backends: the verdicts do not change; the stored shape is in
+backends/<backend>/mapping.md and the differences in backends/paradigms.md.
+
 ## Verdict
 
 The *Metrics* table row:

@@ -91,14 +91,22 @@ APM index templates in the Elasticsearch `apm-data` plugin.
   ordinary keyword fields, not TSDB dimensions. UNVERIFIED for 8.x versions
   before the `apm-data` plugin owned the templates.
 
+## Other backends
+
+Other backends: the verdicts do not change; the stored shape is in
+backends/<backend>/mapping.md and the differences in backends/paradigms.md.
+
 ## Verdict
 
 Write into the *Metrics* table, *Labels* column, and make sure each key has a
 row in *Span attributes* with tier `label` and its allowed values:
 
 ```
-| <metric name> | ... | <unit> | entity.definition, entity.operation, outcome | no |
+| sahara.controller.polls | counter | {poll} | sahara.entity.definition, outcome | no |
 ```
+
+A metric with no labels writes `(none)` in that column, as
+`sahara.worker.queue.depth` does.
 
 ## Never
 
