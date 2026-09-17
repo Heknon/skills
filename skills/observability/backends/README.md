@@ -24,8 +24,11 @@ where another costs. Read both once.
 | `collector.md` | there is a Collector between the SDK and the stack, or the stack needs one to derive span metrics |
 | `verification-ladder.md` | data is missing, wrong or duplicated, and you must find the hop where it stops |
 
-Elastic has two files more: `queries-dsl.md` for Elasticsearch aggregations
-and `elastic-agent.md` for APM Server under Fleet.
+Each folder has one or two files more where a topic outgrew the shared set.
+Elastic: `queries-dsl.md` for Elasticsearch aggregations and
+`elastic-agent.md` for APM Server under Fleet. Grafana: `queries-promql.md`
+and `collector-alloy.md`, the same collector config in Alloy syntax.
+Victoria: `vmagent.md` for relaying, relabeling and stream aggregation.
 
 ## This installation
 
