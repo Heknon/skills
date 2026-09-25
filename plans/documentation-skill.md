@@ -102,6 +102,7 @@ output pasted. A task is not done until the checkers pass.
 | Diagram or prose, and which C4 level | `core/diagrams.md` |
 | Who is the reader | `core/audience.md` |
 | We know what the code does but not why | `core/rationale.md` (always stop and ask, or cite a source) |
+| Does this function need a docstring, and what goes in it | `core/docstring-needed.md` (section 10b) |
 
 ## 5. The law file: `docs-map.md`
 
@@ -191,15 +192,17 @@ skills/documentation/
   inventory/                    finding the surfaces that need documentation
     README.md                   what a surface is, per kind
     scan_surfaces.py            standard library, heuristic, fixtures per ecosystem
-  tooling/                      see section 10a and decision D3
+  tooling/                      see sections 10a and 10c
     README.md  choosing.md  paradigms.md
     <tool>/overview.md  install-offline.md  config.md
           structure.md  build-check.md  air-gap-pitfalls.md
   checks/
     check_map.py  check_links.py  check_pages.py
     check_claims.py  check_coverage.py  check_freshness.py  check_style.py
+    check_docstrings.py
     fixtures/  run_fixtures.sh
   examples/
+    multi-repo-aggregator.md    the current setup, section 10c
     library-repo.md             one package, public API, generated reference
     service-with-subsystems.md  a system and its components, C4 context and container
     multi-repo-system.md        one system across three repositories, team hub
@@ -247,7 +250,7 @@ The scanner is regex over files, per ecosystem, and says so. It over-reports
 rather than under-reports, and the map's exemption table absorbs the noise
 once. Anything subtler than a regex, such as a route built at runtime, a
 type inferred across a virtual environment, or a call path, is not in this
-skill. See decision D1.
+skill. It belongs to the navigation skill (section 13).
 
 ## 10a. Tooling knowledge: `tooling/`
 
@@ -300,7 +303,7 @@ tool, so the skill holds what it needs, verified and version stamped.
   successor); `choosing.md` must state the verified status on the date it was
   written, and the model must not assume a newer state.
 
-### Default recommendation, to be confirmed by the research
+### Default recommendation, to be confirmed by the research and by D3
 
 One static site generator for the whole organisation, a hub repository per
 team that aggregates per-repository docs folders, generated reference pulled
@@ -309,9 +312,83 @@ the page, Vale and lychee in the checks. `choosing.md` decides the generator
 from facts: languages in use, whether Backstage already runs, how many
 repositories, whether versioned docs are needed.
 
+## 10b. In-code documentation: when a docstring earns its place
+
+Too many docstrings is a defect as real as too few. A docstring that restates
+the name and signature costs reading time and drifts. A missing one on a
+function with a hidden contract costs a bug. The skill decides from facts,
+not taste, in `core/docstring-needed.md`.
+
+**Questions, answered from the code:**
+
+1. Is it public: exported, in `__all__`, in a package's `exports`, called
+   from another module or another repository?
+2. Do the name, the parameter names and the types together state everything
+   a caller must know?
+3. Does it do anything the signature hides: raise, mutate an argument, write
+   to disk, network, or a global, block, retry, cache, or depend on call
+   order?
+4. Does a value carry a unit, a range, a format, or a sentinel meaning
+   (seconds or milliseconds, `None` means "all", `-1` means "unlimited")?
+5. Does it return an untyped shape (`dict`, `Any`, a tuple) whose keys or
+   positions a caller must know?
+6. Is there a non-obvious reason it is written this way, recorded in a
+   commit, a pull request or an issue?
+
+**Verdict:**
+
+- No to 1, yes to 2, no to 3 to 6: **no docstring**. An existing one that
+  restates the name is deleted.
+- Yes to 3, 4, 5 or 6: **a docstring naming exactly those facts**, one line
+  each, and nothing else. No retelling of the body.
+- Yes to 1 and no to 2: **a one-line summary**, plus 3 to 6 as they apply.
+- 6 without a source: a comment is not written; stop and ask (invariant 2).
+
+**Never:** a docstring that repeats parameter names and types already in the
+signature; a comment that says what the next line does; a docstring on a
+private helper whose name says it all.
+
+**Checker:** `check_docstrings.py`, Python through the standard library `ast`
+module, TypeScript and JavaScript by pattern. It reports **restating**
+docstrings (every content word is already in the function or parameter
+names), and **missing** ones on public functions that raise, touch I/O,
+return an untyped shape, or take a parameter named like a unit
+(`timeout`, `delay`, `size`, `limit`). Both are `WARN` with the question
+number that decides it, because the final call is the procedure's, not the
+pattern's.
+
+## 10c. The case this skill must handle first: your current setup
+
+Each repository keeps its own docs folder. A downstream repository pulls them
+together and builds one site, with MkDocs or Read the Docs. That is a real
+pattern, the multi-repository aggregator, and it becomes the first worked
+example and the first eval, built from the real repositories.
+
+What the skill must be able to do with it:
+
+- **Audit it as it is**: which repositories feed the aggregator, how
+  (git submodules, a copy step in CI, a plugin such as a multirepo or
+  monorepo plugin), which pages fall out of the navigation, which links
+  break across repositories, which pages are stale.
+- **Decide whether to keep it**, through `tooling/choosing.md`: keep the
+  aggregator and fix it, move to Backstage with TechDocs (each repository
+  publishes its own docs, the catalog provides the team, system and
+  component hierarchy), or another generator.
+- **Migrate it**, as a Restructure task, if the verdict says move.
+
+Read the Docs is a hosting and build service, not a generator. It builds
+Sphinx or MkDocs. Its hosted service needs the internet, and self-hosting it
+is heavy, so in an air-gapped setting it is usually the wrong layer to depend
+on. The research will confirm this and state it in `tooling/choosing.md`.
+
+Backstage fits the hierarchy problem directly, since its catalog already has
+teams, systems and components, but it is a service to run, upgrade and
+mirror offline. The choosing procedure weighs that against keeping a static
+aggregator. No verdict until the aggregator repository has been read.
+
 ## 11. Worked examples
 
-Four examples, as in section 8. Each holds a small fictional codebase, its
+Five examples, as in section 8. Each holds a small fictional codebase, its
 `docs-map.md`, its pages, and the checker output. `extract_golden.py` pulls
 them out and `run_fixtures.sh` runs every checker on them, so the examples
 cannot drift from the rules. Same mechanism as observability.
@@ -334,112 +411,109 @@ Draft scenarios, each baiting one known failure:
 | 9 | "Just write something quick about the config, you can guess the defaults" | guesses defaults | reads them from code or stops and asks |
 | 10 | A team with five systems, "organise our docs" | invents a folder scheme | maps to Group, Domain, System, Component via the procedure, produces the map |
 | 11 | A monorepo with twelve packages | one README for everything | one unit per package that passes the unit procedure, one monorepo index |
+| 12 | "Add docstrings to this module" (half its functions are self-explanatory) | docstrings everywhere | applies `core/docstring-needed.md` per function; some get none, restating ones are removed |
+| 13 | A function takes `timeout` with no unit and returns a `dict` | "Returns a dict." | a docstring naming the unit and the keys, sourced from the code |
+| 14 | "Our aggregator site is missing pages and links are broken" | edits the site config by guess | audits which repositories feed it and how, runs the link and map checkers, lists the causes |
 
-Run each on MiniMax 2.7 if we have access (decision D6), otherwise on a small
+Run each on MiniMax 2.7 if we have access (decision D5), otherwise on a small
 stand-in, with only the skill folder readable. Record runs in `evals.json` as
 observability does, fix what fails, rerun.
 
-## 13. Build order
+## 13. The skill family, and where documentation sits in it
 
-1. Decisions in section 14.
-2. Evals first (section 12), with real cases from your repositories replacing
-   the fictional ones where possible.
-3. Router, invariants, answer shape, glossary, docs-map template.
-4. Core procedures, in dilemma-table order.
-5. Structure templates and page-type templates.
-6. Inventory scanner, checkers, fixtures, harness.
-7. Worked examples, extracted and checked by the harness.
-8. Platform folders, per decision D3.
-9. Weak-model eval run, answer-shape fixes, rerun, record.
-10. Consistency pass against one written canon, as observability's final
-    commit did.
+I agree that navigation is a must. The documentation skill's central rule is
+that every claim points at a path, a symbol or a command. A weak model can
+only keep that rule if it can reliably find those things, across
+repositories, through virtual environments and inferred types. Without a
+navigation skill, most explanation pages end in "stop and ask", and the
+skill is much less useful.
 
-## 14. Decisions needed from you
+Proposed family, in three layers:
 
-### D1. A codebase navigation skill ("seniority"): separate, and when
+1. **Seniority: the orchestrator.** A thin router over the other skills: for
+   a kind of task, which skills to load, in which order, and what each hands
+   the next. It holds the shared canon (router shape, procedure format, law
+   files, fixed answer headings, checker contract, eval format). It does not
+   contain domain knowledge; a weak model does badly with one huge skill,
+   and well with a small router that sends it to one short file.
+2. **Capability skills.** Used by every domain skill.
+   - **Navigation**: find the entry points, follow a call path, resolve what
+     a name refers to, read inferred types, locate and activate the right
+     environment, read runtime wiring (config, dependency injection). Its
+     tools are backends, the way Elastic and Grafana are for observability:
+     ripgrep, universal-ctags, a language server, and **Sourcegraph** for
+     cross-repository search. Same questions, a folder per tool, a choosing
+     procedure for which one is available. This is where a Sourcegraph skill
+     plugs in: either as the Sourcegraph folder inside navigation, or as its
+     own skill that navigation points to.
+   - **Execution**: install dependencies from an offline mirror, run a
+     command, capture output. Needed so examples are run, not guessed.
+   - **Git archaeology**: blame, the commit and pull request behind a line,
+     what changed since a commit. Feeds rationale and freshness.
+3. **Domain skills.** Observability, documentation, and later others.
+   Diagramming (C4, Mermaid) and writing style stay inside documentation
+   until a second skill needs them.
 
-Documentation depends on understanding code the model has never seen:
-finding entry points, following a call path, resolving what a name refers
-to, reading dynamically typed code whose types are only inferred, detecting
-and activating the right virtual environment or `node_modules`, reading how
-dependency injection and configuration wire a system together at runtime.
-You said this belongs in another skill; I agree. It is needed for every
-engineering skill, not only documentation.
+**The contract between them.** Each capability skill answers a fixed set of
+questions in a fixed shape, so a domain skill can rely on it:
 
-What documentation needs from it, as its interface:
+| Question from documentation | Answered by | Answer shape |
+| --- | --- | --- |
+| Where is this surface implemented | navigation | `path:line`, symbol |
+| Who calls this, what does it call | navigation | list of `path:line` |
+| Is this claim true | navigation | yes or no, with `path:line` |
+| What does this command print | execution | the command, its exit code, its output |
+| Why is it like this | git archaeology | commit, pull request, or `not recorded` |
+| Has this changed since commit X | git archaeology | list of changed paths |
 
-- given a surface, the file and symbol that implements it;
-- given a symbol, where it is called from and what it calls;
-- given a claim, a yes or no with the path that proves it;
-- how to get a working environment, so commands can be run.
+Documentation is written against this contract from day one. Until a
+capability skill exists, its row returns "stop and ask", and the answer
+names the missing capability.
 
-Options:
+## 14. Build order
 
-- **(a) Build the navigation skill first**, then documentation on top.
-  Slowest; best accuracy for explanation pages.
-- **(b) Build documentation now with a regex inventory, and a stop and ask
-  wherever a claim needs deeper navigation.** Build navigation next and
-  replace those stops with its procedures. *Recommended:* documentation is
-  useful without it for reference, README, runbook, structure and audit, and
-  the stop and ask points become the navigation skill's requirements list.
-- **(c) Fold navigation into documentation.** Not recommended; it would be
-  duplicated in every later skill.
+1. Decisions in section 15.
+2. The canon, as the first file of the seniority skill.
+3. Navigation, with ripgrep and ctags first, Sourcegraph once D2 is answered.
+   Execution and git archaeology as folders of navigation or as their own
+   skills, per D1.
+4. Documentation: evals first, from the real aggregator setup; then router,
+   invariants, procedures, templates, scanner, checkers, examples, tooling.
+5. Seniority router, once there are enough skills to route between.
+6. Weak-model eval runs across the family, then a consistency pass against
+   the canon.
 
-### D2. An environment and execution skill: part of navigation, or its own
+## 15. Decisions needed from you
 
-Invariant 9 wants examples run. Running needs dependencies installed,
-services up, secrets absent. Either part of the navigation skill, or its own
-skill. *Recommended:* part of navigation, as one folder. Until it exists,
-documentation marks command blocks `not run`.
+### D1. The skill family
 
-### D3. Which tools get full folders
+Seniority as a thin orchestrator with the canon; navigation, execution and
+git archaeology as capability skills; documentation and observability as
+domain skills. *Recommended:* yes, with execution and git archaeology as
+folders inside navigation at first, split out when they grow.
 
-Section 10a lists the candidates. Each full folder is real research and an
-offline build, so not all of them can be deep. *Recommended:* every candidate
-gets a row in `choosing.md` and `paradigms.md`; full folders for one site
-generator, Backstage TechDocs if you run Backstage, Mermaid, Vale and lychee,
-and the API reference generator for each language in D4. What do you run
-today, if anything, and is Backstage in the picture?
+### D2. Sourcegraph
 
-### D4. Which languages the surface scanner covers
+Do you run a self-hosted Sourcegraph inside the air-gapped network, and is
+there already a skill for it? If yes, navigation treats it as its main
+backend for cross-repository questions.
 
-Observability chose Python only for recipes. `morphine-sahara-mock-api` is
-TypeScript on Bun with a Python MCP server. *Recommended:* Python and
-TypeScript/JavaScript first, others stop and ask. Other languages you need?
+### D3. The aggregator repository
 
-### D5. Where a team's and a multi-repository system's docs live
+Which repository builds the combined site today? Once I can read it, I can
+confirm MkDocs or Read the Docs, and the keep, fix or move to Backstage
+decision becomes a verdict from facts rather than a guess.
 
-A team hub repository, a portal (Backstage), a wiki, or the largest
-repository of the system? `core/doc-home.md` will decide from facts, but the
-default must match how your organisation works.
+### D4. Which languages the scanner and the docstring checker cover
 
-### D6. The eval model
+*Recommended:* Python and TypeScript/JavaScript first. Others?
 
-Can we run MiniMax 2.7 for the eval runs, and through what? Observability
-used Claude Haiku 4.5 as a stand-in. A stand-in that is smarter than the
-target hides failures.
+### D5. The eval model
 
-### D7. May the skill edit code
+Can we run MiniMax 2.7 for evals, and through what? A smarter stand-in hides
+failures.
 
-Docstrings and code comments are documentation (`core/in-code-or-page.md`).
-Should the skill write them, or only propose them?
+### D6. May the skill edit code
 
-### D8. A shared canon for all weak-model skills
-
-Observability and documentation share a shape: router, procedure format,
-law file, invariants, fixed answer headings, checker contract, eval format.
-A third skill (navigation) will too. *Recommended:* extract it once into
-`CANON.md` at the repository root, and have each skill's consistency pass
-check against it. It could also become a skill-authoring skill later.
-
-### Smaller skills that came up, for the record
-
-- **Diagramming** (C4 and Mermaid). *Recommended:* inside documentation for
-  now, as `core/diagrams.md` and templates. Separate only if another skill
-  needs it.
-- **Technical writing style.** Inside documentation as `check_style.py` and a
-  style section. Worth sharing later with commit-message and pull-request
-  writing.
-- **Git archaeology** (blame, finding the pull request that introduced a
-  line, reading its discussion for rationale). Feeds `core/rationale.md` and
-  `core/freshness.md`. *Recommended:* part of the navigation skill.
+With section 10b in place, it can delete restating docstrings and add
+missing ones. Should it change code directly, or propose the changes?
