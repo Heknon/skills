@@ -224,6 +224,8 @@ and production starts with `skip_indexes=True` (behaviour to verify).
 *Recommended:* nested models flatten to dotted paths; lists and
 `dict`-typed fields are replaced whole; an explicit `None` is sent as
 `$set: null`, never `$unset`, unless the model marks the field removable.
+The `$set` holds only fields that changed after pydantic validated the
+merged document, filtered on its revision: `plans/roadmap.md`, R4.
 
 ### M6. mongomock in tests
 
