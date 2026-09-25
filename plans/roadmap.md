@@ -17,7 +17,7 @@ two disagree, fix both.
 | **offline-docs** | `plans/offline-docs-skill.md` | `claude/plan-offline-docs` | answer "how does this library work" with no web: installed source, `help()`, `pydoc`, `dist-info`, `--help` |
 | **pydantic** | `plans/pydantic-skill.md` | `claude/plan-pydantic` | v2 models, validators, serialization, typing details, settings and config management, partial models for PATCH |
 | **api** | `plans/api-skill.md` | `claude/plan-api` | API design (the contract) and FastAPI (the mechanics) |
-| **architecture** | `plans/architecture-skill.md` | `claude/plan-architecture` | backend structure: router, service, repository/DAL, the models at each boundary |
+| **architecture** | `plans/architecture-skill.md` | `claude/plan-architecture` | code structure from a single file to a service: where a new thing goes, custom errors, router, service, repository/DAL, the models at each boundary |
 | **mongodb** | `plans/mongodb-skill.md` | `claude/plan-mongodb` | efficient queries, indexes, `explain`, aggregation, schema design, Beanie |
 | **packaging** | `plans/packaging-skill.md` | `claude/plan-packaging` | `pyproject.toml`, build backends, wheels, entry points, internal indexes |
 | **linting** | `plans/linting-skill.md` | `claude/plan-linting` | ruff, mypy and pyright: read, fix, configure, suppress |
@@ -99,6 +99,8 @@ points at it.
 | what pydantic types mean (`Annotated`, generics, discriminated unions, `Optional` vs default) | pydantic | linting owns running the checkers, their config and the pydantic mypy plugin setting |
 | pagination | api owns the contract (cursor, page size, links) | mongodb owns the keyset query and the index behind it |
 | error responses | api owns the error shape | architecture owns translating errors layer by layer on the way to it |
+| custom exceptions: when to define one, the hierarchy, where it lives, its fields | architecture | api owns the handlers and response; pydantic owns errors inside validators; linting owns the ruff rules that flag them (N818, TRY002, TRY003, B904) |
+| where one new thing goes (error, constant, enum, helper, type): existing file or new | architecture | a constant that differs by environment is a setting, owned by pydantic |
 | FastAPI `Depends` mechanics, `dependency_overrides` | api | architecture owns what is injected and swapped; pytest owns fixtures |
 | request and response models | api | architecture owns keeping them apart from domain and database models |
 | Beanie (`Document`, `Link`, `init_beanie`, queries) | mongodb | architecture owns the repository pattern around it |
