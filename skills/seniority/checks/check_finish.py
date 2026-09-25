@@ -60,12 +60,18 @@ def probe_required(ledger) -> bool:
     return bool(VAGUE_GOAL_RE.search(ledger.header.get("goal", ""))) or "unchanged" in ledger.header.get("done when", "").lower()
 
 
-def run_probe(probe: str, tree: str) -> Tuple[int, str]:
+def run_probe(probe: str, tree: str, workdir: str) -> Tuple[int, str]:
+    """Run the probe against one tree. A probe that names the working directory by its absolute
+    path would import the changed code in both runs, so that path is rewritten to the tree's."""
+    text = read(probe) or ""
+    copy = os.path.join(tree, ".check_finish_probe.py")
+    with open(copy, "w", encoding="utf-8") as handle:
+        handle.write(text.replace(workdir.rstrip(os.sep), tree))
     env = dict(os.environ)
     env["PYTHONPATH"] = tree + os.pathsep + env.get("PYTHONPATH", "")
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     try:
-        done = subprocess.run([sys.executable, os.path.abspath(probe)], cwd=tree, env=env, capture_output=True,
+        done = subprocess.run([sys.executable, copy], cwd=tree, env=env, capture_output=True,
                               text=True, timeout=PROBE_TIMEOUT_SECONDS)
         return done.returncode, done.stdout + (("\n[stderr]\n" + done.stderr) if done.returncode else "")
     except subprocess.TimeoutExpired:
@@ -79,6 +85,20 @@ def probe_part(workdir: str, before: str, probe: str, required: bool) -> List[Re
                            "the goal asks for behaviour to stay the same; before the first edit write .ledger/probe.py, which imports the code you will change and prints each public function's result on edge inputs (SKILL.md gate 1)")]
         return [Result("probe-present", SKIP, 0, [], "no probe, and the goal does not require one")]
     results = [Result("probe-present", PASS, 0, [], probe)]
+    if not required:
+        scratch = tempfile.mkdtemp(prefix="check_finish_")
+        try:
+            tree = os.path.join(scratch, "after")
+            shutil.copytree(workdir, tree, ignore=COPY_IGNORE)
+            code, out = run_probe(probe, tree, workdir)
+        finally:
+            shutil.rmtree(scratch, ignore_errors=True)
+        if code != 0:
+            results.append(Result("probe-runs", FAIL, 1, [f"exit {code} on the changed code: {out.strip()[-200:]!r}"], "the probe must run"))
+        else:
+            results.append(Result("probe-runs", PASS, 0, [], "exit 0 on the changed code"))
+        results.append(Result("behaviour-unchanged", INFO, 0, [], "not compared: the goal does not ask for behaviour to stay the same, so a fix may change results"))
+        return results
     if not os.path.isdir(before) or not check_change.snapshot_files(before):
         results.append(Result("behaviour-unchanged", FAIL, 1, ["no snapshot to run the probe against"], "take the snapshot before the first edit"))
         return results
@@ -91,8 +111,8 @@ def probe_part(workdir: str, before: str, probe: str, required: bool) -> List[Re
             target = os.path.join(old_tree, path)
             os.makedirs(os.path.dirname(target), exist_ok=True)
             shutil.copyfile(os.path.join(before, path), target)
-        old_code, old_out = run_probe(probe, old_tree)
-        new_code, new_out = run_probe(probe, new_tree)
+        old_code, old_out = run_probe(probe, old_tree, workdir)
+        new_code, new_out = run_probe(probe, new_tree, workdir)
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
     if old_code != 0:

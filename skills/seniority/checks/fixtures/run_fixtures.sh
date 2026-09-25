@@ -42,6 +42,10 @@ expect 1 check_change.py --before fixtures/change/missing --after fixtures/chang
 expect 0 check_finish.py --dir fixtures/finish/good
 expect 1 check_finish.py --dir fixtures/finish/bad_behaviour
 expect 1 check_finish.py --dir fixtures/finish/bad_answer
+# a probe that names its working directory by absolute path must still see the old code
+cp -r fixtures/finish/bad_abs_probe "$tmp/abs_probe"
+{ printf 'import sys\nsys.path.insert(0, "%s")\n' "$tmp/abs_probe"; cat fixtures/finish/good/.ledger/probe.py; } > "$tmp/abs_probe/.ledger/probe.py"
+expect 1 check_finish.py --dir "$tmp/abs_probe"
 
 for example in ../examples/*.md; do
     name="$(basename "$example" .md)"
