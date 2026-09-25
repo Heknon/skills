@@ -13,6 +13,18 @@ Give a weak, offline model (the target is MiniMax 2.7 class) the ability to:
    subsystems, a monorepo, a system spread over many repositories, and a
    team that owns many systems.
 4. **Keep it true** as the code changes.
+5. **Choose and run the tooling**: which site generator, reference
+   generator, diagram tool, linter, link checker and search to use for which
+   problem, and how to install and run each one without internet.
+
+**Air gapped is a hard constraint.** The model cannot search the web, and
+neither can the tools. Every fact the model needs about a tool, such as its
+config keys, commands, plugin names and failure modes, is written into the
+skill and stamped with the version it was verified against, as the backends
+are in observability. Every recommended tool must build and serve with no
+network: no CDN scripts, no remote fonts, no hosted search, no plugin that
+calls home. A tool that cannot do that is documented as unsuitable, with the
+reason.
 
 The skill does the thinking in advance, as the observability skill does. The
 model follows procedures, fills templates and runs checkers. It does not
@@ -32,7 +44,7 @@ These worked. The weak-model eval run on observability is the evidence
 | Invariants a procedure never overrides | Documentation invariants (section 6) |
 | Four fixed answer headings, so invention has nowhere to hide | Five fixed answer headings (section 7) |
 | `checks/` scripts, Python 3.11 standard library, fixtures, `run_fixtures.sh` | Same, over pages, maps, links, claims and coverage (section 9) |
-| `backends/`: same file names per backend, a selector README, a choosing procedure | `platforms/`: same file names per docs platform (section 10) |
+| `backends/`: same file names per backend, a selector README, a choosing procedure | `tooling/`: same file names per tool, a selector README, a choosing procedure (section 10a) |
 | Worked examples whose golden data passes the checkers | Worked examples whose golden docs pass the checkers (section 11) |
 | `glossary.md` fixes the words, no synonyms | Same |
 | `evals/` with a "never open this while doing a task" rule | Same |
@@ -65,7 +77,7 @@ Plus two page types Diátaxis does not name, which teams need: **ADR**
 | **Audit** | find what is undocumented, stale, wrong, duplicated, or orphaned | `inventory/README.md`, then `checks/`, then `core/gap-priority.md` |
 | **Write** | write or rewrite one page | `docs-map.md` in the project, `core/doc-type.md`, `types/<type>.md`, `core/claims-and-sources.md` |
 | **Update** | code changed, fix the docs it affects | `core/change-impact.md`, then **Write** for each page it names |
-| **Restructure** | move, merge, split, or migrate existing docs into the map | `core/placement.md`, `core/split-or-merge.md`, `platforms/<platform>/redirects.md` |
+| **Restructure** | move, merge, split, or migrate existing docs into the map | `core/placement.md`, `core/split-or-merge.md`, `tooling/<tool>/structure.md` |
 | **Choose** | settle a dilemma | the one procedure the dilemma table names |
 
 Every task that changes a doc ends with the matching checker run and its
@@ -107,7 +119,7 @@ Tables, read by header, as the observability vocabulary is:
 - **Terms**: the project glossary, one term per row, with forbidden synonyms.
 - **Surfaces not documented on purpose**: surfaces the Audit must not report,
   each with a reason and who decided.
-- **Repositories**: name, clone URL, default branch, docs root, platform.
+- **Repositories**: name, clone URL, default branch, docs root, tool.
 
 ## 6. Invariants (draft)
 
@@ -179,7 +191,10 @@ skills/documentation/
   inventory/                    finding the surfaces that need documentation
     README.md                   what a surface is, per kind
     scan_surfaces.py            standard library, heuristic, fixtures per ecosystem
-  platforms/                    see decision D3
+  tooling/                      see section 10a and decision D3
+    README.md  choosing.md  paradigms.md
+    <tool>/overview.md  install-offline.md  config.md
+          structure.md  build-check.md  air-gap-pitfalls.md
   checks/
     check_map.py  check_links.py  check_pages.py
     check_claims.py  check_coverage.py  check_freshness.py  check_style.py
@@ -233,6 +248,66 @@ rather than under-reports, and the map's exemption table absorbs the noise
 once. Anything subtler than a regex, such as a route built at runtime, a
 type inferred across a virtual environment, or a call path, is not in this
 skill. See decision D1.
+
+## 10a. Tooling knowledge: `tooling/`
+
+The equivalent of observability's `backends/`. The model cannot look up a
+tool, so the skill holds what it needs, verified and version stamped.
+
+### Structure
+
+- `tooling/README.md`: a selector, and a filled block for *this
+  installation*: which tool is in use for each problem, and its version.
+- `tooling/choosing.md`: facts about a situation in, one tool per problem
+  out, with the price of each choice. Same shape as
+  `backends/choosing.md`.
+- `tooling/paradigms.md`: one question per row, one answer per tool. How
+  navigation is defined, how versions are published, how search works
+  offline, how diagrams render, how API reference is pulled in.
+- One folder per tool, same file names in each: `overview.md` (what it
+  solves, version, how to read the running version), `install-offline.md`
+  (the wheel, npm or container artefacts to mirror, and the command to
+  install from the mirror), `config.md` (a complete working config, copied
+  whole), `structure.md` (how the docs map becomes navigation),
+  `build-check.md` (the strict build command and what each failure means),
+  `air-gap-pitfalls.md` (what calls the network by default and how to turn
+  it off).
+
+### The problems, and the candidates to research and document
+
+| Problem | Candidates |
+| --- | --- |
+| Docs site generator | MkDocs with Material, Zensical, Docusaurus, Sphinx, Antora, Hugo |
+| Catalog and portal for a team with many systems | Backstage with TechDocs, or a hub repository and a static site |
+| API reference from code | mkdocstrings, Sphinx autodoc, pdoc, TypeDoc |
+| HTTP API reference | OpenAPI rendered by Redoc or Swagger UI, bundled locally |
+| Diagrams | Mermaid, PlantUML, Structurizr for C4, D2, Kroki as a local server |
+| Prose and style linting | Vale with a local style package, markdownlint |
+| Link checking | lychee in offline mode, the generator's own strict mode |
+| Search with no network | the generator's built in index, Pagefind |
+| Versioned docs | mike for MkDocs, Docusaurus versioning, Antora branches |
+| Decision records | adr-tools, Log4brains, or plain Markdown by template |
+| Serving | static files behind nginx or any file server |
+
+### Research rules for writing these files
+
+- Every config key, command and flag is copied from the tool's own
+  documentation or source for a pinned version, and the file says which.
+- Every recommended config is built once, offline, in a container with the
+  network disabled, and the build log is kept in the fixtures.
+- Tool status is part of the knowledge. For example, the MkDocs ecosystem is
+  in transition (Material for MkDocs moving to maintenance, Zensical as its
+  successor); `choosing.md` must state the verified status on the date it was
+  written, and the model must not assume a newer state.
+
+### Default recommendation, to be confirmed by the research
+
+One static site generator for the whole organisation, a hub repository per
+team that aggregates per-repository docs folders, generated reference pulled
+in rather than written, Mermaid for diagrams because it renders from text in
+the page, Vale and lychee in the checks. `choosing.md` decides the generator
+from facts: languages in use, whether Backstage already runs, how many
+repositories, whether versioned docs are needed.
 
 ## 11. Worked examples
 
@@ -317,14 +392,14 @@ services up, secrets absent. Either part of the navigation skill, or its own
 skill. *Recommended:* part of navigation, as one folder. Until it exists,
 documentation marks command blocks `not run`.
 
-### D3. Which documentation platforms
+### D3. Which tools get full folders
 
-Like observability's backends: same file names per platform (`overview.md`,
-`structure.md`, `linking.md`, `redirects.md`, `build-check.md`). Candidates:
-plain Markdown on GitHub, MkDocs (Material), Docusaurus, Backstage TechDocs,
-Sphinx, Confluence. *Recommended:* plain Markdown on GitHub first, since
-every other one reads it, plus the one your team actually publishes with.
-Which do you use?
+Section 10a lists the candidates. Each full folder is real research and an
+offline build, so not all of them can be deep. *Recommended:* every candidate
+gets a row in `choosing.md` and `paradigms.md`; full folders for one site
+generator, Backstage TechDocs if you run Backstage, Mermaid, Vale and lychee,
+and the API reference generator for each language in D4. What do you run
+today, if anything, and is Backstage in the picture?
 
 ### D4. Which languages the surface scanner covers
 
