@@ -12,12 +12,14 @@ steps.
 
 <Prose, with one diagram if it helps. Each claim backed by code.>
 
-## Trade-offs
-
-<What this design gives up, only where a record or person says so.>
-
 ## Reasons
 
 <Each reason with where it comes from (ADR, commit, issue, person), or
 "Reason: not recorded".>
 ```
+
+Describe what the code does and what follows from it ("a cached answer
+can be up to one hour old"). Never write what it is for ("to balance
+freshness and performance", "to reduce load") unless a record says so;
+that is a reason, and belongs under *Reasons* with its source. No
+*Trade-offs* section unless a record names the trade-offs.

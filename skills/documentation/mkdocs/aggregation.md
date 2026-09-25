@@ -25,6 +25,20 @@ and CI files.
 If you find none, say so and ask how the site gets the other
 repositories' pages. Do not guess.
 
+## Step 2, copy step: adding a repository, or its pages are missing
+
+All six, in the site repository unless it says otherwise. For styles A
+and B, read their sections below instead.
+
+1. Add it to the script's list (`REPOS` in `collect_docs.py`).
+2. Add its folder name to `docs\.nav.yml` (or to `nav:`).
+3. Add `docs/<name>/` to `.gitignore`: the copy is build output.
+4. Link to it from the home page or its system page.
+5. In the added repository, fix links that point into other
+   repositories (Links between repositories, below).
+6. Run the copy script, then the strict build, and check that
+   `site\<name>\index.html` exists.
+
 ## A. monorepo plugin
 
 **How it works.** Each `!include` points at another repository's own
@@ -120,18 +134,6 @@ and never edit them; edit the page in its own repository.
 **How it breaks.** A repository missing from the script's list; a
 repository not checked out; an edit made to a copy, lost at the next
 copy.
-
-**Adding a repository to a copy-step site**, all six, in the site
-repository unless it says otherwise:
-
-1. Add it to the script's list (`REPOS` in `collect_docs.py`).
-2. Add its folder name to `docs\.nav.yml` (or to `nav:`).
-3. Add `docs/<name>/` to `.gitignore`: the copy is build output.
-4. Link to it from the home page or its system page.
-5. In the added repository, fix links that point into other
-   repositories (Links between repositories, below).
-6. Run the copy script, then the strict build, and check that
-   `site\<name>\index.html` exists.
 
 **It works with MkDocs and Zensical alike**, including mkdocstrings,
 Mermaid and awesome-nav. It is the migration path for A and B.

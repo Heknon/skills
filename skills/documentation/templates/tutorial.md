@@ -33,5 +33,7 @@ You see:
 <Two or three sentences. Link to the how-tos and explanation for more.>
 ````
 
-No option tables, no alternatives, no "why" beyond one sentence. Link to
-them.
+No option tables, no alternatives, no "why" beyond one sentence. A
+settings or options table found in a tutorial moves to a reference page
+(`templates/reference.md`), created if missing, and the tutorial links to
+it; moving it to the end of the tutorial is not enough.

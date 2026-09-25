@@ -5,7 +5,7 @@
   "copy the skill folder without evals/ to <skill>, and the navigation skill without evals/ next to it",
   "copy evals/sandboxes/<sandbox> to a fresh <work>; where setup is given, run setup.sh inside it once",
   "place or link the prepared .venv at <work>/.venv",
-  "start the model in <work> with: 'Load the skill at <skill>/SKILL.md and follow it. Task: <prompt>'; add the machine's operating system",
+  "start the model in <work> with: 'Load the skill at <skill>/SKILL.md and follow it. Task: <prompt>'; add the machine's operating system, and when it is not Windows, say to adapt the commands it runs but not the commands written in pages",
   "grade each expectation by hand"
  ],
  "evals": [
