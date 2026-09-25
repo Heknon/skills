@@ -1,6 +1,6 @@
 # First step
 
-**Verdict you produce:** step 1 in the ledger.
+**Verdict you produce:** step 1 in your notes.
 
 Two ways to fail at the start: act before knowing anything, or read
 everything before doing anything. The first step is the smallest action

@@ -9,7 +9,7 @@ verdict challenge: <proceed | proceed with a change: <change> | drop> because <q
 
 Use it before acting on a plan of more than three steps, before accepting
 an idea (yours or the person's), before reporting a conclusion, and always
-at gate 2 in `SKILL.md`: before any action that cannot be undone or reaches
+before any action that cannot be undone or reaches
 outside this environment, even one the person asked for. Once per plan or
 conclusion; again only when a new fact arrives.
 

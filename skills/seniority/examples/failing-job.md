@@ -1,7 +1,7 @@
 # Worked example: a failing job, a loop caught, a cause confirmed
 
 Follow this when something fails and you must find out why and fix it.
-Copy the order of the moments and the shape of the ledger lines. Change
+Copy the order of the moments and the shape of the notes. Change
 the facts, not the shape.
 
 ## The ask
@@ -45,8 +45,7 @@ Step 2 shows `pyyaml` is installed in `.venv`. The model then tries the
 install again (step 3), which returns the same as a check it already had.
 Step 4 runs the job again: same failure as step 1. Steps 3 and 4 give no
 new fact. **Loop rule 2 fires.** Step 4 also repeats step 1 with the same
-result, which the ledger checker reports as a warning: a third run would
-break loop rule 1.
+result: a third run would break loop rule 1.
 
 **Stuck** (`core/loop-breaker.md`). Reread the goal. The approach so far is
 "make sure the package is installed". Change the approach, not the
@@ -76,46 +75,39 @@ when` says: the fixed cron line's command, exit 0, file written. **Done** (`core
 step 9; the check ran the changed command; the diff is one line; no test
 was touched.
 
-## The ledger
+## The notes
 
-```markdown
-# Ledger
-
+```
 goal: "The nightly export job has failed since Monday. Fix it."
 kind: change
 done when: the cron line's command, run by hand with `--date 2026-09-21`, exits 0 and writes `out/2026-09-21.csv`
 budget: 25 steps
 scope out: the pandas FutureWarning in the job log
 
-## Assumptions
-
+assumptions:
 - A1 [false at step 5] the job runs with the project's .venv interpreter
 - A2 [verified at step 1] the failure reproduces locally
 - A3 [verified at step 6] something changed on Monday
 
-## Hypotheses
-
+hypotheses:
 - H1 [ruled out at step 7] a dependency changed on Monday | test: history of requirements.txt since last week | disproved if: no change since before Monday
 - H2 [confirmed at step 6] the job runs a different interpreter than .venv | test: print sys.executable from the job's command, and the history of deploy/crontab | disproved if: it prints .venv/bin/python
 
-## Steps
-
-1. action: `python -m export.nightly --date 2026-09-21` | result: exit 1, ModuleNotFoundError: No module named 'yaml' | new fact: the failure reproduces locally
+steps:
+1. `python -m export.nightly --date 2026-09-21` -> exit 1, ModuleNotFoundError: No module named 'yaml' -> the failure reproduces locally
    verdict reading-errors: ModuleNotFoundError: No module named 'yaml' at export/config.py:3 | category: not installed | first check: which interpreter runs
-2. action: `.venv/bin/pip show pyyaml` | result: Name: PyYAML, Version: 6.0.1 | new fact: pyyaml is installed in .venv
-3. action: `.venv/bin/pip install pyyaml` | result: Requirement already satisfied: pyyaml | new fact: none
-4. action: `python -m export.nightly --date 2026-09-21` | result: exit 1, ModuleNotFoundError: No module named 'yaml' | new fact: none
+2. `.venv/bin/pip show pyyaml` -> Name: PyYAML, Version: 6.0.1 -> pyyaml is installed in .venv
+3. `.venv/bin/pip install pyyaml` -> Requirement already satisfied: pyyaml -> nothing new
+4. `python -m export.nightly --date 2026-09-21` -> exit 1, ModuleNotFoundError: No module named 'yaml' -> nothing new
    stuck: making sure the package is installed -> find which interpreter the job runs
-5. action: `python -c "import sys; print(sys.executable)"` | result: /usr/bin/python3 | new fact: plain python is the system interpreter, not .venv
-6. action: `git log -p --since=2026-09-18 -- deploy/crontab` | result: 2026-09-21 commit a41c2e0 changed .venv/bin/python to python | new fact: the cron line lost the .venv interpreter on Monday
+5. `python -c "import sys; print(sys.executable)"` -> /usr/bin/python3 -> plain python is the system interpreter, not .venv
+6. `git log -p --since=2026-09-18 -- deploy/crontab` -> 2026-09-21 commit a41c2e0 changed .venv/bin/python to python -> the cron line lost the .venv interpreter on Monday
    verdict hypothesis-loop: H2 confirmed at step 6: the cron line runs the system python since commit a41c2e0
-7. action: `git log --since=2026-09-10 -- requirements.txt` | result: no commits | new fact: no dependency changed recently
-8. action: edit deploy/crontab line 1 back to `.venv/bin/python -m export.nightly` | result: one line changed | new fact: the cron line calls .venv again
-9. action: `.venv/bin/python -m export.nightly --date 2026-09-21` | result: exit 0, wrote out/2026-09-21.csv, 1188 rows | new fact: the job succeeds with the .venv interpreter
+7. `git log --since=2026-09-10 -- requirements.txt` -> no commits -> no dependency changed recently
+8. edit deploy/crontab line 1 back to `.venv/bin/python -m export.nightly` -> one line changed -> the cron line calls .venv again
+9. `.venv/bin/python -m export.nightly --date 2026-09-21` -> exit 0, wrote out/2026-09-21.csv, 1188 rows -> the job succeeds with the .venv interpreter
 
-## Done
-
-observed at step 9: exit 0 and out/2026-09-21.csv written with 1188 rows
+done: observed at step 9: exit 0 and out/2026-09-21.csv written with 1188 rows
 ```
 
 ## The answer
@@ -140,9 +132,6 @@ writes out/2026-09-21.csv: observed at step 9.
 ## Unverified
 none
 
-## Checks
-ledger: OK: PASS=12 WARN=1; exit 0
-change: OK: PASS=6 INFO=1; exit 0
-The ledger warning is steps 1 and 4, the same run with the same result,
-which is the loop that step 4's stuck line broke.
+## Decided for you
+none
 ```

@@ -1,6 +1,6 @@
 # Assumptions
 
-**Verdict you produce:** the *Assumptions* list in the ledger, and the one
+**Verdict you produce:** the *Assumptions* list in your notes, and the one
 assumption to verify first.
 
 Every task rests on things you have not checked. The dangerous ones are
@@ -37,8 +37,8 @@ Write every assumption as `A<n> [unverified] <text>`. Then order your work:
 | little | any | leave it `unverified`; it goes under *Unverified* at the end |
 
 Write the check as a step. Then update the line to `verified at step <n>` or
-`false at step <n>`. A false assumption is the most valuable line in the
-ledger: reread `goal` and ask whether the plan still holds.
+`false at step <n>`. A false assumption is the most valuable line in your
+notes: reread `goal` and ask whether the plan still holds.
 
 ## The silent assumptions
 

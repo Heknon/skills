@@ -1,11 +1,8 @@
 #!/bin/sh
-# Runs the ledger checker on every fixture and on the ledger of every worked
-# example, the change checker on a good and a bad change, and the finish
-# checker on a good and two bad finished tasks and on every example's
-# ledger and answer, and judges the harness itself. Good fixtures and
-# every example must exit 0; everything named bad, and the template, must
-# exit 1. The finish check on an example also proves its answer quotes the
-# ledger check's real summary. Prints PASS or
+# Runs the ledger checker on every ledger fixture, the change checker on a
+# good and a bad change, and the finish checker on a good and several bad
+# finished tasks, and judges the harness itself. Good fixtures must exit 0;
+# everything named bad, and the template, must exit 1. Prints PASS or
 # FAIL per run and a final line for the harness. Exit code 0 when every
 # expectation holds.
 set -u
@@ -46,13 +43,6 @@ expect 1 check_finish.py --dir fixtures/finish/bad_answer
 cp -r fixtures/finish/bad_abs_probe "$tmp/abs_probe"
 { printf 'import sys\nsys.path.insert(0, "%s")\n' "$tmp/abs_probe"; cat fixtures/finish/good/.ledger/probe.py; } > "$tmp/abs_probe/.ledger/probe.py"
 expect 1 check_finish.py --dir "$tmp/abs_probe"
-
-for example in ../examples/*.md; do
-    name="$(basename "$example" .md)"
-    expect 0 fixtures/extract_golden.py "$example" "$tmp/$name"
-    expect 0 check_ledger.py --ledger "$tmp/$name/ledger.md"
-    expect 0 check_finish.py --dir "$tmp/$name" --ledger "$tmp/$name/ledger.md" --answer "$tmp/$name/answer.md" --no-change-check
-done
 
 if [ "$failures" -eq 0 ]; then
     echo "HARNESS PASS"

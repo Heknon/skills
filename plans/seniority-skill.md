@@ -172,3 +172,16 @@ the cost is small and the habits are always present.
 
 *Recommended:* build seniority and navigation before documentation, since
 documentation's accuracy depends on both.
+
+## 11. After six eval runs: the skill judges, the harness enforces
+
+Six weak-model runs showed that rules the model had to remember to run
+itself were skipped, and that making the model run its own checks cost it
+time and tokens on bookkeeping. Enforcement is a harness's job. The skill
+now carries only judgement: the procedures, the invariants, light working
+notes, the closing headings, and an unattended mode in which questions
+become written decisions and irreversible steps are set aside for a
+person. The checkers moved to `harness/seniority-checks/`, for hooks to
+run before a risky command, before an edit, and when the model finishes.
+The ledger-as-a-file decision (S1) is withdrawn: notes are kept in a file
+only when the task is long.

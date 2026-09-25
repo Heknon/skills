@@ -1,9 +1,19 @@
-# Checks
+# Seniority checks, for a harness
 
-Scripts that judge the work mechanically. At Finish, run only
-`check_finish.py` from the working directory: it runs the others and
-checks the answer. Run `check_ledger.py` alone after step 1 and before
-any risky command. Standard library only, Python 3.8 or later.
+These scripts are **not part of the seniority skill**, and a model using
+the skill is never told to run them. They are for a harness around the
+model: hooks that run them before a risky command, before an edit, or when
+the model tries to finish, and send any failure back to the model. They
+came out of the weak-model evals in `skills/seniority/evals/evals.json`,
+where rules the model had to remember to run itself were skipped, and
+rules a script enforced held. Enforcement belongs to the harness; the
+skill keeps the judgement.
+
+They read files under `.ledger/` in the working directory: a ledger in the
+strict format below, a snapshot of each file before its first edit, an
+optional behaviour probe, and the final answer. A harness that keeps its
+own tool-call log can detect loops from that log instead of a ledger.
+Standard library only, Python 3.8 or later.
 
 | Script | Reads | Rules |
 | --- | --- | --- |
@@ -49,19 +59,19 @@ loop stays. The answer says so under *Checks*.
 
 ## Fixtures
 
-`fixtures/finish/` holds three finished tasks: `good` (a tidy-up whose
-probe gives the same output before and after, and a correct answer),
-`bad_behaviour` (the probe's output changes, and the answer quotes stale
-lines) and `bad_answer` (no closing headings). `fixtures/change/` holds a snapshot, a good change (a fix plus a new test)
-and a bad one (a renamed parameter, a changed default, a swallowed error,
-a changed expectation, a changed constant). `fixtures/` holds three passing ledgers (`good.md`, finished;
-`in_progress.md`, not finished; `risky_good.md`, a risky command after a
-challenge and the person's answer), the unfilled template, and one failing ledger per loop or
-format rule (`*_bad.md`). `sh fixtures/run_fixtures.sh` runs all of them,
-then extracts the ledger from each `examples/*.md` with
-`fixtures/extract_golden.py` and checks it, then runs the finish check on
-the example's ledger and answer, which proves the answer's headings and
-its quoted ledger line. It
-prints `HARNESS PASS` when the good runs exit 0, the bad ones exit 1, and
-every quote matches. Run it after editing the checker, an example, or the
-ledger format.
+- `fixtures/*.md`: three passing ledgers (`good.md` finished,
+  `in_progress.md` not finished, `risky_good.md` a risky command after the
+  challenge and the person's answer), the unfilled `template.md`, and one
+  failing ledger per rule (`*_bad.md`).
+- `fixtures/change/`: a snapshot, a good change (a fix and a new test) and
+  a bad one (a renamed parameter, a changed default, a swallowed error, a
+  changed expectation, a removed command-line option, a changed constant).
+- `fixtures/finish/`: finished tasks: `good` (a tidy-up whose probe gives
+  the same output before and after), `bad_behaviour` (the output changes),
+  `bad_answer` (no closing headings), and `bad_abs_probe` (a probe that
+  names its directory by absolute path, built at run time by the harness
+  script).
+
+`sh fixtures/run_fixtures.sh` runs all of them and prints `HARNESS PASS`
+when every good one exits 0 and every bad one exits 1. Run it after
+editing a checker.

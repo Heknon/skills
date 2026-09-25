@@ -1,8 +1,9 @@
 # Asking and stopping
 
 **Verdict you produce:** one message to the person, either a question or a
-stop report. In the ledger: a step whose action is `ask: <question>`, or
-`stopped at step <n>: <why>` under *Done*.
+stop report; or, in an unattended run, a decision written down in its
+place. In your notes: the question and its answer as a step, or
+`done: stopped at step <n>: <why>`.
 
 ## When to ask
 
@@ -46,7 +47,25 @@ Would settle it: <the observation, access or decision that would>
 Recommend: <next action, and who takes it>
 ```
 
-Then the four closing headings from `SKILL.md`.
+Then the closing headings from `SKILL.md`.
+
+## When nobody will answer
+
+In an unattended run (`SKILL.md`), a question is never sent and waited on.
+
+- **A decision the person owns:** take the option you would have
+  recommended, if it can be undone. Write it under *Decided for you* with
+  the reason and what the other option was.
+- **An irreversible or outward-facing step:** do not take it. Prepare it:
+  the exact command, the challenge (`core/challenge.md`), what breaks
+  between steps. Set it aside under *Decided for you* as waiting for a
+  person, and go on with work that does not depend on it.
+- **A fact only the person has:** proceed on the most likely reading,
+  written as an unverified assumption, and choose work that stays correct
+  if the assumption is wrong. If no such work exists, set the item aside.
+- **Stuck on an item:** set it aside with the stop report above, and move
+  to the next item. The run ends only when every item is done or set
+  aside.
 
 ## Never
 

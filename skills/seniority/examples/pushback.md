@@ -1,7 +1,7 @@
 # Worked example: the person's diagnosis is wrong
 
 Follow this when the person tells you the cause, and the evidence points
-elsewhere. Copy the order of the moments and the shape of the ledger lines.
+elsewhere. Copy the order of the moments and the shape of the notes.
 Change the facts, not the shape.
 
 ## The ask
@@ -47,42 +47,35 @@ The evidence is observed, so **pushback** (`core/pushback.md`), once:
 The person answers: read from the primary, leave the cache on. The
 decision is theirs; the verdict line records it.
 
-## The ledger
+## The notes
 
-```markdown
-# Ledger
-
+```
 goal: "Users see old prices after we update them. It's the cache. Just turn caching off for the price endpoint."
 kind: change
 done when: a price updated through the admin API is returned by `GET /prices/<sku>` within 5 seconds, observed with `tools/price_roundtrip.py`
 budget: 25 steps
 scope out: why the replica lags 40 minutes
 
-## Assumptions
-
+assumptions:
 - A1 [false at step 3] the person's diagnosis: the response cache serves the old prices
 
-## Hypotheses
-
+hypotheses:
 - H1 [ruled out at step 3] the response cache serves old prices | test: read /prices/<sku> with the cache bypassed | disproved if: the old price comes back with the cache bypassed
 - H2 [confirmed at step 5] the endpoint reads prices from a lagging replica | test: read the data source in the endpoint, then measure replica lag | disproved if: it reads the primary, or lag is under 5 seconds
 
-## Steps
-
-1. action: search "prices" in api/routes/ | result: api/routes/prices.py:22 get_price(sku) | new fact: /prices/<sku> is served by api/routes/prices.py
-2. action: `python tools/price_roundtrip.py --sku P-100 --wait 5` | result: wrote 12.50, read 11.90 after 5 s | new fact: the stale price reproduces
-3. action: `python tools/price_roundtrip.py --sku P-100 --wait 5 --no-cache` | result: wrote 12.60, read 11.90 after 5 s | new fact: the price is stale with the cache bypassed
-4. action: read api/routes/prices.py lines 22-40 | result: get_price uses db.replica() | new fact: the endpoint reads from the replica
-5. action: `python manage.py replica_lag` | result: replica lag 2412 s | new fact: the replica is 40 minutes behind
+steps:
+1. search "prices" in api/routes/ -> api/routes/prices.py:22 get_price(sku) -> /prices/<sku> is served by api/routes/prices.py
+2. `python tools/price_roundtrip.py --sku P-100 --wait 5` -> wrote 12.50, read 11.90 after 5 s -> the stale price reproduces
+3. `python tools/price_roundtrip.py --sku P-100 --wait 5 --no-cache` -> wrote 12.60, read 11.90 after 5 s -> the price is stale with the cache bypassed
+4. read api/routes/prices.py lines 22-40 -> get_price uses db.replica() -> the endpoint reads from the replica
+5. `python manage.py replica_lag` -> replica lag 2412 s -> the replica is 40 minutes behind
    verdict hypothesis-loop: H2 confirmed at step 5: the endpoint reads a replica 40 minutes behind
-6. action: ask: pushback message, caching off will not fix it, read prices from the primary instead? | result: person: read from the primary, keep the cache on | new fact: the person chose reading from the primary
+6. ask: pushback message, caching off will not fix it, read prices from the primary instead? -> person: read from the primary, keep the cache on -> the person chose reading from the primary
    verdict pushback: said the cache serves old prices vs stale with cache bypassed (step 3) and replica lag 2412 s (step 5); person decided read from the primary, keep the cache
-7. action: edit api/routes/prices.py line 25 from db.replica() to db.primary() | result: one line changed | new fact: get_price reads the primary
-8. action: `python tools/price_roundtrip.py --sku P-100 --wait 5` | result: wrote 12.70, read 12.70 after 5 s | new fact: the updated price is returned within 5 seconds
+7. edit api/routes/prices.py line 25 from db.replica() to db.primary() -> one line changed -> get_price reads the primary
+8. `python tools/price_roundtrip.py --sku P-100 --wait 5` -> wrote 12.70, read 12.70 after 5 s -> the updated price is returned within 5 seconds
 
-## Done
-
-observed at step 8: wrote 12.70 and read 12.70 back within 5 seconds with the cache on
+done: observed at step 8: wrote 12.70 and read 12.70 back within 5 seconds with the cache on
 ```
 
 ## The answer
@@ -107,7 +100,6 @@ within 5 seconds: observed at step 8.
 ## Unverified
 none
 
-## Checks
-ledger: OK: PASS=13; exit 0
-change: OK: PASS=6 INFO=1; exit 0
+## Decided for you
+none
 ```

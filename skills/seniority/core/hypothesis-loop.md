@@ -39,7 +39,7 @@ could fail, and one change at a time.
    be gone in the same reproduction. If it was intermittent, run it as many
    times as it took to fail before, and say how many.
 
-Write each hypothesis in the ledger in this form:
+Write each hypothesis in your notes in this form:
 
 ```
 - H1 [open] <cause> | test: <observation> | disproved if: <what you would see>

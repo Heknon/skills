@@ -40,9 +40,10 @@ failure; not noticing would be. Do the steps in order.
 5. **Write the `stuck:` line** under the current step, and take the next
    step with the new approach. The step after a `stuck:` line must not
    repeat any action from before it.
-6. **Budget.** If the budget rule fired: if the ledger's facts show real
-   progress toward `done when`, extend it once with `budget extended to
-   <n>: <reason>`. A second overrun, or no progress: stop.
+6. **Too many steps.** If loop rule 4 fired: if the facts in your notes
+   show real progress toward `done when`, go on, once, and write why. A
+   second time, or no progress: stop, or in an unattended run set the item
+   aside and move to the next.
 
 ## When to stop instead
 
@@ -59,12 +60,12 @@ Stopping with a clear report is a good result. Looping is not.
 
 The same failure happens in prose. If you notice you are writing a
 sentence, a list or a plan you already wrote, stop writing. Do not finish
-the paragraph. Write the next ledger step instead, and take it.
+the paragraph. Write the next step in your notes instead, and take it.
 
 ## Never
 
 - Never do the same action "one more time to be sure". The only exception
   is testing an intermittent failure, written as a step with a count:
   `` `pytest tests/test_x.py` run 10 times ``.
-- Never start over and discard the ledger. The facts in it are the way out.
+- Never start over and discard your notes. The facts in it are the way out.
 - Never answer a loop by thinking longer about the same approach.

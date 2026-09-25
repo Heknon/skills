@@ -7,26 +7,26 @@ One sentence per term. Use these words and no synonyms.
 | Term | Meaning |
 | --- | --- |
 | ask | The person's request, in their words. |
-| goal | The ask, copied or cut down, never reworded; the first line of the ledger. |
+| goal | The ask, copied or cut down, never reworded; the first line of your notes. |
 | done when | An observable condition that, once seen in this task, means the goal is met. |
 | scope out | Things near the task that you will report and not touch. |
 | budget | The number of steps after which you must stop and decide whether to go on. |
 | answer, change, decision, plan | The four kinds of result an ask can want; a question asks for an answer, not a change. |
 
-## The ledger
+## Notes
 
 | Term | Meaning |
 | --- | --- |
-| ledger | The one file per task that holds the goal, assumptions, hypotheses, steps and done state. |
+| notes | The short working record of a task: goal, done when, assumptions, hypotheses, steps and done state. |
 | step | One action, its result, and the new fact it gave, on one numbered line. |
 | action | What you did, exactly: a command as run, a file and part read, a search and where, or a question asked. |
 | result | What came back, short, with error text copied exactly. |
 | new fact | One thing you know after the step that you did not know before, or `none`. |
 | verdict | The line a procedure tells you to write; it records a decision and why. |
 | stuck line | The line under a step that records the old approach and the new one. |
-| snapshot | The copy of a file taken at `.ledger/before/` before its first edit, which the finish check compares against. |
-| probe | `.ledger/probe.py`: a script that prints the results of calling the code you will change; the finish check runs it on the old and new code. |
-| kind | The one-word kind of result the ask wants, `answer`, `change`, `decision` or `plan`, in the ledger header. |
+| kind | The one-word kind of result the ask wants: `answer`, `change`, `decision` or `plan`. |
+| unattended | A run with no person to answer; questions become written decisions and irreversible steps are set aside. |
+| set aside | Stopping one item in an unattended run, with a note, and moving to the next. |
 
 ## Loops
 

@@ -27,7 +27,7 @@ is whichever one here says it answers your question.
 3. **Of those, which is the narrowest?** Walk the ladder below from the
    top, and take the first rung that can answer.
 4. **Does it give evidence you can quote, or only an opinion?** Prefer the
-   one whose output you can copy into the ledger.
+   one whose output you can copy into your notes.
 5. **Does it change anything?** For a question about the current state,
    use a tool that only reads.
 

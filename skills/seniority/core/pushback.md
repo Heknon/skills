@@ -38,7 +38,7 @@ I recommend <what to do instead>. Tell me if you still want <their way>.
 ```
 
 Then wait for their answer if the next action depends on it. Otherwise,
-proceed with their way and keep the evidence in the ledger.
+proceed with their way and keep the evidence in your notes.
 
 ## Never
 

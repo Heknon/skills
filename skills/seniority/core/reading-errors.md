@@ -16,7 +16,7 @@ what is wrong; the mistake is reading the wrong one, or reading it loosely.
 1. **Which error came first?** Scroll up. Later errors are often caused by
    the first one: a failed import makes every later name undefined. The
    first one is the one to read.
-2. **What is the exact message?** Copy it into the ledger, character for
+2. **What is the exact message?** Copy it into your notes, character for
    character. Do not paraphrase it.
 3. **Where was it raised?** In a traceback, find the deepest frame that is
    in this project's code, not in a library. That line is where your code
@@ -51,7 +51,7 @@ warning is often the cause, printed long before the failure.
 ## Never
 
 - Never fix the last error in a cascade before the first.
-- Never paraphrase an error in the ledger. Copy it.
+- Never paraphrase an error in your notes. Copy it.
 - Never retry the same command hoping the error goes away. That is the
   first half of a loop.
 - Never silence an error to make the output clean, by catching and
