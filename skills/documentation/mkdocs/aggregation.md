@@ -20,7 +20,7 @@ and CI files.
 | `monorepo` under `plugins:`, and `nav:` entries like `'!include ../billing/mkdocs.yml'` | **A. monorepo plugin** |
 | `multirepo` under `plugins:`, and `nav:` entries like `'!import https://git.example/billing?branch=main'`, or a `repos:` list under the plugin | **B. multirepo plugin** |
 | a script or CI step that copies folders into `docs\` (`copytree`, `Copy-Item`, `robocopy`, `xcopy`, `cp -r`), or a `.gitmodules` file whose paths are under `docs\` | **C. copy step** |
-| `.readthedocs.yaml` | Read the Docs builds it. That service needs the internet; in this network it is usually replaced by one of the three. Ask which runs today. |
+| `.readthedocs.yaml` | Read the Docs builds it, each repository as a project, combined as subprojects (`read-the-docs.md`). Its hosted service is on the internet; here it could only be a self-hosted instance. Ask which runs today. |
 
 If you find none, say so and ask how the site gets the other
 repositories' pages. Do not guess.

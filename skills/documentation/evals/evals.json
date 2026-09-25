@@ -167,6 +167,21 @@
     "notices bearing is missing from the reference because it has no docstring, and reports it (or documents it from the code, 0 to 360 degrees)",
     "ends with the four headings"
    ]
+  },
+  {
+   "id": 11,
+   "name": "read-the-docs-plan",
+   "sandbox": "zensical-question",
+   "prompt": "Plan moving our docs site to Read the Docs.",
+   "bait": "the network is air gapped, so the hosted service is out; self-hosting is unsupported by its makers; the monorepo site's addresses change under subprojects",
+   "expectations": [
+    "says first that the hosted service cannot be used from an air-gapped network, and that only a self-hosted instance remains, which Read the Docs does not support for production",
+    "asks for or marks as 'ask' who would run a self-hosted instance",
+    "maps billing to a subproject of a parent project built from the site repository",
+    "lists the address change, /billing/ to /projects/billing/<language>/<version>/, and the need for redirects",
+    "shows the .readthedocs.yaml each repository would need, with fail_on_warning: true",
+    "changes no file; leaves the decision to the team; ends with the four headings"
+   ]
   }
  ],
  "runs": [

@@ -1,6 +1,6 @@
 ---
 name: documentation
-description: Write, fix and organise documentation for Python code and the teams and systems around it, published with MkDocs or Zensical, air gapped. Write a page of the right kind, add or remove docstrings where they earn their place, find what is undocumented, stale, wrong or duplicated, decide where a fact belongs across a team, its systems, subsystems and repositories, update docs after a code change, and run the docs site, including combining several repositories into one site, offline diagrams, API reference, and moving from MkDocs to Zensical. Every claim in a page points at the code, command or record that shows it.
+description: Write, fix and organise documentation for Python code and the teams and systems around it, published with MkDocs or Zensical, air gapped. Write a page of the right kind, add or remove docstrings where they earn their place, find what is undocumented, stale, wrong or duplicated, decide where a fact belongs across a team, its systems, subsystems and repositories, update docs after a code change, and run the docs site, including combining several repositories into one site, offline diagrams, API reference, and moving from MkDocs to Zensical or planning a move to Read the Docs. Every claim in a page points at the code, command or record that shows it.
 ---
 
 # Documentation
@@ -24,7 +24,7 @@ backs it.
 | **Audit** | find what is undocumented, stale, wrong or duplicated | `core/find-gaps.md` |
 | **Structure** | organise docs for a repository, a system, a team; decide where something goes | `core/structure.md` |
 | **Update** | code changed; fix the docs it affects | `core/update-after-change.md` |
-| **Site** | build, fix, extend or migrate the MkDocs or Zensical site | `mkdocs/status.md` first, then the file it names |
+| **Site** | build, fix, extend or migrate the MkDocs or Zensical site; plan a move to Zensical or Read the Docs | `mkdocs/status.md` first, then the file it names |
 
 A task often needs two: an Audit before a Write, a Structure before
 several Writes.

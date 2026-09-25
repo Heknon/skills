@@ -38,6 +38,7 @@ package for a plugin name is usually `mkdocs-<name>-plugin` or
 | combine several repositories into one site; pages missing from the combined site; links broken between repositories | `aggregation.md` |
 | show API reference from docstrings | `api-reference.md` |
 | move from MkDocs to Zensical, or decide whether to | `zensical.md` |
+| plan a move to Read the Docs, or decide whether it can work here | `read-the-docs.md` |
 
 ## Never
 
