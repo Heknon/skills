@@ -1,6 +1,7 @@
 # Ledger
 
 goal: <the ask, in the person's words, one line>
+kind: <answer | change | decision | plan, from core/scope.md question 2>
 done when: <an observable condition, from core/scope.md>
 budget: <n> steps
 scope out: <things near the task that you will not touch, or none>

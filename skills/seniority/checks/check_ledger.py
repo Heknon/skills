@@ -20,7 +20,8 @@ from typing import Dict, List, Optional
 PASS, FAIL, WARN, SKIP, INFO = "PASS", "FAIL", "WARN", "SKIP", "INFO"
 MAX_EXAMPLES = 5
 
-HEADER_KEYS = ("goal", "done when", "budget", "scope out")
+HEADER_KEYS = ("goal", "kind", "done when", "budget", "scope out")
+KINDS = ("answer", "change", "decision", "plan")
 VAGUE_DONE = re.compile(r"\b(works?|working|fixed|correct(ly)?|clean|good|better|properly|done)\b", re.I)
 CONCRETE_DONE = re.compile(r"`|\d|\bexits?\b|\bprints?\b|\bshows?\b|\bexists?\b|\bcontains?\b|\banswered\b|\bnamed\b")
 STEP_RE = re.compile(r"^(\d+)\.\s+(.*)$")
@@ -186,13 +187,16 @@ def rule_header(ledger: Ledger) -> Result:
             offenders.append(f"missing '{key}:' line")
         elif not value or re.search(r"<[A-Za-z][^<>]*>", re.sub(r"`[^`]*`", "", value)):
             offenders.append(f"'{key}:' still holds a placeholder: {value!r}")
+    kind = ledger.header.get("kind", "")
+    if kind and kind.lower() not in KINDS and not re.search(r"<[A-Za-z][^<>]*>", kind):
+        offenders.append(f"'kind:' must be one of {', '.join(KINDS)}, found {kind!r}")
     budget = ledger.header.get("budget", "")
     if budget and not BUDGET_RE.match(budget):
         offenders.append(f"'budget:' must be '<n> steps', found {budget!r}")
     for section in ("assumptions", "hypotheses", "steps", "done"):
         if section not in ledger.sections:
             offenders.append(f"missing '## {section.capitalize()}' section")
-    return verdict("header", offenders, note="core/ledger.md: The template", passing_note="goal, done when, budget, scope out and all four sections present")
+    return verdict("header", offenders, note="core/ledger.md: The template", passing_note="goal, kind, done when, budget, scope out and all four sections present")
 
 
 def rule_done_when(ledger: Ledger) -> Result:
@@ -375,10 +379,14 @@ def rule_done(ledger: Ledger) -> Result:
     state = done_state(ledger)
     if not state:
         return Result("done-observed", FAIL, 1, lines[:1], "Done must be 'observed at step <n>: ...' or 'stopped at step <n>: ...'")
-    kind, number, _ = state
-    if number not in {step.number for step in ledger.steps}:
-        return Result("done-observed", FAIL, 1, [f"{kind} at step {number}, which does not exist"], "core/done.md question 1")
-    return Result("done-observed", PASS, 0, [], f"{kind} at step {number}")
+    how, number, _ = state
+    steps = {step.number: step for step in ledger.steps}
+    if number not in steps:
+        return Result("done-observed", FAIL, 1, [f"{how} at step {number}, which does not exist"], "core/done.md question 1")
+    if how == "observed" and ledger.header.get("kind", "").lower() == "change" and not BACKTICK_RE.search(steps[number].action):
+        return Result("done-observed", FAIL, 1, [f"step {number} is not a command: {steps[number].action[:70]!r}"],
+                      "a change is observed by running something (a test, the program, the command in done when), in backticks; reading the code is not observing it")
+    return Result("done-observed", PASS, 0, [], f"{how} at step {number}")
 
 
 def rule_unverified_at_done(ledger: Ledger) -> Result:
@@ -390,18 +398,8 @@ def rule_unverified_at_done(ledger: Ledger) -> Result:
     return Result("unverified-at-done", PASS)
 
 
-def main(argv: Optional[List[str]] = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--ledger", required=True, help="path to ledger.md")
-    parser.add_argument("--json", action="store_true", help="print one JSON object")
-    args = parser.parse_args(argv)
-    try:
-        with open(args.ledger, encoding="utf-8") as handle:
-            text = handle.read()
-    except OSError as error:
-        print(f"check_ledger: cannot read {args.ledger}: {error}", file=sys.stderr)
-        return 2
-
+def evaluate(text: str):
+    """Parse a ledger and run every rule. Returns (ledger, results, summary)."""
     ledger = parse(text)
     results = [
         rule_header(ledger),
@@ -424,6 +422,38 @@ def main(argv: Optional[List[str]] = None) -> int:
         "hypotheses": len(ledger.hypotheses),
         "stuck": sum(len(step.stuck) for step in ledger.steps),
     }
+    return ledger, results, summary
+
+
+def summary_line(results: List[Result]) -> str:
+    exit_code = 1 if any(result.status == FAIL for result in results) else 0
+    counts = {status: sum(1 for result in results if result.status == status) for status in (PASS, FAIL, WARN, SKIP, INFO)}
+    counts_text = " ".join(f"{status}={count}" for status, count in counts.items() if count)
+    return f"{'OK' if exit_code == 0 else 'NOT OK'}: {counts_text}; exit {exit_code}"
+
+
+def print_results(results: List[Result]) -> None:
+    for result in results:
+        print(f"{result.status:<4} {result.name:<26} {result.count}")
+        for example in result.examples[:MAX_EXAMPLES]:
+            print(f"       - {example}")
+        if result.note:
+            print(f"       note: {result.note}")
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--ledger", required=True, help="path to ledger.md")
+    parser.add_argument("--json", action="store_true", help="print one JSON object")
+    args = parser.parse_args(argv)
+    try:
+        with open(args.ledger, encoding="utf-8") as handle:
+            text = handle.read()
+    except OSError as error:
+        print(f"check_ledger: cannot read {args.ledger}: {error}", file=sys.stderr)
+        return 2
+
+    _, results, summary = evaluate(text)
     exit_code = 1 if any(result.status == FAIL for result in results) else 0
     if args.json:
         print(json.dumps({"tool": "check_ledger", "input": args.ledger, "summary": summary,
@@ -431,15 +461,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return exit_code
     print(f"check_ledger: {args.ledger}")
     print("  " + ", ".join(f"{key}={value}" for key, value in summary.items()))
-    for result in results:
-        print(f"{result.status:<4} {result.name:<26} {result.count}")
-        for example in result.examples[:MAX_EXAMPLES]:
-            print(f"       - {example}")
-        if result.note:
-            print(f"       note: {result.note}")
-    counts = {status: sum(1 for result in results if result.status == status) for status in (PASS, FAIL, WARN, SKIP, INFO)}
-    counts_text = " ".join(f"{status}={count}" for status, count in counts.items() if count)
-    print(f"{'OK' if exit_code == 0 else 'NOT OK'}: {counts_text}; exit {exit_code}")
+    print_results(results)
+    print(summary_line(results))
     return exit_code
 
 

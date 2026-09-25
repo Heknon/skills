@@ -53,6 +53,7 @@ decision is theirs; the verdict line records it.
 # Ledger
 
 goal: "Users see old prices after we update them. It's the cache. Just turn caching off for the price endpoint."
+kind: change
 done when: a price updated through the admin API is returned by `GET /prices/<sku>` within 5 seconds, observed with `tools/price_roundtrip.py`
 budget: 25 steps
 scope out: why the replica lags 40 minutes
@@ -107,6 +108,6 @@ within 5 seconds: observed at step 8.
 none
 
 ## Checks
-OK: PASS=13; exit 0
-check_change: OK: PASS=6 INFO=1; exit 0
+ledger: OK: PASS=13; exit 0
+change: OK: PASS=6 INFO=1; exit 0
 ```

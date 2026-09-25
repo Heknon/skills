@@ -1,9 +1,11 @@
 #!/bin/sh
 # Runs the ledger checker on every fixture and on the ledger of every worked
-# example, and the change checker on a good and a bad change, and judges
-# the harness itself. Good fixtures and every example
-# must exit 0; each *_bad.md and template.md must exit 1; each example's
-# answer must quote the summary line the checker really prints. Prints PASS or
+# example, the change checker on a good and a bad change, and the finish
+# checker on a good and two bad finished tasks and on every example's
+# ledger and answer, and judges the harness itself. Good fixtures and
+# every example must exit 0; everything named bad, and the template, must
+# exit 1. The finish check on an example also proves its answer quotes the
+# ledger check's real summary. Prints PASS or
 # FAIL per run and a final line for the harness. Exit code 0 when every
 # expectation holds.
 set -u
@@ -37,18 +39,15 @@ expect 0 check_change.py --before fixtures/change/before --after fixtures/change
 expect 1 check_change.py --before fixtures/change/before --after fixtures/change/after_bad
 expect 1 check_change.py --before fixtures/change/missing --after fixtures/change/after_good
 
+expect 0 check_finish.py --dir fixtures/finish/good
+expect 1 check_finish.py --dir fixtures/finish/bad_behaviour
+expect 1 check_finish.py --dir fixtures/finish/bad_answer
+
 for example in ../examples/*.md; do
     name="$(basename "$example" .md)"
     expect 0 fixtures/extract_golden.py "$example" "$tmp/$name"
     expect 0 check_ledger.py --ledger "$tmp/$name/ledger.md"
-    actual="$(python3 check_ledger.py --ledger "$tmp/$name/ledger.md" | tail -1)"
-    quoted="$(cat "$tmp/$name/expected_summary.txt" 2>/dev/null)"
-    if [ "$actual" = "$quoted" ]; then
-        echo "PASS $name quotes the checker's real summary: $actual"
-    else
-        echo "FAIL $name quotes '$quoted' but the checker prints '$actual'"
-        failures=$((failures + 1))
-    fi
+    expect 0 check_finish.py --dir "$tmp/$name" --ledger "$tmp/$name/ledger.md" --answer "$tmp/$name/answer.md" --no-change-check
 done
 
 if [ "$failures" -eq 0 ]; then

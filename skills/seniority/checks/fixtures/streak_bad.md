@@ -1,6 +1,7 @@
 # Ledger
 
 goal: "why is the dashboard empty?"
+kind: answer
 done when: the cause named, with the query and the log line that show it
 budget: 25 steps
 scope out: none

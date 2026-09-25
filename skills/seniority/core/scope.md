@@ -20,7 +20,9 @@ Stuck and at Finish.
    - a **plan** (what should be done, not doing it).
 
    A question is not a request to change anything. Answer it, then offer
-   the change.
+   the change. The one word goes in the ledger as `kind:`. For `change`,
+   `done when` is observed by running something: a test, the program, a
+   command. Reading the code you changed is not observing it.
 3. **What would the person look at to accept the result?** Write it as
    something you can observe in this environment. That is `done when`.
    Good forms:
@@ -48,7 +50,8 @@ Stuck and at Finish.
    by running the old and the new code on the same inputs and comparing
    the outputs, including edge values: a whole number, zero, a negative, an
    empty value, `None`, a missing file. Tests that exist count only for
-   what they cover. Anything that would
+   what they cover. Write those calls as `.ledger/probe.py` before the
+   first edit (gate 1 in `SKILL.md`); the finish check runs it on both. Anything that would
    change behaviour, even a clear improvement, is a finding under *Not
    done*, not an edit. Then either ask what the person wants from the
    cleanup, with options and a recommendation, or proceed on the narrowest
@@ -70,6 +73,7 @@ Stuck and at Finish.
 
 ```
 goal: <the person's words, cut, not reworded>
+kind: <answer | change | decision | plan>
 done when: <observable condition>
 budget: <n> steps
 scope out: <list, or none>

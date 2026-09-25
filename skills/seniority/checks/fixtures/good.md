@@ -1,6 +1,7 @@
 # Ledger
 
 goal: "the nightly export job fails, fix it"
+kind: change
 done when: `python -m export.nightly --date 2026-09-20` exits 0 and writes `out/2026-09-20.csv`
 budget: 25 steps
 scope out: the deprecation warning from pandas in the same run

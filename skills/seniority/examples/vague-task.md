@@ -18,6 +18,7 @@ query, the same data, before and after.
 
 ```
 goal: "Search is slow. Make it faster."
+kind: change
 done when: p95 of `GET /search?q=pump` over 200 runs on the dev dataset, measured before and after, meets the target the person gives
 budget: 40 steps
 scope out: indexing speed, the search UI
@@ -77,6 +78,7 @@ Steps 8 to 10: change, compare the ids (identical), measure again: p95 is
 # Ledger
 
 goal: "Search is slow. Make it faster."
+kind: change
 done when: p95 of `GET /search?q=pump` over 200 runs on the dev dataset, measured before and after, meets the target the person gives
 budget: 40 steps
 scope out: indexing speed, the search UI
@@ -132,6 +134,6 @@ target: observed at step 10, 240 ms against under 300 ms.
 none
 
 ## Checks
-OK: PASS=13; exit 0
-check_change: OK: PASS=6 INFO=1; exit 0
+ledger: OK: PASS=13; exit 0
+change: OK: PASS=6 INFO=1; exit 0
 ```

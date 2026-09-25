@@ -24,7 +24,9 @@ One sentence per term. Use these words and no synonyms.
 | new fact | One thing you know after the step that you did not know before, or `none`. |
 | verdict | The line a procedure tells you to write; it records a decision and why. |
 | stuck line | The line under a step that records the old approach and the new one. |
-| snapshot | The copy of a file taken at `.ledger/before/` before its first edit, which the change check compares against. |
+| snapshot | The copy of a file taken at `.ledger/before/` before its first edit, which the finish check compares against. |
+| probe | `.ledger/probe.py`: a script that prints the results of calling the code you will change; the finish check runs it on the old and new code. |
+| kind | The one-word kind of result the ask wants, `answer`, `change`, `decision` or `plan`, in the ledger header. |
 
 ## Loops
 

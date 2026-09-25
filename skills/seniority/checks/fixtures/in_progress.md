@@ -1,6 +1,7 @@
 # Ledger
 
 goal: "where is the retry limit for the uploader set?"
+kind: answer
 done when: the setting is named with the file and line that sets it, and the file and line that reads it
 budget: 8 steps
 scope out: none

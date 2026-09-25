@@ -1,6 +1,7 @@
 # Ledger
 
 goal: "start the dev server"
+kind: change
 done when: `curl -s localhost:8000/health` prints ok
 budget: 15 steps
 scope out: none

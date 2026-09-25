@@ -39,16 +39,16 @@ Done is an observation, not a feeling.
    memory.** Reread the diff before you describe a change. Reread the
    ledger before you describe what you did: every step in it happened, and
    the answer never says you did not do a step the ledger shows.
-7. **Run the checkers.** `python3 checks/check_ledger.py --ledger
-   .ledger/ledger.md`. Fix any `FAIL` in the ledger that reflects a real
-   gap. A `FAIL` because you really did loop is not hidden: it stays, and
-   the answer says so. If you changed files, `python3 checks/check_change.py
-   --before .ledger/before --after .`. Each `FAIL` there is a behaviour
-   change: revert it, unless the goal asks for exactly that change, and
-   then name the goal's words under *Done when*. The change check reads
-   structure, not results: a function that returns something different
-   passes it, so run old and new on the same inputs as well
-   (`core/scope.md` question 6).
+7. **Write the answer to `.ledger/answer.md` and run
+   `python3 checks/check_finish.py`** from the working directory (gate 3
+   in `SKILL.md`). A `FAIL` in the change part is a behaviour change:
+   revert it, unless the goal asks for exactly that change. A `FAIL` in
+   the probe part is a result that changed: revert it, or keep the old
+   behaviour and propose the new one under *Not done*. A `FAIL` in the
+   ledger part that reflects a real gap is fixed in the ledger; a `FAIL`
+   because you really did loop stays, and the answer says so. A `FAIL` in
+   the answer part is fixed in the answer. Run it again until it prints
+   `FINISH OK`, then send the answer file's text unchanged.
 
 ## Verdict
 

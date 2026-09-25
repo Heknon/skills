@@ -1,6 +1,7 @@
 # Ledger
 
 goal: "what does the --strict flag of build.py do?"
+kind: answer
 done when: the flag's effect named, with the line in build.py that reads it
 budget: 3 steps
 scope out: none

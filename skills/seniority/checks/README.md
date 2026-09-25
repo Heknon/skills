@@ -1,12 +1,13 @@
 # Checks
 
-Two scripts that judge the work mechanically. Run the ledger check after
-step 1, before any risky command, and at Finish. Run the change check at
-Finish if you changed any file. Paste each one's last line into the answer
-under *Checks*. Standard library only, Python 3.8 or later.
+Scripts that judge the work mechanically. At Finish, run only
+`check_finish.py` from the working directory: it runs the others and
+checks the answer. Run `check_ledger.py` alone after step 1 and before
+any risky command. Standard library only, Python 3.8 or later.
 
 | Script | Reads | Rules |
 | --- | --- | --- |
+| `check_finish.py [--dir .] [--json]` | `.ledger/ledger.md`, `.ledger/answer.md`, `.ledger/before/`, `.ledger/probe.py` | the ledger rules; the change rules when the kind is `change` or a snapshot exists; probe-present, probe-runs, behaviour-unchanged when the goal is a cleanup, refactor, tidy-up or improvement, or `done when` says unchanged, or a probe exists; answer-present, answer-headings, answer-done-matches-ledger, answer-unverified-matches, answer-quotes-checks. Prints a `ledger:`, `change:` and `probe:` line to quote, then `FINISH OK` or `FINISH NOT OK` |
 | `check_change.py --before .ledger/before --after . [--json]` | the snapshot of each file before its first edit, and the working directory | snapshot-present, files-changed (INFO), files-deleted, public-signature, swallowed-errors, test-expectations, module-constants (WARN), tests-added (INFO) |
 | `check_ledger.py --ledger FILE [--json]` | a ledger written from `core/ledger.md` | header, done-when-observable (WARN), steps-numbered, repeated-action, oscillation, no-new-fact-streak, stuck-changes-approach, budget, risky-needs-challenge, hypotheses-falsifiable, assumption-status, done-observed, unverified-at-done (WARN) |
 
@@ -48,15 +49,19 @@ loop stays. The answer says so under *Checks*.
 
 ## Fixtures
 
-`fixtures/change/` holds a snapshot, a good change (a fix plus a new test)
+`fixtures/finish/` holds three finished tasks: `good` (a tidy-up whose
+probe gives the same output before and after, and a correct answer),
+`bad_behaviour` (the probe's output changes, and the answer quotes stale
+lines) and `bad_answer` (no closing headings). `fixtures/change/` holds a snapshot, a good change (a fix plus a new test)
 and a bad one (a renamed parameter, a changed default, a swallowed error,
 a changed expectation, a changed constant). `fixtures/` holds three passing ledgers (`good.md`, finished;
 `in_progress.md`, not finished; `risky_good.md`, a risky command after a
 challenge and the person's answer), the unfilled template, and one failing ledger per loop or
 format rule (`*_bad.md`). `sh fixtures/run_fixtures.sh` runs all of them,
 then extracts the ledger from each `examples/*.md` with
-`fixtures/extract_golden.py` and checks it. It also checks that each
-example's answer quotes the summary line the checker really prints. It
+`fixtures/extract_golden.py` and checks it, then runs the finish check on
+the example's ledger and answer, which proves the answer's headings and
+its quoted ledger line. It
 prints `HARNESS PASS` when the good runs exit 0, the bad ones exit 1, and
 every quote matches. Run it after editing the checker, an example, or the
 ledger format.

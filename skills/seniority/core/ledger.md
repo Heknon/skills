@@ -21,6 +21,7 @@ Copy this block, fill every `<...>`, and delete nothing.
 # Ledger
 
 goal: <the ask, in the person's words, one line>
+kind: <answer | change | decision | plan, from core/scope.md question 2>
 done when: <an observable condition, from core/scope.md>
 budget: <n> steps
 scope out: <things near the task that you will not touch, or none>
@@ -44,8 +45,9 @@ not yet
 
 ## The rules for each line
 
-**Header.** `goal:`, `done when:`, `budget:` and `scope out:` each on one
-line. `budget:` is a whole number followed by `steps`.
+**Header.** `goal:`, `kind:`, `done when:`, `budget:` and `scope out:`
+each on one line. `kind:` is one word: `answer`, `change`, `decision` or
+`plan`. `budget:` is a whole number followed by `steps`.
 
 **Assumptions.** One per line: `- A<n> [<status>] <text>`. The status is
 one of:
@@ -115,7 +117,7 @@ stopped at step <n>: <why>
 | `risky-needs-challenge` | a step runs a risky command (in backticks, or after a leading `run`) with no `verdict challenge:` line before it, or no `action: ask:` step between the challenge and the command |
 | `hypotheses-falsifiable` | a hypothesis has no `disproved if:` |
 | `assumption-status` | an assumption's status is not one of the three forms |
-| `done-observed` | the Done section names a step that does not exist |
+| `done-observed` | the Done section names a step that does not exist, or the kind is `change` and the step it names is not a command in backticks |
 | `unverified-at-done` (`WARN`) | the task is done and assumptions are still `unverified`; list them under *Unverified* |
 
 Two actions are the same when their text is the same after lower-casing and

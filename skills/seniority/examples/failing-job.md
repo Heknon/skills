@@ -17,6 +17,7 @@ the cause of a failure, 25 steps.
 
 ```
 goal: "The nightly export job has failed since Monday. Fix it."
+kind: change
 done when: the cron line's command, run by hand with `--date 2026-09-21`, exits 0 and writes `out/2026-09-21.csv`
 budget: 25 steps
 scope out: the pandas FutureWarning in the job log
@@ -81,6 +82,7 @@ was touched.
 # Ledger
 
 goal: "The nightly export job has failed since Monday. Fix it."
+kind: change
 done when: the cron line's command, run by hand with `--date 2026-09-21`, exits 0 and writes `out/2026-09-21.csv`
 budget: 25 steps
 scope out: the pandas FutureWarning in the job log
@@ -139,7 +141,8 @@ writes out/2026-09-21.csv: observed at step 9.
 none
 
 ## Checks
-OK: PASS=12 WARN=1; exit 0. The warning is steps 1 and 4, the same run with
-check_change: OK: PASS=6 INFO=1; exit 0
-the same result, which is the loop that step 4's stuck line broke.
+ledger: OK: PASS=12 WARN=1; exit 0
+change: OK: PASS=6 INFO=1; exit 0
+The ledger warning is steps 1 and 4, the same run with the same result,
+which is the loop that step 4's stuck line broke.
 ```

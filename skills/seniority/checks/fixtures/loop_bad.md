@@ -1,6 +1,7 @@
 # Ledger
 
 goal: "install the dependencies and run the tests"
+kind: change
 done when: `pytest` exits 0
 budget: 15 steps
 scope out: none

@@ -4,10 +4,8 @@
 Usage: extract_golden.py <example.md> <outdir>
 
 Writes <outdir>/ledger.md from the fenced block under the example's
-"## The ledger" heading, and <outdir>/expected_summary.txt from the
-ledger checker summary line the example's answer quotes first under
-"## Checks".
-Exits 1 when either is missing.
+"## The ledger" heading, and <outdir>/answer.md from the fenced block
+under "## The answer". Exits 1 when either is missing.
 """
 
 import os
@@ -33,13 +31,14 @@ def main() -> int:
     os.makedirs(outdir, exist_ok=True)
     with open(os.path.join(outdir, "ledger.md"), "w", encoding="utf-8") as handle:
         handle.write(block.group(1))
-    summary = re.search(r"^## Checks\s*\n((?:OK|NOT OK):[^.\n]*)", text, re.M)
-    if not summary:
-        print(f"extract_golden: {source}: no ledger checker summary line under '## Checks' in the answer", file=sys.stderr)
+    answer_heading = re.search(r"^## The answer\s*$", text, re.M)
+    answer = re.search(r"^```\s*\n(.*?)^```\s*$", text[answer_heading.end():], re.M | re.S) if answer_heading else None
+    if not answer:
+        print(f"extract_golden: {source}: no ``` block under '## The answer'", file=sys.stderr)
         return 1
-    with open(os.path.join(outdir, "expected_summary.txt"), "w", encoding="utf-8") as handle:
-        handle.write(summary.group(1).strip() + "\n")
-    print(f"extract_golden: wrote ledger.md and expected_summary.txt to {outdir}")
+    with open(os.path.join(outdir, "answer.md"), "w", encoding="utf-8") as handle:
+        handle.write(answer.group(1))
+    print(f"extract_golden: wrote ledger.md and answer.md to {outdir}")
     return 0
 
 

@@ -1,6 +1,7 @@
 # Ledger
 
 goal: "make test_parse pass"
+kind: change
 done when: `pytest tests/test_parse.py` exits 0
 budget: 15 steps
 scope out: none

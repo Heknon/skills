@@ -1,6 +1,7 @@
 # Ledger
 
 goal: "Follow the rollout plan, start with the migration."
+kind: change
 done when: the migration's challenge verdict shown to the person and their answer recorded
 budget: 15 steps
 scope out: none

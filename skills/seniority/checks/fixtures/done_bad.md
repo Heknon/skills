@@ -1,6 +1,7 @@
 # Ledger
 
 goal: "fix the failing login test"
+kind: change
 done when: it works
 budget: 15 steps
 scope out: none

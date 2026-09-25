@@ -22,7 +22,14 @@ procedure at a time, at the moment it names. Each procedure ends in a
    there is a `.git`. After step 1, run the ledger check once, so a wrong
    format is caught early. **Before your first edit to any file**, copy it
    to `.ledger/before/<the same relative path>`. That snapshot is what the
-   change check compares against at the end.
+   finish check compares against at the end. **If the goal is a cleanup,
+   refactor, tidy-up or improvement, or `done when` says behaviour stays
+   unchanged**, also write `.ledger/probe.py` before the first edit: a
+   script that imports the code you will change and prints, one per line,
+   the result of calling each public function you will touch on edge
+   inputs: a whole number, zero, a negative, an empty value, `None`. The
+   finish check runs it on the old and the new code and fails any
+   difference.
 2. **Before a risky action.** Risky means it cannot be undone or reaches
    outside this environment: it names `prod` or `production`, deploys,
    migrates data, publishes, pushes, deletes recursively, forces, drops a
@@ -37,11 +44,19 @@ procedure at a time, at the moment it names. Each procedure ends in a
    ask; do not run it. Write the risky step into the ledger first, run the
    ledger check, and run the command only if the check passes; it fails a
    risky command without the challenge and the question before it.
-3. **Before your final message**: run `core/done.md`, run the ledger check,
-   and, if you changed any file, the change check. Revert anything the
-   change check fails unless the goal asks for exactly that change. End
-   the message with the four headings in *What you say when you finish*.
-   Every final message, short or long, a question or a result.
+3. **Before your final message**, every time, short or long, a result or
+   a question:
+   1. run `core/done.md`;
+   2. write the whole final message to `.ledger/answer.md`, ending with
+      the four headings in *What you say when you finish*;
+   3. from the working directory run
+      `python3 <this skill>/checks/check_finish.py`;
+   4. if it prints `FINISH NOT OK`, fix what it names: revert a change it
+      fails, fix the ledger, rewrite the answer, and run it again;
+   5. when it prints `FINISH OK`, send the text of `.ledger/answer.md` as
+      your final message, unchanged.
+
+   Never send a final message that `check_finish.py` has not passed.
 
 ## The ledger
 
@@ -139,16 +154,19 @@ statement in the answer below the level "read", or `none`; an assumption
 marked verified or false does not go here>
 
 ## Checks
-<the last line check_ledger.py printed, copied, such as
-"OK: PASS=13; exit 0", and the last line check_change.py printed, or
-"no files changed", or why either could not run>
+<each line check_finish.py printed that starts with "ledger:", "change:"
+or "probe:", copied exactly, such as "ledger: OK: PASS=13; exit 0">
 ```
 
-The ledger check is `python3 <this skill>/checks/check_ledger.py --ledger
-.ledger/ledger.md`. The change check is `python3 <this skill>/checks/check_change.py
---before .ledger/before --after .`; it fails a renamed or removed public
-function, parameter or default, a new `except` that does not re-raise, and
-a changed test expectation. Both need Python 3.8 or later and nothing else.
+`check_finish.py` runs everything: the ledger rules; the change rules, which
+fail a renamed or removed public function, parameter or default, a new
+`except` that does not re-raise, and a changed test expectation; the probe;
+and the answer rules, which fail a missing heading, a *Done when* that
+does not match the ledger, an *Unverified* list that does not match the
+ledger, and a *Checks* section that does not quote its lines. The single
+checks can also be run alone: `check_ledger.py --ledger .ledger/ledger.md`
+after step 1 and before a risky command. All need Python 3.8 or later and
+nothing else.
 
 The `evals/` folder is for people testing this skill. Never open it while
 doing a task.

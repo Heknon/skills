@@ -189,28 +189,20 @@ def compare_tests(path: str, old: str, new: str, offenders: List[str], added: Li
         added.append(f"{path}: {len(new_asserts)} expectation line(s) added")
 
 
-def main(argv: Optional[List[str]] = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--before", required=True, help="the snapshot folder, such as .ledger/before")
-    parser.add_argument("--after", required=True, help="the working directory")
-    parser.add_argument("--json", action="store_true")
-    args = parser.parse_args(argv)
-    if not os.path.isdir(args.after):
-        print(f"check_change: {args.after} is not a directory", file=sys.stderr)
-        return 2
-
+def evaluate(before: str, after: str):
+    """Compare the snapshot with the working directory. Returns (results, summary)."""
     results: List[Result] = []
-    files = snapshot_files(args.before) if os.path.isdir(args.before) else []
+    files = snapshot_files(before) if os.path.isdir(before) else []
     if not files:
-        results.append(Result("snapshot-present", FAIL, 1, [f"no files under {args.before}"],
+        results.append(Result("snapshot-present", FAIL, 1, [f"no files under {before}"],
                               "copy each file to .ledger/before/<same path> before its first edit (SKILL.md gate 1); without it nothing can be compared"))
     else:
         results.append(Result("snapshot-present", PASS, 0, [], f"{len(files)} file(s) in the snapshot"))
 
     changed, missing, api, errors, constants, tests, tests_added = [], [], [], [], [], [], []
     for path in files:
-        old = read(os.path.join(args.before, path))
-        new = read(os.path.join(args.after, path))
+        old = read(os.path.join(before, path))
+        new = read(os.path.join(after, path))
         if new is None:
             missing.append(f"{path} is in the snapshot but gone from the working directory")
             continue
@@ -230,8 +222,34 @@ def main(argv: Optional[List[str]] = None) -> int:
     results.append(verdict("module-constants", constants, failing=WARN, note="a changed constant is a changed default for every caller; name it in the answer"))
     if tests_added:
         results.append(Result("tests-added", INFO, len(tests_added), tests_added, "new expectations only"))
+    return results, {"snapshot_files": len(files), "changed": len(changed)}
 
-    summary = {"snapshot_files": len(files), "changed": len(changed)}
+
+def summary_line(results: List[Result]) -> str:
+    exit_code = 1 if any(result.status == FAIL for result in results) else 0
+    counts = {status: sum(1 for result in results if result.status == status) for status in (PASS, FAIL, WARN, SKIP, INFO)}
+    return f"{'OK' if exit_code == 0 else 'NOT OK'}: " + " ".join(f"{s}={c}" for s, c in counts.items() if c) + f"; exit {exit_code}"
+
+
+def print_results(results: List[Result]) -> None:
+    for result in results:
+        print(f"{result.status:<4} {result.name:<26} {result.count}")
+        for example in result.examples[:MAX_EXAMPLES]:
+            print(f"       - {example}")
+        if result.note:
+            print(f"       note: {result.note}")
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--before", required=True, help="the snapshot folder, such as .ledger/before")
+    parser.add_argument("--after", required=True, help="the working directory")
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args(argv)
+    if not os.path.isdir(args.after):
+        print(f"check_change: {args.after} is not a directory", file=sys.stderr)
+        return 2
+    results, summary = evaluate(args.before, args.after)
     exit_code = 1 if any(result.status == FAIL for result in results) else 0
     if args.json:
         print(json.dumps({"tool": "check_change", "before": args.before, "after": args.after, "summary": summary,
@@ -239,14 +257,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return exit_code
     print(f"check_change: {args.before} -> {args.after}")
     print("  " + ", ".join(f"{key}={value}" for key, value in summary.items()))
-    for result in results:
-        print(f"{result.status:<4} {result.name:<26} {result.count}")
-        for example in result.examples[:MAX_EXAMPLES]:
-            print(f"       - {example}")
-        if result.note:
-            print(f"       note: {result.note}")
-    counts = {status: sum(1 for result in results if result.status == status) for status in (PASS, FAIL, WARN, SKIP, INFO)}
-    print(f"{'OK' if exit_code == 0 else 'NOT OK'}: " + " ".join(f"{s}={c}" for s, c in counts.items() if c) + f"; exit {exit_code}")
+    print_results(results)
+    print(summary_line(results))
     return exit_code
 
 
