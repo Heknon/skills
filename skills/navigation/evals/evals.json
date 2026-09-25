@@ -26,13 +26,13 @@
       "name": "registry-caller",
       "sandbox": "registry",
       "prompt": "Nothing seems to call handle_refund in events/handlers.py. Can I delete it?",
-      "bait": "it is only called through the HANDLERS table filled by the @handler decorator",
+      "bait": "it is only called through the HANDLERS table filled by the @handler decorator; the table is dispatched on the kind field of queue messages in events/consumer.py, outside data",
       "expectations": [
         "Says no, it is used",
         "Names the @handler(\"refund\") registration and the HANDLERS table in events/registry.py",
-        "Names the dispatch in events/dispatch.py and the producer in billing/refunds.py",
-        "Does not conclude from a single search for handle_refund(",
-        "Lists what was not searched, such as other repositories, or says none with reason"
+        "Names the dispatch in events/dispatch.py and the queue consumer in events/consumer.py, whose messages can carry kind 'refund'",
+        "Does not call it dead because billing/refunds.py is itself not called",
+        "Lists what was not searched, such as other services that publish events, or says none with reason"
       ]
     },
     {
@@ -95,11 +95,11 @@
       "prompt": "What exactly does parse_rows in app/rows.py return? I want to annotate it.",
       "bait": "no annotations; the answer must come from a checker, not from the name",
       "expectations": [
-        "Runs at least one type checker with reveal_type in a probe file, not in app/rows.py",
-        "Quotes the checker's output line",
-        "Reports the type as a list of dict[str, str] or the checker's exact wording",
-        "Deletes the probe file afterwards, or says it was left and where",
-        "Does not leave reveal_type in project code"
+        "Runs Pyright with reveal_type in a single probe file, not in app/rows.py",
+        "Quotes Pyright's output line, list[dict[str, str]]",
+        "If it also runs ty or mypy, explains that their Unknown or Any means the function has no annotation",
+        "Deletes the probe file and creates no other files in the project",
+        "Does not answer only from reading the body"
       ]
     },
     {
@@ -141,5 +141,31 @@
       ]
     }
   ],
-  "runs": []
+  "runs": [
+    {
+      "date": "2026-09-25",
+      "model": "claude-haiku-4-5 as a stand-in for a small offline model",
+      "setup": "each scenario as a fresh agent with the skill without evals/, a fresh sandbox, Linux instead of Windows (told to adapt PowerShell commands), no web; graded by hand",
+      "first_run": {
+        "pass": [
+          2,
+          3,
+          4,
+          5,
+          7,
+          9
+        ],
+        "partial": [
+          0,
+          6,
+          8
+        ],
+        "fail": [
+          1
+        ],
+        "notes": "Strong on resolution: re-exports with an alias, the vendored copy on sys.path, the route composed from two prefixes, the dotted string with importlib, the commit and its reason. 1 traced the decorator, table, dispatch and producer correctly, then called handle_refund dead because the producer function was itself not called in the sandbox. 6 gave the right type by reading the body instead of a checker, and left two scratch files in the project; checking by hand showed ty says Unknown and mypy says Any for the unannotated function, only Pyright infers list[dict[str, str]]. 0 and 8 were right but thin: no chain shown for 0, the overridden tests/conftest.py not mentioned for 8, and several answers skipped the Found / How I know / Not covered headings.",
+        "changes": "trace-in gains step 6: follow each use to where it can be reached from; public functions, entry points and dispatch on outside data are reachable, so a handler for a message kind is live even if no line here sends it. The registry sandbox gains events/consumer.py, a queue entry point. types.md and type-checkers.md record that only Pyright infers an unannotated function's return type (ty Unknown, mypy Any, measured), forbid answering from reading the body, and limit probes to one deleted file."
+      }
+    }
+  ]
 }

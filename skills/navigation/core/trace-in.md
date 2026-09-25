@@ -26,12 +26,25 @@ safe to change: <yes | no, because <use> | unknown, because <what could not be s
 5. **Read every hit.** Mark each one: call, import only (unused import),
    registration, string reference, subclass or override, test, comment.
    Comments and dead imports are not uses.
-6. **Decide safety.** No uses after steps 2 to 5, and nothing left under
-   *Not covered*: safe. Any use: not safe, name it. Anything not covered,
-   such as other repositories without Sourcegraph: unknown, say what.
+6. **Follow each use back to where it can be reached from.** A use inside
+   a function that nothing in this repository calls is not the end: ask
+   what can reach that function from outside. It is reachable when it is
+   public (no leading underscore, in a module others can import), when it
+   is an entry point (`python/entry-points.md`), or when the use depends
+   on outside data: a dispatch keyed by a message's field, a request's
+   path, a file's content, a setting. Outside data can bring any key, so
+   a handler registered for that key is live even if no line in this
+   repository sends it.
+7. **Decide safety.** No uses after steps 2 to 6, and nothing left under
+   *Not covered*: safe. Any use reachable as in step 6: not safe, name
+   the use and how it is reached. Anything not covered, such as other
+   repositories without Sourcegraph: unknown, say what.
 
 ## Never
 
 - Never write "unused" from one search for `X(`.
 - Never count a test as the only user without saying so; code used only
   by tests is a finding in itself.
+- Never call something dead because the only function that reaches it is
+  itself not called in this repository. Public functions, entry points
+  and dispatch on outside data are reached from outside it.

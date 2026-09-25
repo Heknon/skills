@@ -28,6 +28,18 @@ Pyright 1.1.414):
 - mypy: `dict[str, object]`
 - Pyright: `dict[str, Unknown]`
 
+For a function with no return annotation, only Pyright infers the return
+type from the body. For `parse_rows` below, which builds
+`[dict(zip(header, row)) for row in reader]` with no annotations:
+
+- ty: `Unknown`
+- mypy: `Any` (mypy treats an unannotated function's return as `Any`)
+- Pyright: `list[dict[str, str]]`
+
+So for "what does this unannotated function return", ask Pyright. An
+`Unknown` or `Any` from ty or mypy there means "not annotated", not "the
+type cannot be known".
+
 `Unknown` (Pyright, ty) and `Any` mean the checker could not tell. It is
 not a type to report as the answer: say the type is not known statically,
 and why (no annotation, an untyped library).
@@ -40,6 +52,7 @@ checkers disagree and the difference matters, give both.
 ## Never
 
 - Never state a type from a variable's name (`user_id` is not proof of
-  `int`) or from how such code usually looks.
+  `int`), from how such code usually looks, or from your own reading of
+  the body. Reading gives a hypothesis; the checker's line is the answer.
 - Never leave a `reveal_type` call in project code. It is a probe; see
   `tools/type-checkers.md` for where to put it.

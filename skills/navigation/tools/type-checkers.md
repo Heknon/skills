@@ -8,8 +8,10 @@ little between versions.
 
 ## Ask for one type with `reveal_type`
 
-Do not edit project code to do it. Write a small probe file in the
-project folder, check it, read the answer, delete the file.
+Do not edit project code to do it, and do not create other files such as
+an annotated copy of the module. Write one probe file, `nav_probe.py`, in
+the project folder, check it, read the answer, delete it. Say in the
+answer that it was deleted.
 
 ```python
 # nav_probe.py, in the project folder; delete it afterwards
@@ -61,6 +63,12 @@ Copy the whole line into the answer.
 
 To see which environment Pyright used, add `--verbose`: it prints
 `Search paths:`. ty prints its Python version with `-v`.
+
+## Unannotated functions
+
+For the return type of a function with no annotations, use Pyright: it
+infers it from the body. ty prints `Unknown` and mypy prints `Any` for
+the same call, meaning only that there is no annotation.
 
 ## Which one to use
 

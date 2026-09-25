@@ -42,8 +42,10 @@ steps and the answer shape; change the names.
    events/dispatch.py:15:     return HANDLERS[event["kind"]](event)
    ```
 
-6. **Find where the key comes from.** `event["kind"]` is set by the message
-   producer. Search for the string `"refund"` in `.py` and configuration:
+6. **Find where the key comes from.** `event["kind"]` comes from outside
+   data, the message, so any producer can send `"refund"`; the handler is
+   live even if no line in this repository sends it (`core/trace-in.md`
+   step 6). Search for the string `"refund"` in `.py` and configuration:
 
    ```
    events/consumer.py:30:     kind = message.headers["kind"]   # "refund" for refund messages
