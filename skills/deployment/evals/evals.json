@@ -1,6 +1,6 @@
 {
  "skill_name": "deployment",
- "notes": "Scenarios for checking that a weak model using this skill fixes pipelines, charts and deploys from evidence and from the skill's files, instead of from memory or the person's first idea. Each names a sandbox under evals/sandboxes/, copied fresh before the run. No GitLab or cluster is available to the model; job logs and command outputs are given as files. Give the model the skill folder without evals/, the sandbox as its working directory, and the prompt. Grade by reading the answer and the diff.",
+ "notes": "Scenarios for checking that a weak model using this skill fixes pipelines, charts and deploys from evidence and from the skill's files, instead of from memory or the person's first idea. Each names a sandbox under evals/sandboxes/, copied fresh before the run. No GitLab or cluster is available to the model; job logs and command outputs are given as files. Give the model the skill folder without evals/, the sandbox as its working directory, and the prompt. Grade by reading the answer and the diff. Sandboxes external-config and discover-map hold real API responses from the lab GitLab 19.4.1, with the host renamed.",
  "how_to_run": [
   "copy the skill folder without evals/ to <skill>",
   "copy evals/sandboxes/<sandbox> to a fresh <work>",
@@ -200,6 +200,35 @@
     "Mentions --verify=false only as the less good option, with the reason, or asks for the .prov file",
     "Shows how to check it: helm plugin list, then helm diff version",
     "Does not suggest downloading from the internet"
+   ]
+  },
+  {
+   "id": 14,
+   "name": "external-config",
+   "sandbox": "external-config",
+   "prompt": "Someone says lab/extcfg runs pipelines, but its repository has no .gitlab-ci.yml and the lint API says 'Please provide content of .gitlab-ci.yml'. Does it have CI, and where is it? The API responses are in this folder.",
+   "bait": "no .gitlab-ci.yml in the tree and a failing lint point to 'no CI'; project.json shows ci_config_path external-pipeline.yml@platform/templates and pipelines.json shows a successful pipeline",
+   "expectations": [
+    "Says the project has CI: its ci_config_path points to external-pipeline.yml in platform/templates",
+    "Explains the lint error: GET /ci/lint lints only the repository's own file",
+    "Notes the reference has no :ref, so it follows platform/templates' default branch, and a change there changes this project's pipeline",
+    "Says how to see the resolved configuration: POST /ci/lint with an include of that project file (api scope), or ci_map.py, or reading the file in platform/templates",
+    "Does not invent a .gitlab-ci.yml or claim Auto DevOps runs"
+   ]
+  },
+  {
+   "id": 15,
+   "name": "discover-map",
+   "sandbox": "discover-map",
+   "prompt": "Map everything that makes up lab/discover's pipeline and tell me what is risky. The lint API's answer is in ci-lint-response.json; the repository's CI files are here too.",
+   "bait": "the includes list omits the Code-Quality template (rules false) and everything inside ci/child.yml; one project include is unpinned (ref HEAD); there is a dynamic child and a multi-project trigger",
+   "expectations": [
+    "Lists every include from the response with its type, project and ref, and where it was included from (context_project), including common.yml included by platform/templates",
+    "Flags platform/templates:common.yml @ HEAD as not pinned, and says what that risks",
+    "Notices the Code-Quality template include is in .gitlab-ci.yml but not in the list, because its rules were false, and says when it would apply",
+    "Finds the three trigger jobs from merged_yaml: child (ci/child.yml, whose own include of platform/templates is not in the list and must be linted on its own), dynamic-child (content only from the generate job's artifact), charts-pipeline (a pipeline in platform/charts, to be mapped the same way)",
+    "Mentions the extends and !reference chains (unit extends .python-base from platform/templates, which extends .common-base; !reference [.login, script])",
+    "Does not call the map complete without saying what was not resolved"
    ]
   }
  ],

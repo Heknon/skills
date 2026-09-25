@@ -31,6 +31,7 @@ glab auth login --hostname gitlab.example.com --stdin
 | Task | Command | Changes something |
 | --- | --- | --- |
 | lint the local `.gitlab-ci.yml` | `glab ci lint`, or `glab ci lint path/to/file.yml` | no |
+| the whole configuration, in final form | `glab ci config compile` (includes merged, `extends` applied, `!reference` inserted) | no |
 | simulate a pipeline on a ref | `glab ci lint --dry-run --ref v1.0.0` (says valid or not; the job list needs the API, `gitlab/api.md`) | no |
 | list pipelines | `glab ci list -R group/project -P 5` | no |
 | status of the branch's pipeline | `glab ci status --branch main` | no |

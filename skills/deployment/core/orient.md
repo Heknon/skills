@@ -19,9 +19,14 @@ not seen:    <hops that live outside the repository>
 ## Steps
 
 1. **Find the pipeline configuration.** `.gitlab-ci.yml` at the root,
-   unless the project sets another path (Settings > CI/CD > General
-   pipelines > CI/CD configuration file). Read it whole.
-2. **Resolve every include.** For each `include:` entry, note its kind
+   unless the project sets another path: `ci_config_path` from
+   `GET /projects/:id` (Settings > CI/CD > General pipelines > CI/CD
+   configuration file). It can name a file in another project
+   (`file.yml@group/project`), in which case the repository may have no
+   CI file at all. Read the file whole.
+2. **Resolve every include.** For the whole map, including child and
+   multi-project pipelines and configuration kept in another project, use
+   `core/discover.md`; what follows is the short version. For each `include:` entry, note its kind
    (`gitlab/includes-and-components.md`): `local` files are read from this
    repository; `project`, `component` and `template` entries live
    elsewhere. Read what you can reach. Better than reading: ask GitLab.

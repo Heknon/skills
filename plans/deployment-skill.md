@@ -49,7 +49,8 @@ and recipes that are complete files verified by running them.
 | **Variables** | decide where a value or secret lives, or why a variable has the wrong value | the place, its flags, and the precedence that decides it |
 | **Chart** | write or change a Helm chart, a generic chart, or a chart repository | the chart, `helm lint` and `helm template` output |
 | **Deploy** | deploy, promote or roll back a release | the command, what it changed, and how it was observed |
-| **Access** | connect GitLab to a cluster, or talk to GitLab's API | the identity, its permissions, where its credential is stored |
+| **Discover** | map every include, job and downstream pipeline behind a project, or find who uses a template | a tree, each line with the API answer behind it |
+| **Access** | connect to GitLab, or connect GitLab to a cluster | the identity, its permissions, where its credential is stored |
 | **Debug** | a pipeline, job, image or deployment fails | the failing hop on the ladder, the evidence, the fix |
 
 ## 4. The failures it targets
@@ -196,6 +197,18 @@ into the file named:
 - The publish component failed on a second tag with `File name has
   already been taken` until `--check-url` got the job token
   (`recipes/ci-components/templates/python-publish.yml`).
+- A project whose `ci_config_path` names a file in another project has no
+  `.gitlab-ci.yml`, fails `GET /ci/lint`, and still runs pipelines; with no
+  file and Auto DevOps on, the lint API lints the Auto DevOps template
+  without saying so (`core/discover.md`).
+- The lint API's `includes` list resolves nested includes with project,
+  ref (`HEAD` when unpinned) and origin, but omits includes whose rules
+  were false and everything inside child pipeline files; POST lint needs
+  the `api` scope, GET lint works with `read_api` (`core/discover.md`,
+  `recipes/tools/ci_map.py`).
+- GitLab's own MCP server accepts a personal access token with the `mcp`
+  scope, refuses `api` tokens, and has no lint, variable or package tools
+  (`gitlab/mcp.md`).
 
 ## 9. Not yet done
 

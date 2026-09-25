@@ -1,0 +1,7 @@
+{
+  "id": 8,
+  "path_with_namespace": "lab/extcfg",
+  "default_branch": "main",
+  "ci_config_path": "external-pipeline.yml@platform/templates",
+  "auto_devops_enabled": true
+}

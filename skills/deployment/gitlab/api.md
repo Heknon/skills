@@ -31,8 +31,13 @@ sent.
 | --- | --- |
 | GitLab version and edition | `GET /version` (`"enterprise": false` is Community Edition) |
 | project | `GET /projects/:id` |
-| lint a configuration | `POST /projects/:id/ci/lint` body `{"content": "<yaml>"}`; add `?dry_run=true&include_jobs=true&ref=<ref>` to simulate a pipeline on a branch or tag. The POST form takes `ref`: `dry_run_ref` is silently ignored there and the simulation runs on the default branch (seen in the lab) |
-| lint the committed configuration | `GET /projects/:id/ci/lint?content_ref=<ref>&dry_run=true&include_jobs=true&dry_run_ref=<ref>` |
+| project settings that decide the configuration | `GET /projects/:id`: `ci_config_path`, `auto_devops_enabled`, `default_branch`, `permissions` |
+| the token itself | `GET /personal_access_tokens/self`: name, scopes, expiry |
+| lint a configuration (needs the `api` scope; *lab:* `read_api` got 403) | `POST /projects/:id/ci/lint` body `{"content": "<yaml>"}`; add `?dry_run=true&include_jobs=true&ref=<ref>` to simulate a pipeline on a branch or tag. The POST form takes `ref`: `dry_run_ref` is silently ignored there and the simulation runs on the default branch (seen in the lab) |
+| lint the committed configuration (works with `read_api`) | `GET /projects/:id/ci/lint?content_ref=<ref>&dry_run=true&include_jobs=true&dry_run_ref=<ref>`; the response's `includes` lists every resolved include (`core/discover.md`) |
+| a file | `GET /projects/:id/repository/files/<url-encoded path>/raw?ref=<ref>` |
+| a job's artifact file | `GET /projects/:id/jobs/:job_id/artifacts/<path>` |
+| code search in one project | `GET /projects/:id/search?scope=blobs&search=<text>` (group and global code search need advanced search) |
 | latest pipeline on a ref | `GET /projects/:id/pipelines/latest?ref=main` |
 | pipelines | `GET /projects/:id/pipelines?ref=<ref>&status=failed&source=<source>&per_page=20` |
 | create a pipeline | `POST /projects/:id/pipeline` (singular) body `{"ref": "main"}`; add `"inputs": {...}` or `"variables": [{"key":..., "value":...}]` |
