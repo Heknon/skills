@@ -19,7 +19,7 @@ Read this file, then load only what the task needs.
 ```
 uv run pytest --version            # pytest 9.1.1
 uv run python -c "import pluggy; print(pluggy.__version__)"
-uv run pytest --co | Select-Object -First 6    # the header: rootdir, configfile, plugins
+uv run pytest --co | Select-Object -First 10   # the header: rootdir, configfile, plugins
 ```
 
 `internals/versions.md` lists what differs between 8 and 9. Run pytest

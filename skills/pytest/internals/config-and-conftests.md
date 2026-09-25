@@ -20,8 +20,10 @@ parser.addini("budget_ms", help="...", type="string", default="")
   shell), `linelist` (one per line), `paths` (relative to the
   configuration file), `pathlist` (py.path), and from 8.4 `int` and
   `float`. 9.0 added `aliases=[...]`.
-- Environment: `PYTEST_ADDOPTS` is appended to the command line; pytester
-  removes it for inner runs.
+- Environment: `PYTEST_ADDOPTS` is put **before** the command-line
+  arguments (`config/__init__.py`: `shlex.split(env_addopts) + args`), so
+  options typed on the command line win; pytester removes it for inner
+  runs.
 
 ## Config: reading them (*lab*, both versions)
 
@@ -73,8 +75,11 @@ config's stash lives for the run; an item's for the item.
   interrupted collection (`Defining 'pytest_plugins' in a non-top-level
   conftest is no longer supported`) from the root, and loaded when the
   path was given.
-- Each conftest is registered as a plugin; its hooks run for nodes under
-  its directory (`item.ihook`), start-up hooks only if it is initial.
+- Each conftest is registered as a plugin. Hooks called through a node's
+  `ihook` (the runtest, report, `collect_file` and fixture hooks) run only
+  for nodes under its directory; every other hook, including
+  `pytest_collection_modifyitems` and `pytest_terminal_summary`, is
+  session-wide (`internals/hooks.md`).
 - `--noconftest` skips all conftests; `--confcutdir=DIR` stops the
   upward search at DIR.
 - Conftests are always assertion-rewritten (`internals/assertion-rewriting.md`).

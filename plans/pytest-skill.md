@@ -98,8 +98,9 @@ skill:
   caught them.
 - An xpassed test's call report has outcome `passed`; plugins that count
   passes must check `wasxfail` (recipe test and eval `counter-and-xpass`).
-- `pytest.register_fixture` (9.1) needs `trylast=True` in
-  `pytest_sessionstart`.
+- `pytest.register_fixture` (9.1) cannot be called from a plain
+  `pytest_sessionstart`; the skill registers in `pytest_collection`
+  (`tryfirst=True`), the documented phase.
 - A plugin's module globals are shared by the outer run and every
   in-process pytester run (a counter read 1, 2, 3), so the recipe keeps
   its state in the stash.
@@ -107,6 +108,15 @@ skill:
   own); strict failures still work. Recorded as the recipe's limitation.
 - An option in a non-initial conftest is a usage error from the root
   (eval `option-in-deep-conftest`).
+
+The independent review then found, and the lab confirmed: a conftest's
+`pytest_collection_modifyitems` and summary hooks are session-wide, not
+limited to its folder; `strict_markers`/`strict_config` keys exist only
+from 9.0; pytest 9.0.x ignores `--strict-markers` in `addopts`; both
+`[tool.pytest]` tables in one file is an error on 9; `-p no:` needs the
+entry-point name, not the distribution name; `PYTEST_ADDOPTS` goes
+before the command line; py.path hook arguments were removed in 9.1, not
+9.0. All are fixed in the skill.
 
 ## 8. Evals
 

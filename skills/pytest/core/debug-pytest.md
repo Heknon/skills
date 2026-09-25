@@ -18,7 +18,7 @@ Use this before reading pytest's source and before any claim in
 | Question | Command | Shows |
 | --- | --- | --- |
 | which versions and plugins | `uv run pytest -VV` | pytest version and path, then `registered third-party plugins:` with each plugin's version and file |
-| which config, rootdir, plugins for this run | `uv run pytest --co \| Select-Object -First 6` | `rootdir:`, `configfile:`, `plugins:` |
+| which config, rootdir, plugins for this run | `uv run pytest --co \| Select-Object -First 10` | `rootdir:`, `configfile:`, `plugins:` |
 | which tests are collected, and their node ids | `uv run pytest --co -q` | one node id per line |
 | the collection tree | `uv run pytest --co` | `<Dir>`, `<Package>`, `<Module>`, `<Class>`, `<Function>` nested |
 | which fixtures exist here | `uv run pytest --fixtures tests/api` | every fixture visible there, grouped by where it is defined |
@@ -27,7 +27,7 @@ Use this before reading pytest's source and before any claim in
 | the same while running | `uv run pytest --setup-show "<node id>"` | the same, interleaved with the test |
 | which plugin modules and conftests got registered | `uv run pytest --trace-config --co -q` | `PLUGIN registered: <module 'conftest' from '...'>` per plugin |
 | every hook call, with arguments and results | `uv run pytest --debug "<node id>"` | writes `pytestdebug.log`: `pytest_runtest_makereport [hook]`, its arguments, then `finish pytest_runtest_makereport --> <TestReport ... when='setup' outcome='passed'>` |
-| does a plugin cause it | `uv run pytest -p no:<name> ...` | the run without that plugin; `<name>` as in `-VV` or the entry point name |
+| does a plugin cause it | `uv run pytest -p no:<name> ...` | the run without that plugin. `<name>` is the entry point name: as on the header's `plugins:` line without the version (`randomly`, `cov`, `xdist`). *lab:* the distribution name from `-VV` (`-p no:pytest-randomly`) was silently ignored and the plugin still ran |
 | do installed plugins cause it | `$env:PYTEST_DISABLE_PLUGIN_AUTOLOAD = "1"; uv run pytest ...; Remove-Item Env:PYTEST_DISABLE_PLUGIN_AUTOLOAD` | no third-party plugin is loaded unless named with `-p` (*lab:* the `plugins:` line disappears) |
 | does a conftest cause it | `uv run pytest --noconftest ...` | the run without any `conftest.py` |
 | what a configuration value is | `uv run pytest --help` bottom part lists ini keys; in code: `config.getini("name")` | |

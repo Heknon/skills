@@ -77,7 +77,10 @@ named 'myplugin'`.
   bug. *lab:* the recipe passed in both modes.
 - pytester removes `PYTEST_ADDOPTS` for inner runs and sets `HOME` to
   the test directory, so the outer command line and user configuration
-  do not reach them; `PYTEST_DISABLE_PLUGIN_AUTOLOAD` does.
+  do not reach them; `PYTEST_DISABLE_PLUGIN_AUTOLOAD` does, and stops
+  only entry-point plugins. To check tests of a plugin loaded with `-p`
+  or `plugins=` without it, break the plugin temporarily
+  (`core/write-plugin.md` step 4).
 
 ## Checking the result
 

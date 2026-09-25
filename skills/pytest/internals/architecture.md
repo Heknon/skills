@@ -30,8 +30,10 @@ builds a `PytestPluginManager` and a `Config`.
 
 `pytest_cmdline_parse` is called before `-p` and installed plugins are
 loaded; *lab:* an implementation in a `-p` plugin or a conftest is
-never called. Output written to stdout or stderr during start-up is
-captured and not shown; write to a file when checking these hooks.
+never called. Output printed during `pytest_addoption` and while
+conftests are imported is captured and not shown (*lab*); output from
+`pytest_configure` and `pytest_sessionstart` is shown. Write to a file
+when checking the early hooks.
 
 **2. Session start.** `pytest_sessionstart`, then the header
 (`pytest_report_header`).

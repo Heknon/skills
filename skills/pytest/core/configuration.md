@@ -13,10 +13,11 @@ cause:      <the setting or file that explains the problem>
 ## Read the header first
 
 ```
-uv run pytest --co | Select-Object -First 6
+uv run pytest --co | Select-Object -First 10
 ```
 
-prints `rootdir:`, `configfile:` and `plugins:`. *lab, 9.1.1:* with both
+prints `rootdir:`, `configfile:`, `testpaths:` and `plugins:` (other
+plugins may add lines, so read ten, not six). *lab, 9.1.1:* with both
 a `pytest.ini` and a `pyproject.toml` present, the header said
 `configfile: pytest.ini (WARNING: ignoring pytest config in
 pyproject.toml!)`.
@@ -45,13 +46,23 @@ pytest.mark.slow`. A project supporting 8 keeps `[tool.pytest.ini_options]`
 
 | Setting | Effect |
 | --- | --- |
-| `strict_markers` (`--strict-markers`) | an unregistered marker is an error at collection (*lab:* `'typo_mark' not found in markers configuration option`) |
-| `strict_config` | unknown configuration keys are errors |
+| `--strict-markers` in `addopts` (both); the key `strict_markers` (9.0 and later) | an unregistered marker is an error at collection (*lab:* ``'typo_mark' not found in `markers` configuration option``) |
+| `--strict-config` in `addopts` (both); the key `strict_config` (9.0 and later) | unknown configuration keys are errors (`ERROR: Unknown config option: testpahts`) |
 | `xfail_strict` (both versions; 9.0 adds the name `strict_xfail`) | an xfail test that passes fails the run |
 | `strict_parametrization_ids` (9.0) | duplicate parametrize ids are errors |
 | `strict = true` (9.0) | all of the above (*lab:* same error for the unknown marker) |
 
 Register markers in the configuration: `markers = ["slow: slow tests"]`.
+
+*lab:* on 8.4.2, the keys `strict_markers = true` or `strict_config =
+true` are themselves unknown options: pytest warns `Unknown config
+option: strict_markers` and a typo marker passes with only a warning.
+On 8.x use the command-line flags in `addopts`.
+
+**pytest 9.0.x ignored `--strict-markers` and `--strict-config` given
+in `addopts`** (fixed in 9.1.0, changelog #14442). Read the full
+version: on 9.0.x, use the keys (`strict_markers = true`, or `strict =
+true`) instead of the flags.
 
 ## Imports
 
@@ -85,8 +96,11 @@ passed. Fix it so both work:
   at startup ("initial conftests"): only those can add command-line
   options (`pytest_addoption`).
 - `pytest_plugins = [...]` is allowed only in the root `conftest.py`.
-- Hooks in a conftest apply to tests under it; some hooks (collection,
-  options) only work in initial conftests.
+- Hooks in a conftest: the runtest, report and fixture hooks apply only
+  to tests under its folder, but `pytest_collection_modifyitems`,
+  `pytest_terminal_summary` and the session hooks see the whole session
+  wherever the conftest is (*lab*); filter by `item.path` when only the
+  folder is meant (`internals/hooks.md`).
 - `confcutdir` stops the upward search.
 - Do not import from `conftest.py` (`core/fixtures.md`).
 
@@ -97,3 +111,9 @@ passed. Fix it so both work:
 - Never keep two configuration files with pytest settings; one is
   silently ignored.
 - Never move to `[tool.pytest]` while any environment still runs pytest 8.
+- Never have both `[tool.pytest]` and `[tool.pytest.ini_options]` in one
+  `pyproject.toml`. *lab, 9.1.1:* `ERROR: .../pyproject.toml: Cannot use
+  both [tool.pytest] (native TOML types) and [tool.pytest.ini_options]
+  (string-based INI format) simultaneously.` pytest 8 runs, because it
+  ignores `[tool.pytest]`. Move settings from one table to the other;
+  never copy them.

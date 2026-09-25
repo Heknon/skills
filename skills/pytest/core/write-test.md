@@ -37,7 +37,7 @@ run:        <summary line of the final run>
 | several inputs, same behaviour | `@pytest.mark.parametrize("raw, expected", [("80", 80), ("65535", 65535)], ids=["http", "max"])` gives `test_parse_ok[http]`, `test_parse_ok[max]` |
 | an exception, and its message | `with pytest.raises(ValueError, match=r"out of range: \d+"):` (`match` is a regular expression searched in `str(exc)`) |
 | floats | `assert total == pytest.approx(0.3)`; `rel=`, `abs=` for tolerance |
-| several checks in one test, all reported | 9.0 and later: `def test_x(subtests):` and `with subtests.test(msg="port", i=i):` around each check; failures show as `SUBFAILED[port] (i=1)`. On 8.4 the fixture does not exist (`fixture 'subtests' not found`): parametrize instead |
+| several checks in one test, all reported | 9.0 and later: `def test_x(subtests):` and `with subtests.test(msg="port", i=i):` around each check; failures show as `SUBFAILED[port] (i=1)`; the summary counts the test and the subtest both (*lab:* one bad subtest gave `2 failed, 2 subtests passed`: one bug, not two). On 8.4 the fixture does not exist (`fixture 'subtests' not found`): parametrize instead |
 | a temporary directory | `tmp_path` (a `pathlib.Path`, new per test) |
 | environment variables, attributes | `monkeypatch.setenv("KEY", "v")`, `monkeypatch.setattr(...)` (`core/mocking.md`) |
 | printed output | `capsys.readouterr().out` |

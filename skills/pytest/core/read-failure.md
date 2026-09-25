@@ -25,7 +25,8 @@ All shapes below are from the lab (pytest 9.1.1, `-rA`).
 | `ERROR at teardown of test_x` | teardown | cleanup failed after the test; the test itself is counted as passed **and** as an error (*lab:* `PASSED test_teardown_error` and `ERROR test_teardown_error`) |
 | `XFAIL ... - reason` | call | expected to fail, and failed: not a problem |
 | `XPASS ... - reason` | call | expected to fail, but passed: the bug may be fixed; with `xfail_strict = true` (or `strict=True` on the marker) it fails the run as `[XPASS(strict)]` |
-| `SKIPPED [1] file:line: reason` | setup | skipped by a marker or `pytest.skip` |
+| `SKIPPED [1] file:line: reason` | setup (a `skip`/`skipif` marker) or call (`pytest.skip()` in the test body) | skipped |
+| `async def functions are not natively supported` and `FAILED` | call | an `async def` test without an async plugin; *lab:* failed on 8.4.2 and 9.1.1. Use the async plugin the project already has (pytest-asyncio: `@pytest.mark.asyncio`, or its `asyncio_mode`); never install one to make it pass |
 | warnings summary | any | a warning was raised; not a failure unless `-W error` or `filterwarnings = error` is set |
 
 The progress line uses the same letters: `E.EFxXs.E` was error, pass,

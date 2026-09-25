@@ -14,7 +14,7 @@ without:   <summary line with the plugin disabled: every test must fail>
 
 | Scope | Put it in |
 | --- | --- |
-| one folder of one project | that folder's `conftest.py` |
+| one folder of one project | that folder's `conftest.py`; only the runtest, report and fixture hooks are limited to that folder, others such as `pytest_collection_modifyitems` see the whole session (`internals/hooks.md`) |
 | the whole project | the root `conftest.py` (the rootdir or the `testpaths` folder) |
 | several projects | an installed package with a `pytest11` entry point (`recipes/plugin/`) |
 | a plugin module in the project, loaded by name | `pytest_plugins = ["pkg.module"]` in the **root** `conftest.py`, or `-p pkg.module` |
@@ -39,8 +39,13 @@ interrupted collection when running from the root: `Defining
 4. **Run the tests with the plugin, then without it.** For an installed
    plugin: `$env:PYTEST_DISABLE_PLUGIN_AUTOLOAD = "1"; uv run pytest;
    Remove-Item Env:PYTEST_DISABLE_PLUGIN_AUTOLOAD` (inner pytester runs
-   inherit it and do not load the plugin). *lab:* 11 passed with it, 11
-   failed without it. A test that passes without the plugin checks
+   inherit it and do not load the plugin). *lab:* 12 passed with it, 12
+   failed without it. The switch only stops entry-point loading: a plugin
+   the tests load themselves (`runpytest("-p", name)`, `plugins=[module]`)
+   still loads, and `-p no:` cannot be passed to inner runs because
+   pytester removes `PYTEST_ADDOPTS`. For those, break the plugin on
+   purpose instead (rename its hook function, or return early from it),
+   run, and restore it. A test that passes without the plugin checks
    nothing; see "absent lines" in `core/pytester.md`.
 5. Run on every pytest version the project supports
    (`uv run --with "pytest==8.4.2" pytest`).

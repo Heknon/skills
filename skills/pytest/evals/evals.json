@@ -103,6 +103,7 @@
     "Puts pytest_addoption in tests/conftest.py (or the root conftest) and says why tests/integration/conftest.py would not work from the root, or tries it and quotes 'unrecognized arguments: --run-slow'",
     "Uses the slow marker already registered in pyproject.toml",
     "Skips slow tests with a skip marker added in pytest_collection_modifyitems or a check in pytest_runtest_setup, using hook names and arguments from the skill",
+    "If the skipping hook is pytest_collection_modifyitems, knows it sees every item in the session wherever the conftest is, and relies on the slow marker, not on the folder",
     "Runs both ways: without the option 1 passed, 1 skipped; with --run-slow 2 passed",
     "Optionally tests the hook with pytester; if it does, the test fails without the conftest"
    ]
@@ -159,6 +160,7 @@
     "Reads the versions: pytest-8.4.2 in the CI log's header, and the local version from uv run pytest --version",
     "Explains that pytest 8 ignores [tool.pytest] silently, so pythonpath (and the markers and strict mode) do not apply in CI",
     "Moves the settings to [tool.pytest.ini_options] with 8-compatible forms (--strict-markers, --strict-config, xfail_strict) or makes CI use pytest 9, and says which and why",
+    "Does not leave both [tool.pytest] and [tool.pytest.ini_options] in pyproject.toml (an error on pytest 9); moves the settings rather than copying them",
     "Checks on both versions where possible: uv run --with 'pytest==8.4.2' pytest gives 2 passed",
     "Does not add sys.path hacks or an __init__.py to work around it"
    ]

@@ -35,7 +35,7 @@ the command that makes it fail every time, and the reason follows.
 
 | Cause | Sign | Fix |
 | --- | --- | --- |
-| shared state | module globals, class attributes, caches, singletons, environment variables, the working directory | reset it in a fixture (`monkeypatch.setattr(module, "CACHE", {})`, `monkeypatch.setenv`, `monkeypatch.chdir`), or remove the global |
+| shared state | module globals, class attributes, caches, singletons, environment variables, the working directory | reset it in a fixture to its **initial** value, as the module defines it (`monkeypatch.setattr(settings, "_cache", None)` for a cache that starts as `None`; `{}` only if it starts as `{}`), or `func.cache_clear()` for `functools.lru_cache`; `monkeypatch.setenv`, `monkeypatch.chdir`; or remove the global |
 | time | `datetime.now()`, `time.time()`, midnight, time zones, `sleep` | pass the time in, or patch the clock where it is used (`core/mocking.md`) |
 | randomness | `random`, `uuid`, set or dict ordering of unordered data | seed it, or assert on what does not depend on it (sorted, lengths, membership) |
 | network, other services | timeouts, connection errors | mock the boundary; move real calls into marked integration tests |

@@ -36,8 +36,8 @@ firstresult hook: only tryfirst ran; result 4
 - An exception in an implementation stops the other implementations and
   is raised into each wrapper at its `yield`; a new-style wrapper can
   catch it and return a result instead (*lab:* `['recovered from boom']`);
-  an old-style wrapper sees it in `outcome.exception` and it still
-  propagates.
+  an old-style wrapper sees it in `outcome.exception`, and it propagates
+  unless the wrapper calls `outcome.force_result(...)`.
 - Historic hooks: `pm.hook.x.call_historic(kwargs={...})` is remembered;
   a plugin registered later has its implementation called immediately
   (*lab:* `late plugin got historic call x = 1`).

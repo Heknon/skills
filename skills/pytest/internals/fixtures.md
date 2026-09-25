@@ -41,17 +41,23 @@ fixtures of the same name programmatically.
 ## Registering a fixture from code (9.1 and later)
 
 ```python
-@pytest.hookimpl(trylast=True)       # after pytest's own sessionstart creates the fixture manager
-def pytest_sessionstart(session):
+@pytest.hookimpl(tryfirst=True)      # at the start of collection, before any test is collected
+def pytest_collection(session):
     pytest.register_fixture(name="db", func=_make_db, node=session, scope="session")
+    # return nothing: pytest_collection is firstresult
 ```
+
+The docstring says registration is expected during collection. *lab,
+9.1.1:* this passed, and a `db` in `sub/conftest.py` still won for tests
+in `sub/`.
 
 - `node` sets visibility: `session` for everywhere, a `Dir` or `Module`
   node for that part of the tree.
-- *lab:* without `trylast=True`, `AttributeError: 'Session' object has
-  no attribute '_fixturemanager'`. With it, `--fixtures-per-test`
-  showed `db -- plug.py:3`, and a `db` fixture in `sub/conftest.py` still
-  won for tests in `sub/`.
+- *lab:* calling it from a plain `pytest_sessionstart` failed with
+  `AttributeError: 'Session' object has no attribute '_fixturemanager'`
+  (pytest's own `sessionstart` creates it). `--fixtures-per-test` shows
+  a registered fixture with its function's `file:line`
+  (`db -- plug.py:3`).
 - *lab, 8.4:* `module 'pytest' has no attribute 'register_fixture'`. On
   8.x define the fixture with `@pytest.fixture` in the plugin module.
 

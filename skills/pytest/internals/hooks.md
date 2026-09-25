@@ -25,10 +25,23 @@ arguments) in `_pytest/hookspec.py`; your conftest or plugin writes an
   (`pytest_addoption`, `pytest_configure`, `pytest_addhooks`,
   `pytest_plugin_registered`, `pytest_warning_recorded`).
 - Call a hook only with keyword arguments: `config.hook.pytest_x(a=1)`.
-- In a conftest, most hooks apply only to tests under that conftest's
-  folder (pytest calls them through `item.ihook`, which filters by path).
-  Start-up hooks (`pytest_addoption`, `pytest_load_initial_conftests`)
-  only reach initial conftests (`internals/config-and-conftests.md`).
+- **Which tests a conftest's hooks see** (*lab*, 8.4.2 and 9.1.1). Hooks
+  that pytest calls through a node's `ihook` are filtered by path: in
+  `tests/sub/conftest.py`, `pytest_runtest_setup` ran only for
+  `tests/sub/test_s.py::test_s`. These are the `pytest_runtest_*`
+  hooks, `pytest_runtest_makereport`, `pytest_runtest_logreport`,
+  `pytest_collect_file`, `pytest_fixture_setup`. Every other hook is
+  **session-wide**, wherever the conftest is: the same file's
+  `pytest_collection_modifyitems` received every item, including
+  `tests/other/test_o.py::test_o`; `pytest_configure`,
+  `pytest_sessionstart`, `pytest_sessionfinish` and
+  `pytest_terminal_summary` run once for the whole session. In a
+  session-wide hook, filter by `item.path` yourself if the conftest's
+  folder is meant.
+- `pytest_addoption` in a conftest found during collection is still
+  called, but its options cannot be given on the command line
+  (`internals/config-and-conftests.md`). `pytest_load_initial_conftests`
+  is never called on a conftest, only on `-p` and installed plugins.
 
 ## Wrappers
 
@@ -46,7 +59,8 @@ def pytest_runtest_makereport(item, call):
 - The old style, `@pytest.hookimpl(hookwrapper=True)`, receives an
   outcome object from `yield` (`outcome.get_result()`,
   `outcome.force_result(x)`, `outcome.exception`) and its return value is
-  ignored; an exception inside still propagates (*lab*). Both styles run
+  ignored; an exception inside propagates unless the wrapper calls
+  `outcome.force_result(...)` (*lab*). Both styles run
   on 8.4 and 9.1; write new code with `wrapper=True`.
 - Deprecated: configuring hooks with `@pytest.mark.tryfirst` or function
   attributes; use `@pytest.hookimpl(...)`.
@@ -57,7 +71,8 @@ Printed from the installed `_pytest.hookspec` of each version. 8.4.2 has
 the same hooks but also passes deprecated `py.path` arguments (`path`,
 `startdir`) to `pytest_ignore_collect`, `pytest_collect_file`,
 `pytest_pycollect_makemodule`, `pytest_report_header` and
-`pytest_report_collectionfinish`; 9.0 removed them. Use the `pathlib`
+`pytest_report_collectionfinish`; 9.0 still passes them (using them is
+an error by default), 9.1 removed them. Use the `pathlib`
 arguments below, which both have.
 
 **Start-up and configuration**
@@ -123,7 +138,8 @@ arguments below, which both have.
 **Other**: `pytest_internalerror(excrepr, excinfo)`,
 `pytest_keyboard_interrupt(excinfo)`, `pytest_enter_pdb(config, pdb)`,
 `pytest_leave_pdb(config, pdb)`, `pytest_cmdline_parse(pluginmanager,
-args)` (F; only reaches built-in plugins, see
+args)` (F; only reaches built-in plugins and objects passed to
+`pytest.main(plugins=[...])`, not conftests or `-p` plugins; see
 `internals/architecture.md`).
 
 ## Your own hooks
