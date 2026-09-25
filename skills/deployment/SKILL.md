@@ -44,7 +44,7 @@ Before you say any change is done, load `core/verify.md`.
 | `kubernetes/` | workloads, configuration and secrets, security context, RBAC, debugging |
 | `openshift/` | what OpenShift changes, security context constraints, Routes, access from CI, in-cluster builds, `oc` |
 | `tools/` | optional tools, used only when they appear among your tools: Sourcegraph for search across every repository (`tools/sourcegraph.md`) |
-| `recipes/` | complete files that ran: `python-service/`, `monorepo/`, `ci-components/`, `generic-chart/`, `cluster-access/`, and `tools/ci_map.py`, a read-only script that maps a project's pipelines |
+| `recipes/` | complete files that ran: `python-service/`, `monorepo/`, `ci-components/`, `generic-chart/`, `cluster-access/`, and `recipes/tools/ci_map.py`, a read-only script that maps a project's pipelines |
 | `examples/` | three finished tasks: a new service (`new-python-service.md`), a variable with the wrong value (`wrong-variable.md`), a deploy that fails on OpenShift (`openshift-permission-denied.md`) |
 
 `glossary.md` fixes the words. A recipe is copied whole and changed only
