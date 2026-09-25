@@ -122,8 +122,14 @@ Without Python or the script, do the steps by hand.
    `GET /projects/:id/search?scope=blobs&search=platform/templates`
    (*lab:* found `.gitlab-ci.yml` and `ci/child.yml`). Global and group
    code search need advanced search: without it the API answers `scope
-   does not have a valid value` (*lab*). Sourcegraph, when connected,
-   searches every repository at once.
+   does not have a valid value` (*lab*).
+4. **Sourcegraph, if its tools are connected** (`tools/sourcegraph.md`):
+   one search across every repository finds candidates in seconds,
+   including repositories outside the group. It sees text only, so an
+   include written through a variable, a nested include or an external
+   configuration can be missed: confirm each hit with the lint API or the
+   script, and use the script for the group even when Sourcegraph found
+   nothing.
 
 ## Never
 
