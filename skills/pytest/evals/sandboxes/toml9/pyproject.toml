@@ -1,0 +1,13 @@
+[project]
+name = "ledger"
+version = "0.1.0"
+requires-python = ">=3.10"
+
+[dependency-groups]
+dev = ["pytest>=8.4"]
+
+[tool.pytest]
+testpaths = ["tests"]
+pythonpath = ["src"]
+strict = true
+markers = ["db: needs the database"]

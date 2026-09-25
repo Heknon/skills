@@ -1,0 +1,17 @@
+[project]
+name = "app"
+version = "0.1.0"
+requires-python = ">=3.10"
+
+# pytest 9.0 and later only: native TOML types. pytest 8 ignores this
+# table completely, without an error.
+[tool.pytest]
+minversion = "9.0"
+testpaths = ["tests"]
+pythonpath = ["src"]
+strict = true          # strict_config, strict_markers, strict_xfail, strict_parametrization_ids
+addopts = ["-ra"]
+markers = [
+    "slow: slow tests, deselect with -m 'not slow'",
+]
+filterwarnings = ["error"]

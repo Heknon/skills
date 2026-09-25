@@ -1,0 +1,25 @@
+[project]
+name = "pytest-budget"
+version = "0.1.0"
+description = "Report tests whose call phase takes longer than a time budget."
+requires-python = ">=3.10"
+dependencies = ["pytest>=8.4"]
+classifiers = ["Framework :: Pytest"]
+
+# The entry point is what makes pytest load the plugin when the package is
+# installed. The group name must be exactly "pytest11"; "budget" is the
+# plugin's name (used by -p no:budget).
+[project.entry-points.pytest11]
+budget = "pytest_budget.plugin"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = ["pytest>=8.4"]
+
+# ini_options, not [tool.pytest]: pytest 8 ignores [tool.pytest].
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-markers", "-p", "pytester"]
