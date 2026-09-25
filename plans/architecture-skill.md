@@ -12,6 +12,12 @@ It covers the common layouts (by layer, by feature, hexagonal or clean)
 and, above all, how to recognise the structure a codebase already uses,
 so new code follows that codebase and not a textbook.
 
+It also works one level down: where a single new thing goes (an
+exception, a constant, an enum, a helper, a type), whether it joins an
+existing file or earns a new one, and when a custom exception is worth
+defining at all, with which fields. The rule is the same at both levels:
+precedent in the codebase first, defaults only where there is none.
+
 It hands code-review a checklist of layering violations with stable IDs,
 and refactoring a target shape per violation. `beanie/` and
 `sqlalchemy/` hold the repository pattern for each. It carries knowledge
@@ -35,10 +41,11 @@ and judgement, not enforcement.
 | --- | --- | --- |
 | **Recognise** | explain how this service is structured; also the first step of any change | a structure card: layout style, one request traced router to database as `path:line` hops, where models, wiring, transactions and error translation live |
 | **Place** | add an endpoint or feature | the files added or changed, each placed by a line of the card, and the tests run |
+| **Place a thing** | add one exception, constant, enum, helper, type or provider | its path; the precedent (`path:line` of its nearest sibling of the same kind) or "no precedent, default used, convention started"; the rule applied |
 | **Models** | separate or map request, response, domain and database models | the classes, where mapping lives, a test that a hidden field stays hidden |
 | **Wire** | inject or swap a service or repository, including in tests | the provider functions, the `Depends` chain, the override and its test |
 | **Transaction** | make several writes atomic, or decide who commits | the owning layer, the unit of work, a test that shows the rollback |
-| **Errors** | turn database errors into domain errors and HTTP responses | the exception classes, where each is raised and caught, a test per status code |
+| **Errors** | design custom exceptions, or turn database errors into domain errors and HTTP responses | whether a built-in fits; the hierarchy and where it lives; each class's fields; where each is raised and caught; a test per status code |
 | **Repository** | write or fix a repository over Beanie or SQLAlchemy | the repository, what it returns, its tests with a fake and a real database |
 | **Check** | check a change or codebase for layering violations | findings by checklist ID with `path:line`, what the card allows, a verdict |
 | **Shape** | describe the target structure for moving some code | the shape from `shapes/` and the test both sides pass; the steps are refactoring's |
@@ -61,12 +68,18 @@ and judgement, not enforcement.
 | **Circular layers** | `models` imports `schemas` imports `services`; "fixed" by moving imports into functions |
 | **Async loading after commit** | an ORM row serialised after commit, or a lazy relationship, raises `MissingGreenlet` (text to verify in the lab); "fixed" by a sync route |
 | **Layers for their own sake** | a generic `BaseRepository[T]` nobody needs; a forwarding service layer the codebase never had |
+| **A new file per thing** | `order_not_found_error.py`; a new `errors.py` beside an existing `exceptions.py` |
+| **Placed at first use** | the exception defined in the service that first raises it while the codebase keeps them in `errors.py`; the router then imports it from the service |
+| **Grab-bag module** | a helper appended to a 900-line `utils.py`, or a new `helpers.py` or `common.py` |
+| **Custom error for everything** | `InvalidInputError` where `ValueError` fits; one class per message rather than per handling |
+| **Errors nobody can catch** | `raise Exception("not found")`; a caller parses `str(e)` to tell two cases apart |
+| **Broken exception class** | `__init__` without `super().__init__`, so `str(e)` and the log line are empty; keyword-only fields, so it fails to pickle in a worker and the real error is lost |
 
 ## 5. Layout
 
 ```
 skills/architecture/
-  SKILL.md              router over the ten kinds, invariants, answer headings
+  SKILL.md              router over the eleven kinds, invariants, answer headings
   glossary.md           layer, repository, DAL, domain model, unit of work, port
   core/
     recognise.md card.md   read the codebase; the structure card and an example
@@ -77,6 +90,13 @@ skills/architecture/
     wiring.md              Depends as wiring; providers; swapping in tests
     transactions.md        who owns it; unit of work; one session per request
     errors.md              database to domain to HTTP; once per boundary
+  placement/
+    place-a-thing.md       name the kind, find the precedent, else the default
+    new-or-existing.md     when a new file earns its place; names to avoid
+    defaults.md            the table for a codebase with no precedent
+    custom-errors.md       when to define one, the hierarchy, where, its fields
+    constants-and-enums.md module constants, StrEnum, when a value is a setting
+    helpers.md             private first, then a module named for what it does
   checklist/
     violations.md          ID, rule, why, suggested severity, shape
     finding.md             a search per ID, what it misses, card exceptions
@@ -96,6 +116,100 @@ owner per transaction; one error translation per boundary; wire with
 codebase lacks unless asked. Answers end with `## Structure` (the card
 lines relied on), `## Result`, `## Checked`, `## Not checked`.
 
+## 5a. Placement: where one new thing goes, and custom errors
+
+Layers decide the folder; placement decides the file. Asked to add an
+exception, a constant or a helper, a weak model either makes a new file
+for it or defines it where it first needs it, whatever the codebase
+already does. `placement/` answers one thing at a time.
+
+**The procedure (`place-a-thing.md`).**
+
+1. Name the kind: exception, constant, enum, type alias or Protocol,
+   helper, settings field, schema, dependency provider.
+2. Find the precedent: search for siblings of that kind (for example
+   `class \w+(Error|Exception)\(`, `^[A-Z][A-Z0-9_]+ =`,
+   `class \w+\((Str)?Enum\)`) and note where they live and how the files
+   are named (`errors.py` or `exceptions.py`; one per feature or one per
+   package).
+3. Precedent wins over the defaults, even when the default is better.
+   Say so in the answer when it matters; do not migrate unasked.
+4. No precedent: use the default table, and say a convention was started.
+5. Answer with the path, the precedent's `path:line` or "no precedent",
+   and the rule used.
+
+**New file or existing file (`new-or-existing.md`).** Join the existing
+file when one already holds this kind at this level (the feature or the
+package). A new file earns its place only when the kind has no home at
+this level and the codebase gives kinds their own files, or when joining
+would mix two layers or two features in one file. Never: one file per
+class; a new `utils.py`, `helpers.py` or `common.py`; a second home for a
+kind that has one (`errors.py` beside `exceptions.py`). A circular import
+after placing something is a sign it was placed in the wrong layer, not a
+reason for a local import.
+
+**Defaults, with no precedent (`defaults.md`).**
+
+| Kind | Default home | Moves when |
+| --- | --- | --- |
+| exception | the feature's `errors.py`; base and categories in the package's `errors.py` (or `core/errors.py`) | never next to its first raiser |
+| constant | module level, `UPPER_CASE`, in the one module that uses it | a second module needs it: the feature's `constants.py`; it differs by environment: it is a setting (pydantic) |
+| enum | the feature's domain or schemas module; `StrEnum` when it crosses the wire | two features share it: the shared package |
+| type alias, Protocol | beside the code that depends on it (a repository Protocol beside its service) | two consumers: the shared package |
+| helper | private (`_name`) in the module that uses it | a caller in another module: a module named for what it does (`money.py`, `slugs.py`) |
+| provider for `Depends` | the feature's `dependencies.py` | shared by features: the shared package |
+
+**Custom errors (`custom-errors.md`, with `core/errors.md`).**
+
+*When to define one.* Only when something will catch it by type or
+translate it: a caller handles it differently from other failures (404 or
+409, retry or give up); it crosses a layer boundary and is translated
+once there (L8); or its handler needs data from it (which id, which
+limit). Otherwise raise a built-in: `ValueError` for a bad argument,
+`TypeError`, `LookupError` or `KeyError`, `NotImplementedError`,
+`PermissionError`, `TimeoutError`. Never bare `Exception`. One class per
+distinct handling, not one per message.
+
+*The hierarchy.* One base per application or library (`AppError`); a few
+categories the HTTP edge maps to a status (`NotFoundError` 404,
+`ConflictError` 409, `PermissionDeniedError` 403); specific classes only
+where a caller needs them (`OrderNotFoundError(NotFoundError)`). api
+registers one handler per category, so a new specific error needs no new
+handler (a handler for a base class catching subclasses: to verify in the
+lab on FastAPI 0.141.1). Domain errors never subclass `HTTPException`.
+Names end in `Error` (PEP 8) unless the codebase says otherwise.
+
+*Where.* Base and categories in one shared module; specific errors in
+their feature's `errors.py`, or the domain layer's in a layered layout; a
+library re-exports its public errors from `__init__.py`. Driver errors
+(`DuplicateKeyError`, `IntegrityError`) never leave the repository.
+
+*Its fields.* Structured attributes for what a handler needs
+(`order_id`, `limit`), and a readable `str(e)` for logs. Checked while
+planning, on Python 3.11.15 and 3.12.3:
+
+- `__init__` without `super().__init__(...)`: `str(e)` is `''` and
+  `args` is empty, so the log line says nothing.
+- `__init__` whose signature does not match `self.args` (keyword-only
+  fields with a formatted message is the usual way): `pickle` and
+  `copy.deepcopy` raise `TypeError`, so the error breaks in
+  multiprocessing, `ProcessPoolExecutor` or a task queue, and the real
+  error is lost.
+- Positional fields passed to `super().__init__(*fields)`, with the
+  message built in `__str__`, pickle, copy and print correctly.
+- A `@dataclass` exception pickles, but is unhashable (`eq=True` sets
+  `__hash__` to `None`).
+
+A class-level `code = "order_not_found"` gives a stable machine-readable
+code that api can put in a problem-details `type`. No secrets or personal
+data in fields or messages: they reach logs. The message is built inside
+the class, not at every raise site.
+
+*Raising.* `raise DomainError(...) from exc` at a translation point;
+`from None` only when the cause would leak internals; catch the narrowest
+class; `except Exception` only at the outermost edge; `e.add_note(...)`
+(3.11 and later) to add context without a new class.
+
 ## 6. Dependencies and boundaries
 
 From the roadmap:
@@ -112,6 +226,16 @@ From the roadmap:
 - **mongodb** owns Beanie and every Mongo fact; architecture owns the
   repository around it. **code-review** and **refactoring** turn the
   layering rules owned here into findings and recipes.
+- **Custom errors** are architecture's: when to define one, the
+  hierarchy, where it lives, its fields. **api** owns the handlers, the
+  status code and the response body. **pydantic** owns errors raised
+  inside validators and `ValidationError`. **linting** owns the ruff
+  rules that catch some of this (N818, TRY002, TRY003, EM101, EM102,
+  B904, BLE001; all present in ruff 0.15.8), and runs them only where the
+  project enables them; architecture never enables a rule unasked.
+- **Constants that differ by environment** are settings, owned by
+  pydantic's settings part; architecture only says when a constant has
+  become one.
 
 The checklist's first draft (the lab may split or merge items):
 
@@ -126,6 +250,8 @@ The checklist's first draft (the lab may split or merge items):
 | L7 | imports point up or round | a lower layer imports a higher one; an import cycle |
 | L8 | database error untranslated or translated twice | driver errors reach routes; `HTTPException` in a repository |
 | L9 | dependency not swappable | a repository or client built at module level or in the route |
+| L10 | thing placed against precedent | a new definition of a kind in a file where no sibling of that kind lives, while one exists elsewhere; a second `errors.py`, `utils.py` or `constants.py` |
+| L11 | exception that cannot be handled well | `raise Exception(`; `except` blocks that test `str(e)`; `__init__` without `super().__init__`; keyword-only fields; `HTTPException` subclassed in the domain |
 
 **Hand-off to code-review.** Code-review loads `checklist/violations.md`
 and cites findings by ID with `path:line`. It runs `core/recognise.md`
@@ -153,6 +279,9 @@ named by the same IDs.
 3. Split the pytest touch: api owns `dependency_overrides` mechanics,
    architecture which layer a test fakes, pytest the fixture that sets
    and clears the override.
+4. A boundary row for custom exceptions: architecture owns when, the
+   hierarchy, placement and fields; api the handler and response; pydantic
+   validator errors; linting the rules that flag them.
 
 ## 7. How it will be verified
 
@@ -180,6 +309,13 @@ The lab must:
   sees if it fails; the `MissingGreenlet` message and the access that
   raises it; the exception classes for a duplicate key in PyMongo and a
   unique violation in SQLAlchemy on asyncpg and on aiosqlite.
+- Rerun the exception probes of section 5a on the pinned Python and
+  record the output in `custom-errors.md`; record that a FastAPI handler
+  registered for a base class catches a subclass, and in what order two
+  matching handlers are chosen; check each ruff rule named in section 6
+  exists in the pinned ruff.
+- Run each placement search on the recipes and sandboxes, and record the
+  kinds it misses (errors defined inside functions, re-exported names).
 - Reproduce every eval's bait and pass every intended fix.
 
 ## 8. Evals, written first
@@ -199,6 +335,12 @@ database; *sqlite* marks the ones that use aiosqlite.
 | `review-diff` | check this change's layering | L1, L6 and L8 are real; a forwarding service the card allows is not |
 | `circular` | fix the `ImportError` at start-up | `models` and `schemas` import each other; a local import hides it |
 | `new-service` | lay out a service with two endpoints | ports, adapters and a generic repository for two endpoints |
+| `errors-precedent` | return 404 when an invoice is missing | the project has `billing/errors.py` under a shared `AppError` and one 404 handler; a new `exceptions.py`, an error in the service, or a new handler |
+| `builtin-fits` | reject a negative quantity in `parse_quantity()` | a pure function; a new `InvalidQuantityError` hierarchy where `ValueError` fits |
+| `worker-pickle` | a worker logs `TypeError: __init__() missing 1 required keyword-only argument` | a custom exception with keyword-only fields fails to unpickle; "fixed" by catching `TypeError` |
+| `utils-dump` | add a slug helper used by two features | a 900-line `utils.py` invites one more function |
+| `no-precedent` | add the first custom error to a small app | must say there is no precedent, create one `errors.py` with a base and one category, and say a convention was started |
+| `constant-or-setting` | make the page size 50 in production and 10 in tests | a module constant edited, or a second constant, where it has become a setting |
 
 Graded from the answer and the diff: the card came first, the change
 follows it, the test run is quoted, the answer ends with the headings.
@@ -248,3 +390,26 @@ run?
 scale, which code-review owns (to agree with its plan). The checklist's
 searches are the default check; an import-linter contract appears in the
 recipes as optional, for projects that already have the tool.
+
+### AR8. Placement here, or a separate Python structure skill
+
+Placement applies to CLIs and libraries too, not only backends.
+*Recommended:* here, since it is the same recognise-then-follow rule at
+file level, and custom errors already meet the error translation owned
+here. The description widens to "code structure, from a single file to a
+service"; a project without layers uses `placement/` and `layouts.md`
+alone. Split it out only if non-backend projects become the common case.
+
+### AR9. The form of an exception's fields
+
+*Recommended:* positional fields passed to `super().__init__(*fields)`,
+the message built in `__str__`, an optional class-level `code`. Taught
+for reading: keyword-only fields with a `__reduce__`, and `@dataclass`
+exceptions (fine to pickle, unhashable). Which form does the team use
+today?
+
+### AR10. Error file names and granularity
+
+*Recommended, with no precedent:* `errors.py`, one per feature, with the
+base and categories in the package's shared `errors.py`. With a
+precedent, the precedent, including `exceptions.py` or one central file.
