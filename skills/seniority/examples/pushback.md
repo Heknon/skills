@@ -106,6 +106,7 @@ within 5 seconds: observed at step 8.
 ## Unverified
 none
 
-## Ledger check
+## Checks
 OK: PASS=13; exit 0
+check_change: OK: PASS=6 INFO=1; exit 0
 ```

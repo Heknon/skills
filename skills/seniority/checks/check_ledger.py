@@ -386,7 +386,7 @@ def rule_unverified_at_done(ledger: Ledger) -> Result:
         return Result("unverified-at-done", SKIP, 0, [], "task not finished")
     open_ones = [f"A{number}: {text[:70]}" for number, status, text, _ in ledger.assumptions if status.lower() == "unverified"]
     if open_ones:
-        return Result("unverified-at-done", WARN, len(open_ones), open_ones, "list each under 'Unverified' in the answer")
+        return Result("unverified-at-done", WARN, len(open_ones), open_ones, "first update each status you did check to 'verified at step <n>' or 'false at step <n>'; list only the rest under 'Unverified'")
     return Result("unverified-at-done", PASS)
 
 

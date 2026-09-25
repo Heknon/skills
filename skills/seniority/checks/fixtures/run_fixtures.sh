@@ -1,6 +1,7 @@
 #!/bin/sh
 # Runs the ledger checker on every fixture and on the ledger of every worked
-# example, and judges the harness itself. Good fixtures and every example
+# example, and the change checker on a good and a bad change, and judges
+# the harness itself. Good fixtures and every example
 # must exit 0; each *_bad.md and template.md must exit 1; each example's
 # answer must quote the summary line the checker really prints. Prints PASS or
 # FAIL per run and a final line for the harness. Exit code 0 when every
@@ -32,6 +33,10 @@ done
 for bad in fixtures/*_bad.md fixtures/template.md; do
     expect 1 check_ledger.py --ledger "$bad"
 done
+expect 0 check_change.py --before fixtures/change/before --after fixtures/change/after_good
+expect 1 check_change.py --before fixtures/change/before --after fixtures/change/after_bad
+expect 1 check_change.py --before fixtures/change/missing --after fixtures/change/after_good
+
 for example in ../examples/*.md; do
     name="$(basename "$example" .md)"
     expect 0 fixtures/extract_golden.py "$example" "$tmp/$name"

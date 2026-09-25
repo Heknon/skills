@@ -5,7 +5,8 @@ Usage: extract_golden.py <example.md> <outdir>
 
 Writes <outdir>/ledger.md from the fenced block under the example's
 "## The ledger" heading, and <outdir>/expected_summary.txt from the
-checker summary line the example's answer quotes under "## Ledger check".
+ledger checker summary line the example's answer quotes first under
+"## Checks".
 Exits 1 when either is missing.
 """
 
@@ -32,9 +33,9 @@ def main() -> int:
     os.makedirs(outdir, exist_ok=True)
     with open(os.path.join(outdir, "ledger.md"), "w", encoding="utf-8") as handle:
         handle.write(block.group(1))
-    summary = re.search(r"^## Ledger check\s*\n((?:OK|NOT OK):[^.\n]*)", text, re.M)
+    summary = re.search(r"^## Checks\s*\n((?:OK|NOT OK):[^.\n]*)", text, re.M)
     if not summary:
-        print(f"extract_golden: {source}: no checker summary line under '## Ledger check' in the answer", file=sys.stderr)
+        print(f"extract_golden: {source}: no ledger checker summary line under '## Checks' in the answer", file=sys.stderr)
         return 1
     with open(os.path.join(outdir, "expected_summary.txt"), "w", encoding="utf-8") as handle:
         handle.write(summary.group(1).strip() + "\n")

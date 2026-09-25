@@ -138,7 +138,8 @@ writes out/2026-09-21.csv: observed at step 9.
 ## Unverified
 none
 
-## Ledger check
+## Checks
 OK: PASS=12 WARN=1; exit 0. The warning is steps 1 and 4, the same run with
+check_change: OK: PASS=6 INFO=1; exit 0
 the same result, which is the loop that step 4's stuck line broke.
 ```

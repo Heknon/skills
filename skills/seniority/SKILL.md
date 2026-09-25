@@ -20,7 +20,9 @@ procedure at a time, at the moment it names. Each procedure ends in a
    `core/ledger.md` at `.ledger/ledger.md` in the working directory, unless
    the person names another path. Add `.ledger/` to `.git/info/exclude` if
    there is a `.git`. After step 1, run the ledger check once, so a wrong
-   format is caught early.
+   format is caught early. **Before your first edit to any file**, copy it
+   to `.ledger/before/<the same relative path>`. That snapshot is what the
+   change check compares against at the end.
 2. **Before a risky action.** Risky means it cannot be undone or reaches
    outside this environment: it names `prod` or `production`, deploys,
    migrates data, publishes, pushes, deletes recursively, forces, drops a
@@ -36,8 +38,10 @@ procedure at a time, at the moment it names. Each procedure ends in a
    ledger check, and run the command only if the check passes; it fails a
    risky command without the challenge and the question before it.
 3. **Before your final message**: run `core/done.md`, run the ledger check,
-   and end the message with the four headings in *What you say when you
-   finish*. Every final message, short or long, a question or a result.
+   and, if you changed any file, the change check. Revert anything the
+   change check fails unless the goal asks for exactly that change. End
+   the message with the four headings in *What you say when you finish*.
+   Every final message, short or long, a question or a result.
 
 ## The ledger
 
@@ -134,13 +138,17 @@ was seen>", or "not observed: <why>">
 statement in the answer below the level "read", or `none`; an assumption
 marked verified or false does not go here>
 
-## Ledger check
+## Checks
 <the last line check_ledger.py printed, copied, such as
-"OK: PASS=13; exit 0", or why it could not run>
+"OK: PASS=13; exit 0", and the last line check_change.py printed, or
+"no files changed", or why either could not run>
 ```
 
 The ledger check is `python3 <this skill>/checks/check_ledger.py --ledger
-<path to ledger.md>`. It needs Python 3.8 or later and nothing else.
+.ledger/ledger.md`. The change check is `python3 <this skill>/checks/check_change.py
+--before .ledger/before --after .`; it fails a renamed or removed public
+function, parameter or default, a new `except` that does not re-raise, and
+a changed test expectation. Both need Python 3.8 or later and nothing else.
 
 The `evals/` folder is for people testing this skill. Never open it while
 doing a task.

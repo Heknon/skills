@@ -1,11 +1,13 @@
 # Checks
 
-One script that judges a ledger mechanically. Run it at Finish, and any
-time you suspect a loop. Paste its summary line into the answer under
-*Ledger check*. Standard library only, Python 3.8 or later.
+Two scripts that judge the work mechanically. Run the ledger check after
+step 1, before any risky command, and at Finish. Run the change check at
+Finish if you changed any file. Paste each one's last line into the answer
+under *Checks*. Standard library only, Python 3.8 or later.
 
 | Script | Reads | Rules |
 | --- | --- | --- |
+| `check_change.py --before .ledger/before --after . [--json]` | the snapshot of each file before its first edit, and the working directory | snapshot-present, files-changed (INFO), files-deleted, public-signature, swallowed-errors, test-expectations, module-constants (WARN), tests-added (INFO) |
 | `check_ledger.py --ledger FILE [--json]` | a ledger written from `core/ledger.md` | header, done-when-observable (WARN), steps-numbered, repeated-action, oscillation, no-new-fact-streak, stuck-changes-approach, budget, risky-needs-challenge, hypotheses-falsifiable, assumption-status, done-observed, unverified-at-done (WARN) |
 
 Every rule prints `PASS`, `FAIL`, `WARN`, `SKIP` or `INFO`, a count, up to
@@ -30,15 +32,25 @@ that an edit weakened a test. Risky commands are found by pattern: `prod`,
 after a leading `run`. It catches what leaves a mark on the page; the rules
 in `SKILL.md` still apply to what does not.
 
+The change check reads Python files with the `ast` module and test files
+as text. It sees renamed, removed or re-defaulted public functions and
+parameters, new `except` blocks that do not re-raise, and test lines with
+`assert`, `expect`, `should` or `verify` removed or changed. It does not
+see a function that returns a different value, or changes in other
+languages' signatures: those still need old and new run on the same
+inputs.
+
 ## A `FAIL` at Finish
 
 Fix the ledger only where it misrecords what happened, such as a missing
 step number or a status without a step. A `FAIL` because you really did
-loop stays. The answer says so under *Ledger check*.
+loop stays. The answer says so under *Checks*.
 
 ## Fixtures
 
-`fixtures/` holds three passing ledgers (`good.md`, finished;
+`fixtures/change/` holds a snapshot, a good change (a fix plus a new test)
+and a bad one (a renamed parameter, a changed default, a swallowed error,
+a changed expectation, a changed constant). `fixtures/` holds three passing ledgers (`good.md`, finished;
 `in_progress.md`, not finished; `risky_good.md`, a risky command after a
 challenge and the person's answer), the unfilled template, and one failing ledger per loop or
 format rule (`*_bad.md`). `sh fixtures/run_fixtures.sh` runs all of them,

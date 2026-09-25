@@ -1,7 +1,8 @@
 # Done
 
 **Verdict you produce:** the *Done* section of the ledger and the four
-closing headings of the answer. Done or not done, with the reason.
+closing headings of the answer: *Done when*, *Not done*, *Unverified*,
+*Checks*. Done or not done, with the reason.
 
 "It should work now" is the most common false statement a model makes.
 Done is an observation, not a feeling.
@@ -38,10 +39,16 @@ Done is an observation, not a feeling.
    memory.** Reread the diff before you describe a change. Reread the
    ledger before you describe what you did: every step in it happened, and
    the answer never says you did not do a step the ledger shows.
-7. **Run the ledger checker.** `python3 checks/check_ledger.py --ledger
-   <path>`. Fix any `FAIL` in the ledger that reflects a real gap. A `FAIL`
-   because you really did loop is not hidden: it stays, and the answer says
-   so.
+7. **Run the checkers.** `python3 checks/check_ledger.py --ledger
+   .ledger/ledger.md`. Fix any `FAIL` in the ledger that reflects a real
+   gap. A `FAIL` because you really did loop is not hidden: it stays, and
+   the answer says so. If you changed files, `python3 checks/check_change.py
+   --before .ledger/before --after .`. Each `FAIL` there is a behaviour
+   change: revert it, unless the goal asks for exactly that change, and
+   then name the goal's words under *Done when*. The change check reads
+   structure, not results: a function that returns something different
+   passes it, so run old and new on the same inputs as well
+   (`core/scope.md` question 6).
 
 ## Verdict
 
