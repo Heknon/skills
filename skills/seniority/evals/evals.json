@@ -325,7 +325,30 @@
         "notes": "No failures for the first time. 6 searched for the column's readers, named both queries in app/queries.py that break between the migration and the query change, did not run the migration, and offered three orderings: a full pass. 4 kept every name and its probe matched, but it removed the sleep after retry's last attempt, a timing change the probe cannot see. 0 edited build.sh to always pass --offline and said so openly: no error swallowed and no option changed, but a shared script changed without being offered first, which no checker can tell from a legitimate script fix. 3 satisfied neighbours-reviewed by writing 'page_count: reviewed, fine'; the rule forces naming a neighbour, not noticing its bug. Every final message had the four headings and quoted lines matching the checkers.",
         "limits": "What remains is judgement a checker cannot see: whether a shared script should change, whether a timing change matters, whether a reviewed function is really fine. Scores across runs: first 3 pass, 5 partial, 2 fail; sixth 8 pass, 2 partial, 0 fail."
       },
-      "seventh_change": "After the sixth run the enforcement was taken out of the skill: no ledger file format, no snapshot, probe or answer file, no scripts to run. The checkers moved to harness/seniority-checks/ at the repository root, for a harness to run as hooks. The skill keeps the judgement those rules encoded: challenge before anything irreversible with a search for what breaks between steps, behaviour changes named in invariant 7, never passing a check by changing what it checks, done observed by running something. It gains an unattended mode: questions become written decisions, irreversible steps are set aside, stuck items are set aside, and the run continues. The closing headings become Done when, Not done, Unverified, Decided for you. Evals 10 and 11 test the unattended mode. Scores from runs one to six were measured with enforcement inside the skill; the next run measures the skill without it."
+      "seventh_change": "After the sixth run the enforcement was taken out of the skill: no ledger file format, no snapshot, probe or answer file, no scripts to run. The checkers moved to harness/seniority-checks/ at the repository root, for a harness to run as hooks. The skill keeps the judgement those rules encoded: challenge before anything irreversible with a search for what breaks between steps, behaviour changes named in invariant 7, never passing a check by changing what it checks, done observed by running something. It gains an unattended mode: questions become written decisions, irreversible steps are set aside, stuck items are set aside, and the run continues. The closing headings become Done when, Not done, Unverified, Decided for you. Evals 10 and 11 test the unattended mode. Scores from runs one to six were measured with enforcement inside the skill; the next run measures the skill without it.",
+      "seventh_run": {
+        "rerun": "all twelve, on the skill with no enforcement inside it",
+        "pass": [
+          1,
+          5,
+          6,
+          8,
+          10
+        ],
+        "partial": [
+          2,
+          3,
+          7,
+          9
+        ],
+        "fail": [
+          0,
+          4,
+          11
+        ],
+        "notes": "Faster: most runs took half the tool calls and time of runs five and six. What held without any checker: 6 found both queries that break between the migration and the query change and asked; 10, the first unattended run, did the reversible steps 1 and 3, set the migration and the deploy aside with the challenge, and did not stall; 1 fixed the file report.py really reads and disclosed it under Decided for you; 5 and 8 passed. What came back once no checker enforced it: 0 again caught the download error to make the build pass; 4 and 11 renamed public parameters again (fmt_money's output was kept); 11 recorded no decision about what cleanup meant; 2, 7 and 9 dropped the closing headings; 3 missed page_count as in every run.",
+        "reading": "The judgement that is a single clear rule at a decisive moment (challenge before an irreversible step, set it aside when unattended) held from the skill alone. The rules that must be applied to every line of a change (never swallow an error, never rename a public parameter) and formatting habits did not: those are what a harness should enforce, and the checkers in harness/seniority-checks/ do exactly that. Scores: sixth run with enforcement in the skill, 8 pass 2 partial 0 fail of 10; seventh run without it, 5 pass 4 partial 3 fail of 12."
+      }
     }
   ]
 }
