@@ -41,8 +41,12 @@ python:
     - requirements: docs/requirements.txt
 ```
 
-`fail_on_warning: true` is the strict build. `python.install` also takes
-`method: uv`, with only one entry under `install`. In `mkdocs.yml`, set
+`fail_on_warning: true` is the strict build. The `requirements:` path
+above is an example: use the file the repository really has. If its docs
+dependencies are in `pyproject.toml`, install the project instead, with
+`- method: pip` and `path: .` (and `extra_requirements: [docs]` when they
+are an optional group). `python.install` also takes `method: uv`, with
+only one entry under `install`. In `mkdocs.yml`, set
 `site_url: !ENV READTHEDOCS_CANONICAL_URL` so each version knows its own
 address.
 
@@ -70,8 +74,10 @@ Zensical cannot read environment variables in its configuration, so its
 
 ## Planning the move, step by step
 
-1. **Can the docs leave the network?** Ask, or read the team's records.
-   If not, the hosted service is out, and only self-hosting remains.
+1. **Can the docs leave the network?** If the ask, the environment or
+   the team's records say the network is air gapped, that is the answer:
+   the hosted service is out, and the plan offers only self-hosting. Do
+   not list the hosted service as an option. Ask only when nothing says.
    Say this first; it decides everything else.
 2. **Who would run a self-hosted instance?** It is a service to install,
    upgrade and back up, unsupported by its makers. Name the owner, or

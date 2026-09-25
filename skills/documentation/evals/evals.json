@@ -253,6 +253,17 @@
     ],
     "notes": "2 now describes only what the code does, with 'Reason: not recorded' and no purpose sentences. 3 split the settings table into a reference page and fixed the port, but again wrote output it did not see (listed as not verified), rewrote PowerShell as bash despite being told not to, and moved the unsourced SQLite history into an explanation page. 6 added orders to the copy list and the menu, but skipped .gitignore and the home-page link and linked through the site path. 8 regressed: read ledger's CODEOWNERS as owning all three repositories, kept ledger inside the billing system, and linked to repositories by relative folder paths. These three vary between runs on multi-step judgement tasks.",
     "overall": "After three runs: 8 pass (0, 1, 2, 4, 5, 7, 9, 10), 3 partial (3, 6, 8), 0 fail, of 11. The rule that held once stated at the moment of writing: every number, unit, output and reason names its source or goes. What remains is multi-step housekeeping (every step of adding a repository, keeping page commands untouched, never moving an unsourced sentence), which, as with the seniority and navigation skills, a harness or CI check enforces better than a skill: a strict build with validation, a link check for relative paths out of docs/, and a diff check on fenced command blocks."
+   },
+   "read_the_docs_run": {
+    "date": "2026-09-25",
+    "ran": [
+     11
+    ],
+    "partial": [
+     11
+    ],
+    "notes": "11 put the network question first, said self-hosting is not recommended for production, marked the owner as unassigned, mapped billing to a subproject, listed /billing/ to /projects/billing/en/latest/ with redirects, showed .readthedocs.yaml with fail_on_warning: true, and changed no file. It still listed the hosted service as an option although told the network is air gapped, copied the example's docs/requirements.txt, a file neither repository has, and skipped the closing headings.",
+    "changes": "read-the-docs.md: an air-gapped network answers step 1, so the hosted service is not offered; the requirements path is an example, use the repository's own dependency file or install the project with path: ."
    }
   }
  ]
