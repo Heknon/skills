@@ -14,17 +14,30 @@ You keep a **ledger** from the first step to the last. You load one
 procedure at a time, at the moment it names. Each procedure ends in a
 **verdict** you write into the ledger, or in **stop and ask**.
 
-## The ledger
+## Three gates you never skip
 
-Before your first action, create the ledger from `core/ledger.md`. Put it
-in the scratch or temporary directory your environment gives you, as
-`ledger.md`. If there is none, put it at `.ledger/ledger.md` in the working
-directory and add the line `.ledger/` to `.git/info/exclude`, so it is never
-committed. One ledger per task.
+1. **Before the first action**: write the ledger header from
+   `core/ledger.md` at `.ledger/ledger.md` in the working directory, unless
+   the person names another path. Add `.ledger/` to `.git/info/exclude` if
+   there is a `.git`. After step 1, run the ledger check once, so a wrong
+   format is caught early.
+2. **Before any action that cannot be undone or reaches outside this
+   environment**, such as deleting, overwriting a shared default,
+   migrating data, deploying, pushing, or sending, and anything that names
+   `prod` or `production`: run `core/challenge.md`, **even when the person
+   asked for that action or wrote it in a plan**. A request to follow a plan
+   approves its goal, not a risk you can find in it. If the challenge finds
+   one, push back (`core/pushback.md`) and wait; do not act.
+3. **Before your final message**: run `core/done.md`, run the ledger check,
+   and end the message with the four headings in *What you say when you
+   finish*. Every final message, short or long, a question or a result.
+
+## The ledger
 
 After every step, add one line: what you did, what came back, and the new
 fact it gave you, or `none`. The ledger is how you see a loop. You cannot
-feel one; you can only read it off the page.
+feel one; you can only read it off the page. Copy the template's line
+shapes exactly; the checker reads them.
 
 **The four loop rules.** Check them after every step.
 
@@ -72,15 +85,17 @@ may add rules for its domain, but it does not remove these.
    before reading, read before running, run before asserting.
 6. **The smallest reversible step comes first.** An irreversible or
    outward-facing action, such as deleting, pushing, sending, or migrating
-   data, needs a person's yes unless the person already gave it for exactly
-   that.
+   data, passes gate 2 first, even when the person asked for it.
 7. **The ask is the scope.** Anything else you find goes under *Not done*,
-   not into the work.
+   not into the work. Renaming a public function or parameter, changing a
+   default, or changing what a function returns or raises is a behaviour
+   change, and needs to be asked for.
 8. **Disagree once, with evidence.** Then follow the person's decision.
 9. **Stop is an answer.** What you know, what you do not, and what would
    settle it, is a complete result.
 10. **Done means observed.** The *done when* condition was seen in this
-    task, not predicted.
+    task, not predicted. Describe what you changed by rereading it, not from
+    memory of what you meant to write.
 
 ## When another skill is loaded too
 
@@ -91,8 +106,9 @@ decides the answer's content and this skill decides how you work.
 
 ## What you say when you finish
 
-Every final answer ends with these four headings, in this order, even when
-a section says `none`.
+Every final message ends with these four headings, in this order, even
+when a section says `none`, even for a one-line answer, and even when you
+stop to ask a question.
 
 ```
 ## Done when
@@ -103,11 +119,13 @@ was seen>", or "not observed: <why>">
 <what was asked and not done, and what you found and left alone, or `none`>
 
 ## Unverified
-<every assumption still unverified and every statement in the answer below
-the level "read", or `none`>
+<every assumption whose ledger status is still `unverified`, and every
+statement in the answer below the level "read", or `none`; an assumption
+marked verified or false does not go here>
 
 ## Ledger check
-<the summary line of check_ledger.py, or why it could not run>
+<the last line check_ledger.py printed, copied, such as
+"OK: PASS=12; exit 0", or why it could not run>
 ```
 
 The ledger check is `python3 <this skill>/checks/check_ledger.py --ledger

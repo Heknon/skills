@@ -8,8 +8,10 @@ verdict challenge: <proceed | proceed with a change: <change> | drop> because <q
 ```
 
 Use it before acting on a plan of more than three steps, before accepting
-an idea (yours or the person's), and before reporting a conclusion. Once
-per plan or conclusion; again only when a new fact arrives.
+an idea (yours or the person's), before reporting a conclusion, and always
+at gate 2 in `SKILL.md`: before any action that cannot be undone or reaches
+outside this environment, even one the person asked for. Once per plan or
+conclusion; again only when a new fact arrives.
 
 ## The five questions
 
@@ -27,12 +29,23 @@ Name the issue.
 5. **What would change your mind?** Name the observation that would make
    you drop this. If you can get it cheaply, get it now, before acting.
 
+## Questions that find the risk in a plan
+
+For a plan of several steps, before question 1, read the steps in order and
+ask of each: **what is true of the system right after this step, before the
+next one?** A plan that is right at the end can be broken in between: a
+column renamed before the code that reads it is changed, a service
+stopped before its replacement is up, a file deleted before its copy is
+checked. Name the step and the broken moment.
+
 ## Deciding
 
 - Question 4 or 5 names something cheap to check: check it first, then
   decide.
-- Question 1 or 2 names a failure that is likely and costly: **proceed with
-  a change** that removes it, or **drop**.
+- Question 1 or 2, or the step-by-step reading, names a failure that is
+  likely and costly: **proceed with a change** that removes it, or **drop**.
+  If the plan is the person's, the change is proposed to them first
+  (`core/pushback.md`), and nothing irreversible runs until they answer.
 - Question 3 shows a smaller way that meets `done when`: take the smaller
   way, unless the person asked for the bigger one.
 - None of the above: **proceed**.

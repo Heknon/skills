@@ -28,8 +28,13 @@ Done is an observation, not a feeling.
    Fix what you find, then return to question 1.
 4. **What was asked and not done?** And what did you find and leave, from
    `scope out`? Both go under *Not done*.
-5. **Which assumptions are still unverified?** They go under *Unverified*.
-6. **Run the ledger checker.** `python3 checks/check_ledger.py --ledger
+5. **Which assumptions are still unverified?** Update every status in the
+   ledger first. Only lines still `[unverified]` go under *Unverified*;
+   verified and false ones do not.
+6. **Describe the result from the files, not from memory.** Reread the
+   diff or the changed lines before you describe them. Every sentence in
+   the answer about what changed must match what is there now.
+7. **Run the ledger checker.** `python3 checks/check_ledger.py --ledger
    <path>`. Fix any `FAIL` in the ledger that reflects a real gap. A `FAIL`
    because you really did loop is not hidden: it stays, and the answer says
    so.
@@ -56,3 +61,5 @@ headings from `SKILL.md`.
 - Never bury a failure in a summary. A failed check is the first line, not
   the last.
 - Never claim done with a checker that was not run.
+- Never leave off the four closing headings, even for a one-line answer
+  or a question back to the person.

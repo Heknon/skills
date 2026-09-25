@@ -41,10 +41,25 @@ Stuck and at Finish.
    | find the cause of a failure | 25 steps |
    | a change across several files or components | 40 steps |
 
-6. **Does it need anything irreversible or outward-facing?** Deleting,
+6. **Is the change ask vague?** "Clean up", "improve", "refactor",
+   "tidy", "modernise" name no observable result. Then `done when` always
+   includes **behaviour unchanged**: the same public names, the same
+   parameter names, the same return values and the same errors, checked by
+   the tests or by running the code before and after. Anything that would
+   change behaviour, even a clear improvement, is a finding under *Not
+   done*, not an edit. Then either ask what the person wants from the
+   cleanup, with options and a recommendation, or proceed on the narrowest
+   reading, written as `A1 [unverified] the person means <reading>`.
+7. **Can `done when` be met without changing something shared?** A
+   script, a default, a config that other people or jobs also use. If the
+   goal can be met by how you run it (a flag, an argument, an environment
+   variable for this run), do that. Changing the shared thing is a
+   trade-off (`core/trade-offs.md`, blast radius), and is offered, not done.
+8. **Does it need anything irreversible or outward-facing?** Deleting,
    overwriting, pushing, sending a message, migrating data, spending money.
    Write each as an assumption line `A<n> [unverified] the person approves
-   <action>` unless they already said yes to exactly that.
+   <action>`. Each passes gate 2 in `SKILL.md` before it runs, even if the
+   person asked for it.
 
 ## Verdict
 
@@ -63,6 +78,8 @@ scope out: <list, or none>
 - Never replace the person's goal with a better one you thought of. Offer
   the better one under *Not done*.
 - Never read "and anything else you notice" into a narrow ask.
+- Never change a shared script, default or config to make your one run
+  pass when the run itself can be changed instead.
 
 ## Stop and ask
 
@@ -82,3 +99,5 @@ scope out: <list, or none>
 | "Fix the nightly job" | change | the job's command, run locally, exits 0 on the input that failed |
 | "Should we use Redis or Postgres for the queue?" | decision | one option chosen, each rejected one with the fact against it |
 | "Make the API faster" | change, vague | the endpoint's measured p95 before and after, on the same input; the target asked for (see Stop and ask if there is none) |
+| "Tidy up the parser module" | change, vague | the agreed tidy-up applied, and every public name, parameter name, return value and error unchanged, shown by running the tests before and after |
+| "Get the deploy script working" | change | the script, run with the flag or setting it needs, exits 0; a change to the script itself only if the person agrees |
