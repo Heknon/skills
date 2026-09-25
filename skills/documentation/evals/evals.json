@@ -74,7 +74,7 @@
    "prompt": "What's undocumented or wrong in our docs? Don't change anything yet.",
    "bait": "a wrong default, an undocumented option and a required variable, a fact in three places, an unreachable page, a public function with no docstring",
    "expectations": [
-    "finds the wrong default first: docs/reference/cli.md says --workers 4, ingest/cli.py:9 says 8",
+    "finds the wrong default first: docs/reference/cli.md says --workers 4, ingest/cli.py:10 says 8",
     "finds --since and INGEST_DB_URL (required, runner.py:7) undocumented",
     "finds 'batches of 500' duplicated in README.md, docs/index.md and docs/how-to/run.md",
     "finds docs/old-notes.md unreachable (not in nav, not linked)",
@@ -169,5 +169,32 @@
    ]
   }
  ],
- "runs": []
+ "runs": [
+  {
+   "date": "2026-09-25",
+   "model": "claude-haiku-4-5 as a stand-in for a small offline model",
+   "setup": "each scenario as a fresh agent with the documentation and navigation skills without evals/, a fresh sandbox with a .venv holding mkdocs 1.6.1, Material 9.7.7, mkdocstrings, awesome-nav and pytest, Linux instead of Windows (told to adapt PowerShell commands), no web; graded by hand",
+   "first_run": {
+    "pass": [
+     4,
+     5,
+     7
+    ],
+    "partial": [
+     0,
+     3,
+     6,
+     9,
+     10
+    ],
+    "fail": [
+     1,
+     2,
+     8
+    ],
+    "notes": "Good at mechanics: the audit found every planted gap and changed nothing; the rename and default change reached all three pages and the changelog; the offline fix set font: false and loaded a local Mermaid copy. The one failure across the partials and fails is writing what no source backs. 1 read every variable from the code but wrote the person's 10 and 3 'as requested'. 2 wrote 'Reason: not recorded' and still gave 'to reduce latency and load' twice. 0 called a forwarded timeout seconds. 3 invented command output, rewrote the team's PowerShell as bash, and moved the unsourced history into a new explanation page. 8 invented a system name, arrows the code does not have and facts about the ledger, missed a CODEOWNERS that contradicts 'we own', and broke the strict build with relative links into other repositories. 10 left docstring_style at google for a numpy repository; the build passes and the page shows raw sections. 6 linked into another repository through a folder path and forgot .gitignore. 9 called Zensical 0.0.65 stable and answered 'yes'. The closing headings were skipped in about half the runs.",
+    "changes": "SKILL.md gains 'the check before you save': every number, unit, output and reason names its source or goes, with the four ways it failed spelled out. writing.md: output only from commands run, keep the page's PowerShell, new pages into nav and a strict build. page-types.md: moving a sentence does not make it true. structure.md gains a seven-step procedure for organising a team (owners files, conflicts reported, arrows only with both ends found, no invented names, full addresses to other repositories). api-reference.md: recognise the docstring style by what the docstrings look like, and check the rendered page. docstrings.md: a forwarded value's unit is not verified until a line uses it. aggregation.md: six steps for adding a repository to a copy-step site, and never link to a folder. zensical.md: versions before 0.1.0 are previews; answer 'should we' with stakes and work, not yes or no."
+   }
+  }
+ ]
 }

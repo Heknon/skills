@@ -121,6 +121,18 @@ and never edit them; edit the page in its own repository.
 repository not checked out; an edit made to a copy, lost at the next
 copy.
 
+**Adding a repository to a copy-step site**, all six, in the site
+repository unless it says otherwise:
+
+1. Add it to the script's list (`REPOS` in `collect_docs.py`).
+2. Add its folder name to `docs\.nav.yml` (or to `nav:`).
+3. Add `docs/<name>/` to `.gitignore`: the copy is build output.
+4. Link to it from the home page or its system page.
+5. In the added repository, fix links that point into other
+   repositories (Links between repositories, below).
+6. Run the copy script, then the strict build, and check that
+   `site\<name>\index.html` exists.
+
 **It works with MkDocs and Zensical alike**, including mkdocstrings,
 Mermaid and awesome-nav. It is the migration path for A and B.
 
@@ -138,8 +150,11 @@ where the folders differ. So:
 - So put links between repositories on the site repository's own pages
   (a system page, the home page), which only exist in the combined site.
   When a repository's page must link to another repository, use the
-  combined site's full address, and list it under *Not verified*: no
-  build checks a full address.
+  combined site's full address: `site_url` from the site's `mkdocs.yml`,
+  then the folder, such as `https://docs.payments.internal/billing/`.
+  List it under *Not verified*: no build checks a full address.
+- Never link to a folder (`../billing/`). MkDocs reports it only as
+  `INFO ... unrecognized relative link`, and the strict build passes.
 
 ## Moving to Zensical
 

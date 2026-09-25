@@ -4,16 +4,18 @@
 Zensical.
 
 Zensical is the successor to Material for MkDocs, by the same team. It
-reads an existing `mkdocs.yml`. Tested at 0.0.65, on 2026-09-25; its
-first dependable release, 0.1.0, was due on 2026-11-05.
+reads an existing `mkdocs.yml`. Tested at 0.0.65, on 2026-09-25. Versions
+before 0.1.0 are previews: do not call them stable. Its first dependable
+release, 0.1.0, was due on 2026-11-05.
 
 ## Why move, and by when
 
 Material for MkDocs gets critical fixes only until **2027-05-05**, and
 MkDocs 1.x gets none. A site that stays on them keeps working, but a
 security or compatibility problem after that date will not be fixed.
-Moving is the team's decision: say what is at stake, and do not start it
-unasked.
+Moving is the team's decision. Asked "should we", answer with what is at
+stake, the dates, and what the move takes; do not answer just yes or no,
+and do not start it unasked.
 
 ## What carries over, tested at 0.0.65
 

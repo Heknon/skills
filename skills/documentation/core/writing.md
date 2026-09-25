@@ -11,7 +11,9 @@
 4. **Present tense, active voice**: "`charge()` retries three times", not
    "will be retried".
 5. **Steps are numbered and start with a verb**: "Run", "Open", "Set".
-   One action per step. Show the command, then what it prints.
+   One action per step. Show the command, then what it printed when you
+   ran it. If you did not run it, show no output and list the step under
+   *Not verified*.
 6. **Say it once and link.** If another page already states it, link to
    that page instead of restating it.
 7. **Match the docs around it.** Before writing, read two pages next to
@@ -22,4 +24,7 @@
 9. **Links** are relative paths to `.md` files, so the site's strict build
    can check them: `[charges](../billing/charges.md)`.
 10. **Commands** are PowerShell for this team, and Python runs through
-    `uv run`.
+    `uv run`. Keep the page's commands as they are even if you are working
+    on another system; never rewrite them for your own shell.
+11. **A new page goes in the menu**: in `nav:` in `mkdocs.yml`, or the
+    folder's `.nav.yml`. Then run the strict build (`mkdocs/site.md`).

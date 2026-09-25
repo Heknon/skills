@@ -17,6 +17,33 @@ Backstage runs here.
 | **Resource** | a database, a queue, a bucket a component uses | the component that owns it; the system page if several share it | what it holds, who writes and reads it |
 | **Code** | a module, a class, a function | its docstring | its contract (`python/docstrings.md`) |
 
+## Organising a team's docs, step by step
+
+1. **For each repository, read the records**: `README.md`,
+   `pyproject.toml` (name, scripts), and the owners file
+   (`CODEOWNERS`, `.github/CODEOWNERS` or `docs/CODEOWNERS`). Write down
+   the owner each file names, or `none`.
+2. **Compare the owners with what the person said.** If an owners file
+   names someone else ("we own it" but `CODEOWNERS` says `@finance-core`),
+   report the conflict under *Not done* and write both in the catalog.
+   Do not pick one.
+3. **Find the connections in the code**, one search per kind: HTTP
+   addresses the code calls (`http://`, `https://`), routes it serves,
+   topics it publishes and subscribes to. An arrow exists only where you
+   found both ends: a call to `POST /entries` in one repository and the
+   route `/entries` in another. Write each arrow with its two `path:line`.
+4. **Group the components** (below: System or Component). A system's name
+   comes from the people or the records. If none gives one, name the
+   group by its repositories ("billing-api and billing-worker") and list
+   the missing name under *Not done*. Never invent a name.
+5. **Write the pages**: the team page with the catalog, one page per
+   system, and links to each component's docs. Take out anything the site
+   copies from a repository (install steps, run commands) and link to it.
+6. **Link to a repository's own docs by the full address** where the site
+   publishes them, or by its repository address. A relative path from the
+   site into another repository (`../../ledger/README.md`) never works.
+7. **Run the strict build** (`mkdocs/site.md`).
+
 ## Is a part a System or a Component?
 
 1. Is it deployed or released as one unit? **Component.**

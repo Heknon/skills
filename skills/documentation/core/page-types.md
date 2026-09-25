@@ -39,6 +39,10 @@ steps inside an explanation. Split by moving each part to a page of its
 kind and linking between them. Keep the original path for the kind most
 readers came for, so existing links keep working.
 
+Moving a sentence does not make it true. Check each claim you move
+against the code, as if you were writing it new. History and reasons
+that no record supports are deleted, not moved into an explanation page.
+
 ## Never
 
 - Never add a reference table to a tutorial or how-to "for completeness".

@@ -38,11 +38,20 @@ plugins:
   `[src]`; for a flat layout (`billing\__init__.py` next to
   `mkdocs.yml`) it is `[.]`. In a combined site it points at the other
   repository's checkout, such as `[../billing/src]`.
-- **`docstring_style`** must match how the repository writes docstrings:
-  `google` (sections `Args:`, `Returns:`, `Raises:`), `numpy` (sections
-  underlined with dashes), or `sphinx` (`:param x:` lines). The default is
-  `google`. A wrong style renders sections as plain text and does not
-  warn.
+- **`docstring_style`** must match how the repository writes docstrings.
+  Open two docstrings in the package before writing the config, and
+  choose by what you see:
+
+  | You see | Style |
+  | --- | --- |
+  | `Args:`, `Returns:`, `Raises:` lines ending in a colon | `google` |
+  | `Parameters` with a line of dashes under it | `numpy` |
+  | `:param name:` and `:returns:` lines | `sphinx` |
+
+  The default is `google`. A wrong style builds and passes the strict
+  build, but the page shows the sections as raw text, such as
+  `lat1, lon1 : float`. After the build, open the page's HTML and check
+  that a parameter table is there.
 
 ## What it hides by default
 

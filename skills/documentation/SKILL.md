@@ -38,6 +38,27 @@ docstring clean-up (`docstrings.md`), a guess in the ask
 Nobody may be there to answer. Never stop a task to ask about one claim:
 leave it out or mark it, list it under *Not verified*, and go on.
 
+## The check before you save any page or docstring
+
+Read every sentence you wrote. For each number, default, name, unit,
+command output and reason in it, name the line, the output you saw, or
+the record it came from. **If you cannot, delete it or mark it not
+verified.** Most of all:
+
+- **A value the person gave you.** Check it in the code. If the code
+  differs, write the code's value and tell them. "Use my number" or "you
+  can guess" does not change this.
+- **A unit the code does not state.** A `timeout` passed on to another
+  library is not "seconds" until that library's code says so.
+- **Output you did not see.** Show output only from a command you ran;
+  otherwise the block says `not run`.
+- **A reason.** Any "because", "to reduce", "so that", "the trade-off is
+  made to" needs a record. Without one, delete the sentence, in the
+  introduction and under *Trade-offs* too; do not write a reason next to
+  `Reason: not recorded`.
+
+*Not verified: none* is a claim too: only write it after this check.
+
 ## Invariants
 
 1. **Every factual sentence points at its source.** A path and line, a

@@ -61,6 +61,12 @@ value is used (`time.sleep(timeout)` is seconds), the keys from the
 `return` statement, the exceptions from `raise` lines. Never write what
 such a function usually does.
 
+A value handed on to another function takes its unit from that function.
+Follow it (navigation, Trace out) until a line uses it. If the trail ends
+in code you cannot read, or in code that only forwards it (a query
+parameter, an argument to another service), the unit is **not verified**:
+leave it out of the docstring and list it under *Not verified*.
+
 ## Never
 
 - Never repeat a parameter's name and type as its description:
