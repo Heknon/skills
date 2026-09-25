@@ -1,6 +1,6 @@
 # Plan: the seniority skill
 
-Status: draft for decision. Nothing is built yet.
+Status: built in `skills/seniority/`. Decisions S1, S2 and S3 accepted: the ledger is a file, the skill loads on every task, and it is built before navigation and documentation.
 
 ## 1. What it is
 
