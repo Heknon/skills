@@ -1,0 +1,10 @@
+site_name: Payments team docs
+theme:
+  name: material
+  font: false
+plugins:
+  - search
+  - monorepo
+nav:
+  - Home: index.md
+  - Billing: '!include ../billing/mkdocs.yml'

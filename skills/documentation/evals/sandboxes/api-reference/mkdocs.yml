@@ -1,0 +1,6 @@
+site_name: geo
+theme:
+  name: material
+  font: false
+nav:
+  - Home: index.md

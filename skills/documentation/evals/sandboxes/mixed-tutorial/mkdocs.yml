@@ -1,0 +1,7 @@
+site_name: Tracker
+theme:
+  name: material
+  font: false
+nav:
+  - Home: index.md
+  - Getting started: tutorial/getting-started.md
