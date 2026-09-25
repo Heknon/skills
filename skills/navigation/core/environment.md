@@ -25,8 +25,9 @@ run with: <command>
 4. **Check the project package.** Imported from the repository folder:
    the source you read is what runs. Imported from `site-packages`: an
    installed copy runs; compare its version with the repository.
-5. **Say how to run things** with that interpreter: the tool's run command
-   (`uv run`, `poetry run`), or the interpreter's full path.
+5. **Say how to run things**: `uv run <command>`, or `uv run --no-sync
+   <command>` to leave the environment as it is. For an environment uv
+   does not find, the interpreter's full path.
 
 ## Never
 

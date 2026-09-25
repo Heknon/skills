@@ -91,17 +91,17 @@ hypotheses: none
 
 steps:
 1. search "/search" in api/routes/ -> api/routes/search.py:14 def search(q) -> /search is served by api/routes/search.py
-2. `python manage.py count_documents --env dev` -> 184312 documents -> dev has 184312 documents, close to production's size
+2. `uv run python manage.py count_documents --env dev` -> 184312 documents -> dev has 184312 documents, close to production's size
 3. search "latency" and "SLO" in docs/ and the open tickets export -> no target stated -> no written target exists
 4. ask: what p95 should /search reach? I recommend under 300 ms, the budget other read endpoints meet -> person: under 300 ms -> the target is p95 under 300 ms
-5. `python tools/bench.py /search?q=pump --runs 200` -> p50 1.2 s, p95 1.9 s -> the baseline p95 is 1.9 s
-6. `python tools/bench.py /search?q=pump --runs 1 --profile` -> rank_results 85% of time, Document.load_full 80% of that -> loading full documents in rank_results dominates
+5. `uv run python tools/bench.py /search?q=pump --runs 200` -> p50 1.2 s, p95 1.9 s -> the baseline p95 is 1.9 s
+6. `uv run python tools/bench.py /search?q=pump --runs 1 --profile` -> rank_results 85% of time, Document.load_full 80% of that -> loading full documents in rank_results dominates
    verdict trade-offs: load only the ranked fields because the profile points at it and it is one function; not a cache because the first request stays slow; not ranking in SQL because it changes the schema and is hard to undo
    verdict challenge: proceed with a change: compare ranked ids on the test queries because 4: identical ranking is not verified
-7. `python tools/rank_snapshot.py --queries tests/search_queries.txt --out before.json` -> 20 queries, ids written -> baseline rankings are captured
+7. `uv run python tools/rank_snapshot.py --queries tests/search_queries.txt --out before.json` -> 20 queries, ids written -> baseline rankings are captured
 8. edit search/rank.py rank_results to call Document.load_fields(RANK_FIELDS) -> 6 lines changed -> rank_results now loads 3 fields instead of the full document
-9. `python tools/rank_snapshot.py --queries tests/search_queries.txt --out after.json --compare before.json` -> 20 of 20 identical -> rankings are unchanged
-10. `python tools/bench.py /search?q=pump --runs 200` -> p50 150 ms, p95 240 ms -> p95 is 240 ms, under the 300 ms target
+9. `uv run python tools/rank_snapshot.py --queries tests/search_queries.txt --out after.json --compare before.json` -> 20 of 20 identical -> rankings are unchanged
+10. `uv run python tools/bench.py /search?q=pump --runs 200` -> p50 150 ms, p95 240 ms -> p95 is 240 ms, under the 300 ms target
 
 done: observed at step 10: p95 240 ms over 200 runs on the dev dataset, target under 300 ms, baseline 1.9 s
 ```

@@ -55,7 +55,7 @@ steps and the answer shape; change the names.
 6. **Confirm with the interpreter** (`tools/terminal-probes.md`):
 
    ```
-   > .venv\Scripts\python.exe -c "import inspect, shop; print(inspect.getsourcefile(shop.Client), inspect.getsourcelines(shop.Client)[1])"
+   > uv run --no-sync python -c "import inspect, shop; print(inspect.getsourcefile(shop.Client), inspect.getsourcelines(shop.Client)[1])"
    C:\work\shop-app\shop\api\_http.py 12
    ```
 

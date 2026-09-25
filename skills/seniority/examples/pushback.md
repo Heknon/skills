@@ -65,15 +65,15 @@ hypotheses:
 
 steps:
 1. search "prices" in api/routes/ -> api/routes/prices.py:22 get_price(sku) -> /prices/<sku> is served by api/routes/prices.py
-2. `python tools/price_roundtrip.py --sku P-100 --wait 5` -> wrote 12.50, read 11.90 after 5 s -> the stale price reproduces
-3. `python tools/price_roundtrip.py --sku P-100 --wait 5 --no-cache` -> wrote 12.60, read 11.90 after 5 s -> the price is stale with the cache bypassed
+2. `uv run python tools/price_roundtrip.py --sku P-100 --wait 5` -> wrote 12.50, read 11.90 after 5 s -> the stale price reproduces
+3. `uv run python tools/price_roundtrip.py --sku P-100 --wait 5 --no-cache` -> wrote 12.60, read 11.90 after 5 s -> the price is stale with the cache bypassed
 4. read api/routes/prices.py lines 22-40 -> get_price uses db.replica() -> the endpoint reads from the replica
-5. `python manage.py replica_lag` -> replica lag 2412 s -> the replica is 40 minutes behind
+5. `uv run python manage.py replica_lag` -> replica lag 2412 s -> the replica is 40 minutes behind
    verdict hypothesis-loop: H2 confirmed at step 5: the endpoint reads a replica 40 minutes behind
 6. ask: pushback message, caching off will not fix it, read prices from the primary instead? -> person: read from the primary, keep the cache on -> the person chose reading from the primary
    verdict pushback: said the cache serves old prices vs stale with cache bypassed (step 3) and replica lag 2412 s (step 5); person decided read from the primary, keep the cache
 7. edit api/routes/prices.py line 25 from db.replica() to db.primary() -> one line changed -> get_price reads the primary
-8. `python tools/price_roundtrip.py --sku P-100 --wait 5` -> wrote 12.70, read 12.70 after 5 s -> the updated price is returned within 5 seconds
+8. `uv run python tools/price_roundtrip.py --sku P-100 --wait 5` -> wrote 12.70, read 12.70 after 5 s -> the updated price is returned within 5 seconds
 
 done: observed at step 8: wrote 12.70 and read 12.70 back within 5 seconds with the cache on
 ```

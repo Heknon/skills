@@ -38,6 +38,10 @@ come back unresolved, or resolve to a different version.
 
 ## Commands and what they print
 
+When a checker is installed in the project's environment, run it through
+uv: `uv run --no-sync ty check ...`. When it is installed on its own, as
+a uv tool or on `PATH`, call it by name as below.
+
 ```powershell
 ty check nav_probe.py --output-format concise
 mypy nav_probe.py --python-executable .venv\Scripts\python.exe

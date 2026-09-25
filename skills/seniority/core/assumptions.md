@@ -47,7 +47,7 @@ These are made so often that they are worth checking by habit.
 | Assumption | The one call that checks it |
 | --- | --- |
 | the file I am editing is the one that runs | find what imports or loads it; add nothing, just look |
-| the interpreter running the code is the one I installed into | print its path from inside: `python -c "import sys; print(sys.executable)"` |
+| the interpreter running the code is the one I installed into | print its path from inside: `uv run --no-sync python -c "import sys; print(sys.executable)"`, and compare it with what the program is really started with |
 | the test I ran ran my case | read the test output for the case's name and the count collected |
 | the error comes from my change | run the same thing on the code without the change |
 | this tool's flag works as I remember | run the tool's `--help`, or read its docs in this environment |

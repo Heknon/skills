@@ -41,8 +41,9 @@ Step 1 reproduces it. **Reading the error** (`core/reading-errors.md`): the
 first error is `ModuleNotFoundError: No module named 'yaml'`, category *not
 installed*, whose first check is which interpreter runs.
 
-Step 2 shows `pyyaml` is installed in `.venv`. The model then tries the
-install again (step 3), which returns the same as a check it already had.
+Step 2 shows `pyyaml` is installed in `.venv`. The model then syncs the
+environment again (step 3), which returns the same as a check it already
+had.
 Step 4 runs the job again: same failure as step 1. Steps 3 and 4 give no
 new fact. **Loop rule 2 fires.** Step 4 also repeats step 1 with the same
 result: a third run would break loop rule 1.
@@ -96,8 +97,8 @@ hypotheses:
 steps:
 1. `python -m export.nightly --date 2026-09-21` -> exit 1, ModuleNotFoundError: No module named 'yaml' -> the failure reproduces locally
    verdict reading-errors: ModuleNotFoundError: No module named 'yaml' at export/config.py:3 | category: not installed | first check: which interpreter runs
-2. `.venv/bin/pip show pyyaml` -> Name: PyYAML, Version: 6.0.1 -> pyyaml is installed in .venv
-3. `.venv/bin/pip install pyyaml` -> Requirement already satisfied: pyyaml -> nothing new
+2. `uv pip show pyyaml` -> Name: PyYAML, Version: 6.0.1 -> pyyaml is installed in .venv
+3. `uv sync --offline` -> Audited 14 packages -> nothing new
 4. `python -m export.nightly --date 2026-09-21` -> exit 1, ModuleNotFoundError: No module named 'yaml' -> nothing new
    stuck: making sure the package is installed -> find which interpreter the job runs
 5. `python -c "import sys; print(sys.executable)"` -> /usr/bin/python3 -> plain python is the system interpreter, not .venv

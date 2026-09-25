@@ -105,6 +105,25 @@ may add rules for its domain, but it does not remove these.
     rereading it. Describe what you changed from the files, not from
     memory of what you meant to write.
 
+## Conventions of this team
+
+This section holds the team's own conventions. Replace it when the skill
+is used elsewhere.
+
+- **Python runs through uv.** Run code, tests and tools with
+  `uv run <command>`. When you only want to look and not change the
+  environment, use `uv run --no-sync <command>`. Inspect packages with
+  `uv pip list` and `uv pip show <package>`. Change dependencies with
+  `uv add` and `uv remove`, and only when asked. Never call a bare
+  `python`, `pip` or `python -m pip`: they may be another interpreter, and
+  they bypass the lock file.
+- **In a project that does not use uv**, uv still works on its
+  environment: `uv run` finds a `.venv` in the folder, and
+  `uv pip <command> --python .venv\Scripts\python.exe` targets it.
+- **Air gapped:** add `--offline` to a uv command that might reach the
+  network. A new package cannot be installed offline; report that, do not
+  work around it.
+
 ## When another skill is loaded too
 
 Its procedures, files and answer headings rule its domain. This skill adds

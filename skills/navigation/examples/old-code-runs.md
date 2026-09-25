@@ -15,12 +15,12 @@ steps and the answer shape; change the names.
    repository and the interpreter disagree").
 
 2. **Find the project interpreter** (`python/environment.md`): `uv.lock`
-   is present, so uv, and `.venv\Scripts\python.exe`.
+   is present, so uv; every probe goes through `uv run --no-sync`.
 
 3. **Ask it where the module comes from** (`tools/terminal-probes.md`):
 
    ```
-   > .venv\Scripts\python.exe -c "import importlib.util as u; print(u.find_spec('greeter.core').origin)"
+   > uv run --no-sync python -c "import importlib.util as u; print(u.find_spec('greeter.core').origin)"
    C:\work\greeter\.venv\Lib\site-packages\greeter\core.py
    ```
 
@@ -29,7 +29,7 @@ steps and the answer shape; change the names.
 4. **Is it editable?**
 
    ```
-   > .venv\Scripts\python.exe -m pip show greeter
+   > uv pip show greeter
    Name: greeter
    Version: 1.4.0
    Location: C:\work\greeter\.venv\Lib\site-packages
@@ -49,9 +49,9 @@ steps and the answer shape; change the names.
 src\greeter\core.py - the file you changed, which does not run
 
 ## How I know
-find_spec('greeter.core').origin with the project interpreter,
-.venv\Scripts\python.exe, is the site-packages copy.
-pip show greeter has no Editable project location: it is a plain copy.
+find_spec('greeter.core').origin, run with uv run --no-sync python, is
+the site-packages copy.
+uv pip show greeter has no Editable project location: it is a plain copy.
 The copy prints "Hello v1".
 
 To run your change, reinstall the project in editable mode, or run it with
