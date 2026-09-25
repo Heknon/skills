@@ -1,0 +1,57 @@
+spec:
+  description: Lint with ruff and test with pytest, for a uv project or one uv workspace member.
+  inputs:
+    job-prefix:
+      description: Prefix of the job names, unique per use in one pipeline, such as the package name.
+      default: python
+    stage:
+      default: test
+    working-directory:
+      description: Folder with the pyproject.toml to check, relative to the repository root.
+      default: .
+    package:
+      description: Workspace member to sync, for a uv workspace. Empty syncs the project in working-directory.
+      default: ""
+    python-image:
+      description: An image with uv and Python, from your mirror.
+      default: registry.example.com/mirror/astral-sh/uv:0.12-python3.12-trixie-slim
+    ruff:
+      type: boolean
+      default: true
+---
+.$[[ inputs.job-prefix ]]-uv:
+  image: $[[ inputs.python-image ]]
+  stage: $[[ inputs.stage ]]
+  interruptible: true
+  variables:
+    UV_CACHE_DIR: $CI_PROJECT_DIR/.uv-cache
+    UV_LINK_MODE: copy
+    UV_PYTHON_DOWNLOADS: never
+    PACKAGE: $[[ inputs.package ]]
+  cache:
+    key: uv-$[[ inputs.job-prefix ]]
+    paths: [.uv-cache]
+  before_script:
+    - cd "$[[ inputs.working-directory ]]"
+    - if [ -n "$PACKAGE" ]; then uv sync --locked --package "$PACKAGE"; else uv sync --locked; fi
+  after_script:
+    - uv cache prune --ci
+
+"$[[ inputs.job-prefix ]]-lint":
+  extends: .$[[ inputs.job-prefix ]]-uv
+  rules:
+    - if: $RUFF == "true"
+  variables:
+    RUFF: "$[[ inputs.ruff ]]"
+  script:
+    - uv run --no-sync ruff check .
+    - uv run --no-sync ruff format --check .
+
+"$[[ inputs.job-prefix ]]-test":
+  extends: .$[[ inputs.job-prefix ]]-uv
+  script:
+    - uv run --no-sync pytest --junitxml="$CI_PROJECT_DIR/report-$[[ inputs.job-prefix ]].xml"
+  artifacts:
+    when: always
+    reports:
+      junit: report-$[[ inputs.job-prefix ]].xml

@@ -1,0 +1,6 @@
+$ echo "$CI_JOB_TOKEN" | helm repo add platform "$CI_API_V4_URL/projects/42/packages/helm/stable" --username gitlab-ci-token --password-stdin
+Error: looks like "https://gitlab.example.com/api/v4/projects/42/packages/helm/stable" is not a valid chart repository or cannot be reached: failed to fetch https://gitlab.example.com/api/v4/projects/42/packages/helm/stable/index.yaml : 404 Not Found
+ERROR: Job failed: exit code 1
+
+Note from the person: project 42 is platform/charts. It is private. I can see
+app 1.2.0 under its Packages page when I am logged in.

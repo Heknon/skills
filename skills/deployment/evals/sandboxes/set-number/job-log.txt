@@ -1,0 +1,9 @@
+$ helm upgrade --install web platform/app --version 1.0.0 -n shop-staging -f deploy/values.yaml --set image.repository=$CI_REGISTRY_IMAGE --set image.tag=$CI_COMMIT_SHORT_SHA --wait --rollback-on-failure
+Error: UPGRADE FAILED: values don't meet the specifications of the schema(s) in the following chart(s):
+app:
+- at '/image/tag': got number, want string
+
+ERROR: Job failed: exit code 1
+
+(The same job passed on the three previous commits: 3f2a91c0, a81b77de, 0c9e4d1f.
+ This commit's short SHA is 20240917.)

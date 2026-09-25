@@ -1,0 +1,73 @@
+spec:
+  description: Deploy one release of a chart from a GitLab Helm repository to one environment, waiting for it to be ready and rolling back if it is not. Needs a File variable KUBECONFIG scoped to the environment.
+  inputs:
+    job-name:
+      default: deploy
+    stage:
+      default: deploy
+    environment:
+      description: GitLab environment name, such as staging or staging/api. CI/CD variables scoped to it, such as KUBECONFIG, reach this job.
+    environment-url:
+      default: ""
+    namespace:
+    release:
+      description: Helm release name.
+    chart:
+      description: Chart name in the repository.
+      default: app
+    chart-version:
+    chart-project-id:
+      description: Id of the project whose Helm repository holds the chart.
+    chart-channel:
+      default: stable
+    values-files:
+      description: Values files, relative to the repository root, separated by spaces, later ones overriding earlier ones.
+      default: deploy/values.yaml
+    image:
+      description: Image repository without tag.
+      default: $CI_REGISTRY_IMAGE
+    digest-variable:
+      description: Name of the variable with the image digest, from the build job's dotenv report.
+      default: IMAGE_DIGEST
+    needs:
+      type: array
+      description: Jobs to wait for, including the job that built the image.
+      default: []
+    when:
+      options: [on_success, manual]
+      default: on_success
+    timeout:
+      default: 10m
+    helm-image:
+      default: registry.example.com/mirror/alpine/helm:4.3.0
+---
+"$[[ inputs.job-name ]]":
+  stage: $[[ inputs.stage ]]
+  image:
+    name: $[[ inputs.helm-image ]]
+    entrypoint: [""]
+  needs: $[[ inputs.needs ]]
+  interruptible: false
+  resource_group: $[[ inputs.namespace ]]-$[[ inputs.release ]]
+  when: $[[ inputs.when ]]
+  environment:
+    name: $[[ inputs.environment ]]
+    url: $[[ inputs.environment-url ]]
+  variables:
+    VALUES_FILES: $[[ inputs.values-files ]]
+    DIGEST_VARIABLE: $[[ inputs.digest-variable ]]
+  script:
+    - digest=$(printenv "$DIGEST_VARIABLE" || true)
+    - values=""; for f in $VALUES_FILES; do values="$values --values $f"; done
+    - echo "$CI_JOB_TOKEN" | helm repo add charts
+      "$CI_API_V4_URL/projects/$[[ inputs.chart-project-id ]]/packages/helm/$[[ inputs.chart-channel ]]"
+      --username gitlab-ci-token --password-stdin
+    - helm upgrade --install "$[[ inputs.release ]]" "charts/$[[ inputs.chart ]]"
+      --version "$[[ inputs.chart-version ]]"
+      --namespace "$[[ inputs.namespace ]]"
+      $values
+      --set-string image.repository="$[[ inputs.image ]]"
+      --set-string image.tag="$CI_COMMIT_SHA"
+      --set-string image.digest="$digest"
+      --wait --timeout "$[[ inputs.timeout ]]" --rollback-on-failure --history-max 10
+    - helm history "$[[ inputs.release ]]" --namespace "$[[ inputs.namespace ]]" --max 3

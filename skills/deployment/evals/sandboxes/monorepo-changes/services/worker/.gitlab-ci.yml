@@ -1,0 +1,2 @@
+worker-test:
+  script: [echo test worker]

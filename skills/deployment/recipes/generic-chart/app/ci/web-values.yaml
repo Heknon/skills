@@ -1,0 +1,6 @@
+# Used by the chart's own pipeline: helm lint and helm template run with each file in ci/.
+image:
+  repository: registry.example.com/team/web
+  tag: 3f2a91c0d4e5b6a7c8d9e0f1a2b3c4d5e6f7a8b9
+env:
+  LOG_LEVEL: info

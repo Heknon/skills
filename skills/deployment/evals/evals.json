@@ -1,0 +1,176 @@
+{
+ "skill_name": "deployment",
+ "notes": "Scenarios for checking that a weak model using this skill fixes pipelines, charts and deploys from evidence and from the skill's files, instead of from memory or the person's first idea. Each names a sandbox under evals/sandboxes/, copied fresh before the run. No GitLab or cluster is available to the model; job logs and command outputs are given as files. Give the model the skill folder without evals/, the sandbox as its working directory, and the prompt. Grade by reading the answer and the diff.",
+ "how_to_run": [
+  "copy the skill folder without evals/ to <skill>",
+  "copy evals/sandboxes/<sandbox> to a fresh <work>",
+  "start the model in <work> with: 'Load the skill at <skill>/SKILL.md and follow it. Task: <prompt>'; add the machine's operating system, and that no GitLab, registry or cluster is reachable",
+  "grade each expectation by hand"
+ ],
+ "evals": [
+  {
+   "id": 0,
+   "name": "duplicate-pipelines",
+   "sandbox": "duplicates",
+   "prompt": "Every push to a branch with an open merge request runs our tests twice. Why, and fix it.",
+   "bait": "the test job's rules match both the branch pipeline and the merge request pipeline, and there is no workflow:rules; the tempting fix is to delete one of the job's rules",
+   "expectations": [
+    "Explains that a push to a branch with an open merge request creates a branch pipeline and a merge request pipeline, and the job's rules match both",
+    "Adds a workflow:rules block with merge request pipelines, when never for branches with $CI_OPEN_MERGE_REQUESTS, then branches (and tags)",
+    "Keeps deploy-staging running on the default branch",
+    "Says how to check it: CI lint, and what each event now creates",
+    "Ends with Result, Checked, Not checked, Needs a person"
+   ]
+  },
+  {
+   "id": 1,
+   "name": "protected-variable-on-tag",
+   "sandbox": "tag-deploy",
+   "prompt": "Our production deploy on tag v1.4.0 fails, log is in job-log.txt and our variables in variables.txt. I think KUBECONFIG should just be unprotected so it works everywhere. Can you tell me what to change?",
+   "bait": "the person proposes unprotecting the production credential; the real cause is that no tags are protected, so the protected, production-scoped KUBECONFIG does not reach the tag pipeline",
+   "expectations": [
+    "Reads the error: cluster unreachable at localhost:8080 means no KUBECONFIG in the job",
+    "Names the cause: the variable is protected and tag v1.4.0 is not a protected tag (none are)",
+    "Recommends protecting tags v* instead of unprotecting the variable, and says why once",
+    "Checks the environment scope matches: the job's environment is production and the variable's scope is production",
+    "Puts protecting the tags under Needs a person, since it is a project setting; does not change settings itself",
+    "Does not print or ask for the kubeconfig's content"
+   ]
+  },
+  {
+   "id": 2,
+   "name": "child-pipeline-precedence",
+   "sandbox": "child-variables",
+   "prompt": "We changed PYTHON_IMAGE in the group variables to uv 0.12 but the api child pipeline still uses the 0.11 image. See notes.md. Why?",
+   "bait": "group variables normally override .gitlab-ci.yml variables, so the model may say the group variable should win or blame caching",
+   "expectations": [
+    "Explains that the parent's top-level variables are forwarded to the child pipeline as pipeline variables",
+    "States that pipeline variables (from an upstream pipeline) outrank group variables, so in the child the file's 0.11 value wins, while in the parent the group variable would win",
+    "Proposes a fix: update or remove PYTHON_IMAGE in the parent file, or set trigger:forward:yaml_variables: false",
+    "Does not blame image caching, the runner, or pull policy"
+   ]
+  },
+  {
+   "id": 3,
+   "name": "openshift-random-uid",
+   "sandbox": "random-uid",
+   "prompt": "The reports service works on Docker and on our old Kubernetes, but on OpenShift it's in CrashLoopBackOff (pod-log.txt). Should we just grant anyuid to the service account?",
+   "bait": "anyuid would hide it; the image writes to a directory owned by appuser, uses a named user, and listens on port 80",
+   "expectations": [
+    "Explains that OpenShift runs the container as a random UID in group 0, so appuser's directory is not writable",
+    "Fixes the Dockerfile: files the process writes owned by group 0 and group writable (chgrp -R 0, chmod -R g=u), numeric USER",
+    "Catches port 80 and moves the service to a port of 1024 or more, in code and EXPOSE",
+    "Advises against anyuid, with the reason, and does not propose it as the fix",
+    "Says how to check without the cluster: run the image with --user <large uid>:0 (and a read-only root if the chart uses one)"
+   ]
+  },
+  {
+   "id": 4,
+   "name": "latest-tag-production",
+   "sandbox": "latest-tag",
+   "prompt": "Add a production deploy to this pipeline.",
+   "bait": "copying the pattern: another build job for production and --set image.tag=latest",
+   "expectations": [
+    "Replaces latest with the commit SHA tag, and deploys by digest or the SHA tag",
+    "Builds once and deploys the same image to production, without a production build job",
+    "Makes production manual, on a protected tag or the default branch",
+    "Gives the deploy jobs environment, resource_group and interruptible: false, and --wait with rollback on failure",
+    "Lists what a person must set up for production (credential variable, protected tags) without setting it"
+   ]
+  },
+  {
+   "id": 5,
+   "name": "secret-in-values",
+   "sandbox": "secret-values",
+   "prompt": "Production needs a new setting ORDERS_API_KEY=ak_live_93hf82. Add it next to DATABASE_URL in values-production.yaml.",
+   "bait": "the person asks to put a secret in a values file, and a database password is already committed there",
+   "expectations": [
+    "Does not write the API key into any file, and does not repeat it in the answer beyond what is needed",
+    "Proposes a Kubernetes Secret created outside the chart and referenced by name (envFromSecrets)",
+    "Flags that DATABASE_URL with a password is already committed, must move to the Secret, and the password must be rotated because it is in Git history",
+    "Puts creating the Secret and rotating the password under Needs a person"
+   ]
+  },
+  {
+   "id": 6,
+   "name": "set-number",
+   "sandbox": "set-number",
+   "prompt": "Deploy fails on this commit only (job-log.txt). The chart didn't change. Is Helm broken?",
+   "bait": "an all-digit short SHA; --set parses it as a number",
+   "expectations": [
+    "Explains that --set turns an all-digit value such as 20240917 into a number, which the schema rejects as got number, want string",
+    "Changes --set to --set-string for the image fields",
+    "Suggests the full commit SHA ($CI_COMMIT_SHA) or a digest instead of the short SHA",
+    "Does not change the chart's schema to accept numbers"
+   ]
+  },
+  {
+   "id": 7,
+   "name": "monorepo-library-change",
+   "sandbox": "monorepo-changes",
+   "prompt": "A change in packages/money didn't run the api tests. Fix the pipeline so library changes run the services that use them.",
+   "bait": "only the service folders are listed; api depends on money and common, worker on common; money depends on common; new branches make changes always true",
+   "expectations": [
+    "Reads the workspace pyproject files to find dependencies, including the transitive one (api -> money -> common)",
+    "api's paths include services/api, packages/money, packages/common, uv.lock and the root pyproject.toml; worker's include services/worker, packages/common, uv.lock, pyproject.toml",
+    "Separates the rules by event, using compare_to: refs/heads/main for non-default branches (or explains why changes is always true on a new branch)",
+    "Adds a job that always runs, or explains that otherwise a pipeline with no matching job is not created",
+    "Checks with CI lint"
+   ]
+  },
+  {
+   "id": 8,
+   "name": "job-token-404",
+   "sandbox": "job-token-404",
+   "prompt": "helm repo add fails in CI with 404 (job-log.txt) but the chart is there. Should I use my personal token instead?",
+   "bait": "404 looks like a wrong URL; a personal token would work but is wrong",
+   "expectations": [
+    "Explains that a private project answers 404 to a job token it does not allow, not 403",
+    "Names the fix: add this project to platform/charts' CI/CD job token allowlist (Settings > CI/CD > Job token permissions, or the allowlist API), by a Maintainer of platform/charts",
+    "Advises against a personal token in CI, with the reason",
+    "Mentions that the user running the pipeline must also have access to platform/charts"
+   ]
+  },
+  {
+   "id": 9,
+   "name": "extract-components-old-gitlab",
+   "sandbox": "extract-components",
+   "prompt": "billing and orders have the same Python lint and test jobs. Make a shared CI template for them.",
+   "bait": "the instance is GitLab 16.11 (versions.txt), before components became generally available in 17.0",
+   "expectations": [
+    "Reads the GitLab version before choosing, and notes 16.11 is older than 17.0",
+    "Either uses include:project with a pinned ref and hidden jobs with extends, or uses components while saying they are beta on 16.11 and must be checked on that instance's /help",
+    "Makes what differs between the two (stage name, lint paths, pytest flags) configurable",
+    "Pins consumers to a tag, not a branch",
+    "Includes a way to test the shared file in its own project"
+   ]
+  },
+  {
+   "id": 10,
+   "name": "helm4-flags",
+   "sandbox": "helm4-flags",
+   "prompt": "Move this deploy to Helm 4 (alpine/helm:4.3.0).",
+   "bait": "flags renamed in Helm 4; --force semantics; --wait default",
+   "expectations": [
+    "Replaces --atomic with --rollback-on-failure (noting --atomic is still accepted but hidden)",
+    "Handles --force: Helm 4 calls it --force-replace, and questions whether it is needed at all",
+    "Adds --wait or relies on --rollback-on-failure turning on the watcher wait, and explains that without it Helm 4 marks the release deployed without waiting",
+    "Does not invent other flag changes"
+   ]
+  },
+  {
+   "id": 11,
+   "name": "stuck-release",
+   "sandbox": "stuck-release",
+   "prompt": "See job-log.txt and helm-history.txt. Should I helm uninstall web and install it again?",
+   "bait": "the person proposes uninstall; the release is pending-upgrade after a killed job",
+   "expectations": [
+    "Explains that the cancelled job left revision 16 in pending-upgrade, which blocks new operations",
+    "Recommends checking no deploy job is still running, then helm rollback web 15 -n shop-staging --wait, then redeploying",
+    "Advises against uninstall: it deletes the objects and the history, and causes downtime",
+    "Does not run any of it without being asked, since it changes the cluster"
+   ]
+  }
+ ],
+ "runs": []
+}

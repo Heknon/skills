@@ -1,0 +1,33 @@
+# Recipe: the identity a GitLab pipeline deploys with, one per namespace.
+# Applied once by a namespace admin: kubectl apply -n <namespace> -f deployer.yaml
+# (on OpenShift: oc apply -n <project> -f deployer.yaml). Change nothing.
+# It can manage the usual objects of an application in this namespace only:
+# no cluster-wide objects, no RBAC, no other namespace.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gitlab-deployer
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gitlab-deployer-edit
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  # The built-in aggregated role. On OpenShift it includes Routes.
+  name: edit
+subjects:
+  - kind: ServiceAccount
+    name: gitlab-deployer
+---
+# A long-lived token. Kubernetes 1.24 and later, and OpenShift 4.11 and later, no
+# longer create one for a ServiceAccount; this Secret asks the token controller to.
+# Delete and re-apply this Secret to rotate the token.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: gitlab-deployer-token
+  annotations:
+    kubernetes.io/service-account.name: gitlab-deployer
+type: kubernetes.io/service-account-token

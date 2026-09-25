@@ -1,0 +1,8 @@
+Output of: glab variable list -R shop/web
+
+KEY           PROTECTED  MASKED  HIDDEN  EXPANDED  SCOPE       DESCRIPTION
+KUBECONFIG    true       false   false   true      staging     deployer kubeconfig, shop-staging
+KUBECONFIG    true       false   false   true      production  deployer kubeconfig, shop-production
+
+Protected branches: main
+Protected tags: none

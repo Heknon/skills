@@ -1,0 +1,12 @@
+Output of: oc logs reports-7c9d8b6f4-kq2xs -n reports-staging --previous
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/runpy.py", line 198, in _run_module_as_main
+  File "/usr/local/lib/python3.12/site-packages/reports/__main__.py", line 9, in <module>
+    os.makedirs(DATA_DIR, exist_ok=True)
+  File "<frozen os>", line 225, in makedirs
+PermissionError: [Errno 13] Permission denied: '/home/appuser/app/data/cache'
+
+Output of: oc get pods -n reports-staging
+NAME                      READY   STATUS             RESTARTS   AGE
+reports-7c9d8b6f4-kq2xs   0/1     CrashLoopBackOff   6          9m

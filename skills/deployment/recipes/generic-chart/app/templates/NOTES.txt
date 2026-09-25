@@ -1,0 +1,4 @@
+{{ include "app.fullname" . }} {{ include "app.image" . }} in namespace {{ .Release.Namespace }}, revision {{ .Release.Revision }}.
+Status:   kubectl rollout status deployment/{{ include "app.fullname" . }} -n {{ .Release.Namespace }}
+Pods:     kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+Events:   kubectl get events -n {{ .Release.Namespace }} --sort-by=.lastTimestamp

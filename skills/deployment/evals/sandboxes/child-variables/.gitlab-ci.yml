@@ -1,0 +1,10 @@
+variables:
+  PYTHON_IMAGE: registry.example.com/mirror/astral-sh/uv:0.11-python3.12-bookworm-slim
+
+stages: [units]
+
+api:
+  stage: units
+  trigger:
+    include: services/api/.gitlab-ci.yml
+    strategy: mirror

@@ -1,0 +1,29 @@
+# Every optional feature on, to render and validate every template.
+image:
+  repository: registry.example.com/team/web
+  digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+imagePullSecrets: [registry-pull]
+command: ["uvicorn"]
+args: ["app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+env:
+  LOG_LEVEL: debug
+envFromSecrets: [web-secrets]
+config:
+  files:
+    settings.toml: |
+      [server]
+      workers = 2
+route:
+  enabled: true
+  host: web.apps.example.com
+autoscaling:
+  enabled: true
+serviceAccount:
+  create: true
+migration:
+  enabled: true
+  command: ["python", "-m", "app.migrate"]
+cronJobs:
+  cleanup:
+    schedule: "17 3 * * *"
+    command: ["python", "-m", "app.cleanup"]

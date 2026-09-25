@@ -1,0 +1,38 @@
+{{- if .Values.migration.enabled }}
+{{- /* A hook runs before the new pods; the release fails if it fails.
+       before-hook-creation deletes the previous run's Job before a new one is created;
+       hook-succeeded deletes it after success, so a failed Job stays for its logs. */}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "app.fullname" . }}-migrate
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: {{ .Values.migration.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- /* Not the selector labels: the Service and the PodDisruptionBudget must not count this pod. */}}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: migration
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ include "app.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- range . }}
+        - name: {{ . }}
+        {{- end }}
+      {{- end }}
+      securityContext:
+        {{- include "app.podSecurityContext" . | nindent 8 }}
+      containers:
+        {{- include "app.jobContainer" (dict "root" $ "command" .Values.migration.command "args" .Values.migration.args) | nindent 8 }}
+      {{- include "app.volumes" . | nindent 6 }}
+{{- end }}

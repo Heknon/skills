@@ -1,0 +1,6 @@
+Output of: helm history web -n shop-staging --max 4
+
+REVISION  UPDATED                   STATUS           CHART      APP VERSION  DESCRIPTION
+14        Tue Sep 22 10:02:11 2026  superseded       app-1.0.0  0            Upgrade complete
+15        Wed Sep 23 16:40:37 2026  deployed         app-1.0.0  0            Upgrade complete
+16        Thu Sep 24 09:12:05 2026  pending-upgrade  app-1.0.0  0            Preparing upgrade

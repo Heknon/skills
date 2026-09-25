@@ -1,0 +1,11 @@
+deploy-staging:
+  image:
+    name: registry.example.com/mirror/alpine/helm:4.3.0
+    entrypoint: [""]
+  environment:
+    name: staging
+  script:
+    - echo "$CI_JOB_TOKEN" | helm repo add platform "$CI_API_V4_URL/projects/42/packages/helm/stable" --username gitlab-ci-token --password-stdin
+    - helm upgrade --install web platform/app --version 1.2.0 -n shop-staging -f deploy/values.yaml --wait --rollback-on-failure
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

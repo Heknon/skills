@@ -1,0 +1,7 @@
+# Only what differs in staging. Secrets never go here: see envFromSecrets.
+replicaCount: 1
+route:
+  enabled: true
+env:
+  GREETING_NAME: web-staging
+  LOG_LEVEL: debug

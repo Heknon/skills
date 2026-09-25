@@ -1,0 +1,10 @@
+.git
+.venv
+.uv-cache
+**/__pycache__
+.pytest_cache
+.ruff_cache
+report.xml
+coverage.xml
+dist
+deploy

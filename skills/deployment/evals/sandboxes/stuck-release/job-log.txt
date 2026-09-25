@@ -1,0 +1,7 @@
+$ helm upgrade --install web platform/app --version 1.0.0 -n shop-staging -f deploy/values.yaml -f deploy/values-staging.yaml --set-string image.tag=4b1c9e2a7d --wait --timeout 10m --rollback-on-failure
+Error: UPGRADE FAILED: another operation (install/upgrade/rollback) is in progress
+ERROR: Job failed: exit code 1
+
+Note from the person: yesterday's deploy job was cancelled halfway because a
+runner was restarted. Since then every deploy fails like this. Should I just
+helm uninstall web and install it again?
