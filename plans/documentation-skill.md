@@ -1,6 +1,75 @@
 # Plan: the documentation skill
 
-Status: draft for decision. Nothing is built yet.
+Status: draft, revised on 2026-09-25 after the seniority and navigation
+skills. Nothing is built yet. Read section 0 first: it overrides the older
+sections where they disagree.
+
+## 0. What changed since the first draft
+
+**What the evals of the first two skills taught.** A skill carries
+knowledge and judgement; enforcement belongs to a harness. Rules the
+model had to remember to run itself (checkers, answer files, snapshots)
+were skipped or cost too much; single clear rules at a decisive moment
+held. So:
+
+- The checkers in section 9 are **not** part of the skill. What each one
+  checks becomes guidance inside the procedures ("every claim names a
+  file and line", "a page belongs to one unit"). The scripts may be
+  written later for a harness or CI, next to `harness/seniority-checks/`.
+- The docs map (section 5) stays, but as a document people and models
+  read, not a file a checker parses.
+- The answer ends with a small fixed set of headings, like navigation's.
+
+**Decisions made since.**
+
+- Python only (the scanner, the docstring rules, API reference).
+- Windows, PowerShell, Zed's agent, uv for everything Python.
+- Sourcegraph is connected over MCP: cross-repository questions go to it.
+- Navigation is the skill that answers "where is this implemented, who
+  calls it, what does it return": documentation cites its answers.
+- The docs platform is **MkDocs**.
+
+**MkDocs, as verified on 2026-09-25.** The model cannot look this up, so
+the skill will state it with the date, and say what to check on the
+installed versions.
+
+- **MkDocs 1.x** has had no release in about 18 months and is
+  effectively unmaintained.
+- **MkDocs 2.0** is a pre-release (on PyPI since 2026-08-30) that drops
+  the plugin system, moves configuration from YAML to TOML, and does not
+  work with Material for MkDocs. Material 9.7.5 and later pin
+  `mkdocs<2`. Any project on MkDocs should pin `mkdocs<2` itself.
+- **Material for MkDocs** is in maintenance mode: end of life on
+  2026-11-05, with critical fixes only until **2027-05-05**.
+- **Zensical**, by the same team, is the successor. It reads an existing
+  `mkdocs.yml`, and its dependable release line starts with 0.1.0 on
+  2026-11-05. It supports search, offline, blog, tags, mkdocstrings,
+  autorefs, awesome-nav, macros, mike and redirects; privacy is planned.
+  It does **not** list the `monorepo` or `multirepo` plugins, the two
+  plugins most commonly used to pull several repositories' docs into one
+  site.
+- **mkdocs-monorepo-plugin** is maintained by the Backstage team.
+  **mkdocs-multirepo-plugin** is "no longer being actively developed".
+
+**What this means for the aggregator site.** Before 2027-05-05 it must
+move to Zensical or accept an unmaintained theme. If it combines the
+repositories with the monorepo or multirepo plugin, that step has no
+Zensical equivalent today; a plain copy step before the build (each
+repository's `docs/` folder copied into the site's `docs/<repo>/`, with
+awesome-nav for the navigation) works with both MkDocs and Zensical. The
+skill's tooling section will carry this as a procedure: which aggregation
+the site uses, and the migration path for each.
+
+**Still needed.**
+
+- The aggregator repository, to read how it combines the repositories,
+  which plugins it uses, and to be the first real example.
+- Whether the skill may edit code (docstrings), or only propose changes
+  (D6).
+
+Sources: zensical.org/upcoming-changes, zensical.org/compatibility/plugins,
+squidfunk.github.io/mkdocs-material/blog/2026/02/18/mkdocs-2.0,
+pypi.org/project/mkdocs-multirepo-plugin.
 
 ## 1. What the skill must do
 
