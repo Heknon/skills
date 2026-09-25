@@ -1,4 +1,25 @@
-# GitLab's MCP server
+# GitLab's MCP server (optional)
+
+**Most installations do not have this.** Nothing else in the skill needs
+it: the REST API (`gitlab/api.md`) and `glab` (`gitlab/glab.md`) do
+everything described here and more. Read this file only when GitLab tools
+already appear among your tools, or a person asks whether their GitLab
+could offer them.
+
+## Does this GitLab have it?
+
+| Check | Answer |
+| --- | --- |
+| GitLab older than 18.3 (`GET /api/v4/version`) | no MCP server |
+| 18.3 to 19.1 | experiment or beta, behind flags or Premium; ask an administrator |
+| 19.2 or later | possible on Free; an administrator must have enabled it |
+| a token with the **`mcp`** scope, `POST /api/v4/mcp` with body `{"jsonrpc":"2.0","id":1,"method":"tools/list"}` | `200` and a tool list: enabled; `404`: disabled or absent (*lab*) |
+
+An ordinary `api` or `read_api` token cannot tell: it gets `403` whether
+the server is on or off (*lab*). Creating an `mcp`-scoped token is only
+possible on versions that have the scope.
+
+## What it is
 
 GitLab has its own Model Context Protocol server at
 `https://<gitlab>/api/v4/mcp`. With it, an agent such as Zed's calls

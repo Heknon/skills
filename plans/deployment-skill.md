@@ -207,8 +207,9 @@ into the file named:
   the `api` scope, GET lint works with `read_api` (`core/discover.md`,
   `recipes/tools/ci_map.py`).
 - GitLab's own MCP server accepts a personal access token with the `mcp`
-  scope, refuses `api` tokens, and has no lint, variable or package tools
-  (`gitlab/mcp.md`).
+  scope, refuses `api` tokens, and has no lint, variable or package tools.
+  The team does not run it, so the skill works through the REST API and
+  `glab` only, and keeps `gitlab/mcp.md` as an optional note.
 
 ## 9. Not yet done
 

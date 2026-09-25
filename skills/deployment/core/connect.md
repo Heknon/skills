@@ -3,9 +3,13 @@
 **Verdict you produce:** how you reach this GitLab, as whom, with which
 rights, shown by commands that answered.
 
+The REST API and `glab` are the ways in. Both need only a token and
+the terminal. GitLab's MCP server is an optional extra (step 6): most
+installations do not have it enabled, and nothing in this skill needs it.
+
 ```
 instance:   https://gitlab.example.com, GitLab <version>, <Community | Enterprise> Edition
-channel:    <REST API | glab | GitLab MCP server>, each that works
+channel:    <REST API | glab>, each that works
 identity:   <username>, token "<name>", scopes <...>, expires <date>
 access:     <project>: <role>
 trust:      <system store | CA file>
@@ -24,13 +28,11 @@ trust:      <system store | CA file>
    - `glab`: `GLAB_CA_CERT=<pem>` or `glab config set ca_cert <pem> --host <host>`;
    - Python and uv: `SSL_CERT_FILE=<pem>`; the discovery script:
      `GITLAB_CA_FILE=<pem>`;
-   - Node (the MCP bridge): `NODE_EXTRA_CA_CERTS=<pem>`.
 3. **A token**, the least that does the job (`core/access.md`):
    | Work | Scope |
    | --- | --- |
    | read pipelines, jobs, logs, files, variables' names, lint the committed configuration | `read_api` |
    | lint content that is not committed (a child pipeline file, a draft), and anything that changes GitLab | `api` |
-   | GitLab's MCP server | `mcp`, a separate token (`gitlab/mcp.md`) |
    | clone | `read_repository` |
 
    Read it at a prompt into `$env:GITLAB_TOKEN`, never on a command line
@@ -52,14 +54,17 @@ trust:      <system store | CA file>
    needs Maintainer (40).
 5. **`glab`**, if it will be used: `glab auth login --hostname <host>
    --stdin`, then `glab auth status` (`gitlab/glab.md`).
-6. **The MCP server**, if the agent should use GitLab's tools directly:
-   ask whether an administrator has enabled it, then `gitlab/mcp.md`.
+6. **GitLab's MCP server: only if it is already there.** Use it when
+   GitLab tools (`get_pipeline`, `get_job`, ...) appear in your tool list.
+   Otherwise do not look for it or ask for it; the REST API and `glab`
+   cover everything. `gitlab/mcp.md` has how to tell whether an instance
+   has it, for a person who wants to know.
 
 ## Which channel for what
 
 | Need | Channel |
 | --- | --- |
-| pipelines, jobs, logs, merge requests, files, from the agent's tools | GitLab MCP server |
+| pipelines, jobs, logs, merge requests, files | REST API (`gitlab/api.md`) or `glab` (`gitlab/glab.md`) |
 | lint, merged configuration, discovery, variables, environments, packages, job token allowlist | REST API or `glab` |
 | a map of the whole pipeline | `recipes/tools/ci_map.py` (`core/discover.md`) |
 | inside a pipeline | the REST API with `CI_JOB_TOKEN` (`gitlab/job-token.md`) |

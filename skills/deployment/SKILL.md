@@ -1,6 +1,6 @@
 ---
 name: deployment
-description: Get code from a merge request to a running workload on Kubernetes or OpenShift, with GitLab CI/CD and Helm. Write and fix .gitlab-ci.yml for Python projects and monorepos, build shared CI components and templates, decide where a CI/CD variable or secret lives and why it has the value it has, discover every include and downstream pipeline behind a project, connect through the GitLab REST API, glab or GitLab's MCP server, write Dockerfiles and build images with Buildah, use the Helm CLI, write a generic Helm chart and publish it to a chart repository, deploy, promote and roll back releases, connect a pipeline to a cluster, make images and charts pass OpenShift's security constraints, and debug a failing pipeline, job, image or rollout from its evidence. Verified against GitLab 19.4, Helm 4.3 and 3.22, Kubernetes 1.37 and OpenShift 4.22 clients.
+description: Get code from a merge request to a running workload on Kubernetes or OpenShift, with GitLab CI/CD and Helm. Write and fix .gitlab-ci.yml for Python projects and monorepos, build shared CI components and templates, decide where a CI/CD variable or secret lives and why it has the value it has, discover every include and downstream pipeline behind a project, connect through the GitLab REST API and glab, write Dockerfiles and build images with Buildah, use the Helm CLI, write a generic Helm chart and publish it to a chart repository, deploy, promote and roll back releases, connect a pipeline to a cluster, make images and charts pass OpenShift's security constraints, and debug a failing pipeline, job, image or rollout from its evidence. Verified against GitLab 19.4, Helm 4.3 and 3.22, Kubernetes 1.37 and OpenShift 4.22 clients.
 ---
 
 # Deployment
@@ -29,7 +29,7 @@ needs several kinds in turn, such as Orient, then Pipeline, then Deploy.
 | **Variables** | decide where a value or secret lives; find why a variable has a wrong or empty value | `core/variables.md` |
 | **Chart** | write or change a Helm chart, a generic chart, or a chart repository | `core/chart-design.md` |
 | **Deploy** | deploy, promote or roll back a release; choose image tags | `core/deploy.md`, `core/images.md` |
-| **Access** | connect to GitLab (REST API, `glab`, GitLab's MCP server) and prove who you are; connect a pipeline to a cluster | `core/connect.md`, `core/access.md` |
+| **Access** | connect to GitLab (REST API, `glab`) and prove who you are; connect a pipeline to a cluster | `core/connect.md`, `core/access.md` |
 | **Debug** | a pipeline, job, image build, release or pod fails | `core/debug.md` |
 
 Before you say any change is done, load `core/verify.md`.
@@ -38,7 +38,7 @@ Before you say any change is done, load `core/verify.md`.
 
 | Folder | Holds |
 | --- | --- |
-| `gitlab/` | keywords, rules, variables, includes and components, downstream pipelines, environments, Python jobs, image builds, runners, job token, REST API, `glab`, GitLab's MCP server, and which GitLab version added what |
+| `gitlab/` | keywords, rules, variables, includes and components, downstream pipelines, environments, Python jobs, image builds, runners, job token, REST API, `glab`, GitLab's optional MCP server, and which GitLab version added what |
 | `containers/` | writing Dockerfiles; the Buildah CLI, its configuration and errors |
 | `helm/` | Helm 3 and 4 differences, the CLI, chart anatomy, templating, the generic chart, repositories, commands, hooks |
 | `kubernetes/` | workloads, configuration and secrets, security context, RBAC, debugging |
