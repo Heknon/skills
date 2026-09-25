@@ -1,0 +1,22 @@
+stages: [build, deploy]
+
+build-staging:
+  stage: build
+  image: registry.example.com/mirror/buildah/stable:v1.43
+  script:
+    - buildah build -t $CI_REGISTRY_IMAGE:latest .
+    - buildah push $CI_REGISTRY_IMAGE:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+deploy-staging:
+  stage: deploy
+  image:
+    name: registry.example.com/mirror/alpine/helm:4.3.0
+    entrypoint: [""]
+  script:
+    - helm upgrade --install web ./chart -n shop-staging --set image.tag=latest
+  environment:
+    name: staging
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"

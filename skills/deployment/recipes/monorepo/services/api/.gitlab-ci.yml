@@ -1,0 +1,53 @@
+# Child pipeline of services/api. Every job is prefixed with api so the names
+# stay unique when a person reads several child pipelines side by side.
+# Deploys only from the default branch: staging automatically, production by hand.
+# Needs File variables KUBECONFIG scoped to staging/* and production/*.
+stages: [test, build, deploy]
+
+include:
+  - component: $CI_SERVER_FQDN/platform/ci-components/python-checks@1.3.0
+    inputs:
+      job-prefix: api
+      working-directory: services/api
+      package: api
+      python-image: $PYTHON_IMAGE
+  - component: $CI_SERVER_FQDN/platform/ci-components/buildah-image@1.3.0
+    rules:
+      - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    inputs:
+      job-name: api-image
+      image: $CI_REGISTRY_IMAGE/api
+      # The build context is the workspace root: the service needs its libraries.
+      context: .
+      dockerfile: services/api/Dockerfile
+      build-args: UV_IMAGE=$PYTHON_IMAGE PYTHON_IMAGE=$BASE_IMAGE
+      buildah-image: $BUILDAH_IMAGE
+  - component: $CI_SERVER_FQDN/platform/ci-components/helm-deploy@1.3.0
+    rules:
+      - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    inputs:
+      job-name: api-deploy-staging
+      environment: staging/api
+      namespace: shop-staging
+      release: api
+      chart-version: 1.0.0
+      chart-project-id: "0"
+      image: $CI_REGISTRY_IMAGE/api
+      values-files: services/api/deploy/values.yaml services/api/deploy/values-staging.yaml
+      needs: [api-image]
+      helm-image: $HELM_IMAGE
+  - component: $CI_SERVER_FQDN/platform/ci-components/helm-deploy@1.3.0
+    rules:
+      - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    inputs:
+      job-name: api-deploy-production
+      environment: production/api
+      namespace: shop-production
+      release: api
+      chart-version: 1.0.0
+      chart-project-id: "0"
+      image: $CI_REGISTRY_IMAGE/api
+      values-files: services/api/deploy/values.yaml services/api/deploy/values-production.yaml
+      needs: [api-image, api-deploy-staging]
+      when: manual
+      helm-image: $HELM_IMAGE

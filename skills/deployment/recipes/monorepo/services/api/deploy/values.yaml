@@ -1,0 +1,4 @@
+# api is a worker: no Service, no probes.
+service:
+  enabled: false
+replicaCount: 1

@@ -1,0 +1,6 @@
+api-test:
+  image: $PYTHON_IMAGE
+  script:
+    - cd services/api
+    - uv sync --locked --package api
+    - uv run --no-sync pytest

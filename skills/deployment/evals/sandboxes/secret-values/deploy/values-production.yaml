@@ -1,0 +1,4 @@
+replicaCount: 3
+env:
+  LOG_LEVEL: warn
+  DATABASE_URL: postgresql://orders:Sup3rS3cret!@db.prod.internal:5432/orders

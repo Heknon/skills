@@ -1,0 +1,33 @@
+spec:
+  description: Build a Python package with uv and publish it to this project's GitLab PyPI registry, on a version tag.
+  inputs:
+    job-prefix:
+      default: python
+    stage:
+      default: publish
+    working-directory:
+      default: .
+    package:
+      description: Workspace member to build. Empty builds the project in working-directory.
+      default: ""
+    python-image:
+      default: registry.example.com/mirror/astral-sh/uv:0.12-python3.12-trixie-slim
+---
+"$[[ inputs.job-prefix ]]-publish":
+  stage: $[[ inputs.stage ]]
+  image: $[[ inputs.python-image ]]
+  rules:
+    - if: $CI_COMMIT_TAG
+  variables:
+    UV_PYTHON_DOWNLOADS: never
+    UV_PUBLISH_URL: $CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/pypi
+    UV_PUBLISH_USERNAME: gitlab-ci-token
+    PACKAGE: $[[ inputs.package ]]
+  script:
+    - cd "$[[ inputs.working-directory ]]"
+    - if [ -n "$PACKAGE" ]; then uv build --package "$PACKAGE" --out-dir dist; else uv build --out-dir dist; fi
+    # --check-url skips files the registry already has with the same hash, so a re-run does not
+    # fail with "File name has already been taken". The index needs the token too, in the URL.
+    - api_host="${CI_API_V4_URL#*://}"
+    - check_url="${CI_API_V4_URL%%://*}://gitlab-ci-token:${CI_JOB_TOKEN}@${api_host}/projects/${CI_PROJECT_ID}/packages/pypi/simple"
+    - UV_PUBLISH_PASSWORD="$CI_JOB_TOKEN" uv publish --check-url "$check_url" dist/*

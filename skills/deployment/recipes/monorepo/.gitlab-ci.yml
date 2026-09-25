@@ -1,0 +1,85 @@
+# Recipe: parent pipeline of a Python monorepo, a uv workspace with shared
+# libraries in packages/ and deployable services in services/.
+# Each unit has its own child pipeline file; the parent starts a unit's child
+# pipeline only when a path it depends on changed. Copy whole. Change: the
+# image variables, and one trigger job per unit with its own path list.
+#
+# When rules:changes compares, and with what:
+#   merge request pipeline      the merge request's changes against its target branch
+#   default branch pipeline     the commits of this push
+#   other branch pipeline       against the default branch, through compare_to
+#   tag, schedule, web or API   no comparison: every changes rule is true
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+# Forwarded to every child pipeline, since trigger:forward:yaml_variables is true by default.
+# In a child pipeline they arrive as pipeline variables, which outrank project, group and
+# instance variables: a project variable with the same name overrides them here, not there.
+variables:
+  PYTHON_IMAGE: registry.example.com/mirror/astral-sh/uv:0.12-python3.12-trixie-slim
+  BASE_IMAGE: registry.example.com/mirror/library/python:3.12-slim-trixie
+  BUILDAH_IMAGE: registry.example.com/mirror/buildah/stable:v1.43
+  HELM_IMAGE: registry.example.com/mirror/alpine/helm:4.3.0
+
+stages: [check, units]
+
+# The paths each unit depends on: its own folder, every workspace library it
+# imports, and the lock file. When a library changes, every unit using it runs.
+.paths:
+  common: &common-paths
+    - packages/common/**/*
+    - uv.lock
+    - pyproject.toml
+  api: &api-paths
+    - services/api/**/*
+    - packages/common/**/*
+    - uv.lock
+    - pyproject.toml
+
+# A pipeline whose rules match no job is not created, and a merge request that
+# needs a passing pipeline then cannot merge. This job keeps one in every pipeline.
+changed:
+  stage: check
+  image: $PYTHON_IMAGE
+  script:
+    - echo "pipeline for $CI_COMMIT_SHORT_SHA from $CI_PIPELINE_SOURCE"
+
+.unit:
+  stage: units
+  trigger:
+    # The trigger job takes the child pipeline's status.
+    strategy: mirror
+
+common:
+  extends: .unit
+  trigger:
+    include: packages/common/.gitlab-ci.yml
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: *common-paths
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: *common-paths
+    - if: $CI_COMMIT_BRANCH
+      changes:
+        paths: *common-paths
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
+
+api:
+  extends: .unit
+  trigger:
+    include: services/api/.gitlab-ci.yml
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes: *api-paths
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: *api-paths
+    - if: $CI_COMMIT_BRANCH
+      changes:
+        paths: *api-paths
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH

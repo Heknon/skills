@@ -1,0 +1,80 @@
+# Recipe: pipeline of the project that holds the generic chart in app/.
+# Copy whole. Change: HELM_IMAGE to your mirror.
+# Merge requests: lint and render with every app/ci/*-values.yaml, and refuse a
+# change to app/ without a new chart version. Tag vX.Y.Z: publish app-X.Y.Z to
+# this project's Helm repository, channel "stable".
+# Services add the repository with:
+#   echo "$CI_JOB_TOKEN" | helm repo add platform "$CI_API_V4_URL/projects/<this project id>/packages/helm/stable"
+#     --username gitlab-ci-token --password-stdin
+# and this project must list them under Settings > CI/CD > Job token permissions.
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+variables:
+  HELM_IMAGE: registry.example.com/mirror/alpine/helm:4.3.0
+  CHART_DIR: app
+
+stages: [test, publish]
+
+.helm:
+  image:
+    name: $HELM_IMAGE
+    # The image's entrypoint is helm; the runner needs a shell.
+    entrypoint: [""]
+
+lint:
+  extends: .helm
+  stage: test
+  script:
+    - |
+      for values in "$CHART_DIR"/ci/*-values.yaml; do
+        echo "== $values"
+        helm lint --strict "$CHART_DIR" -f "$values"
+        helm template ci "$CHART_DIR" -f "$values" > "rendered-$(basename "$values")"
+      done
+  artifacts:
+    paths: [rendered-*.yaml]
+    expire_in: 1 week
+
+version-bumped:
+  extends: .helm
+  stage: test
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  script:
+    - git fetch --depth=1 origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+    - |
+      target="origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+      if git diff --quiet "$target" -- "$CHART_DIR"; then
+        echo "$CHART_DIR/ unchanged"; exit 0
+      fi
+      old=$(git show "$target:$CHART_DIR/Chart.yaml" | yq '.version')
+      new=$(yq '.version' "$CHART_DIR/Chart.yaml")
+      if [ "$old" = "$new" ]; then
+        echo "$CHART_DIR/ changed but Chart.yaml version is still $new: bump it"; exit 1
+      fi
+      echo "chart version $old -> $new"
+
+publish:
+  extends: .helm
+  stage: publish
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+  script:
+    - version=$(yq '.version' "$CHART_DIR/Chart.yaml")
+    - |
+      if [ "v$version" != "$CI_COMMIT_TAG" ]; then
+        echo "tag $CI_COMMIT_TAG does not match Chart.yaml version $version"; exit 1
+      fi
+    - helm package "$CHART_DIR"
+    - chart=$(yq '.name' "$CHART_DIR/Chart.yaml")-$version.tgz
+    - >
+      curl --silent --show-error --fail-with-body --user "gitlab-ci-token:$CI_JOB_TOKEN"
+      --form "chart=@$chart"
+      "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/helm/api/stable/charts"

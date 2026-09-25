@@ -1,0 +1,7 @@
+include:
+  - local: ci/nested.yml
+build:
+  stage: build
+  extends: .nested-base
+  script:
+    - echo build

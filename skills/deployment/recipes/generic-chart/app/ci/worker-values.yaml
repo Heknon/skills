@@ -1,0 +1,8 @@
+# A worker: no Service, no probes, one replica.
+image:
+  repository: registry.example.com/team/worker
+  tag: 3f2a91c0d4e5b6a7c8d9e0f1a2b3c4d5e6f7a8b9
+replicaCount: 1
+service:
+  enabled: false
+args: ["python", "-m", "app.worker"]

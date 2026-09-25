@@ -1,0 +1,11 @@
+# Values shared by every environment. The pipeline sets image.repository, image.tag and image.digest.
+env:
+  GREETING_NAME: web
+probes:
+  path: /healthz
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi

@@ -1,0 +1,83 @@
+{
+  "valid": true,
+  "errors": [],
+  "warnings": [],
+  "includes": [
+    {
+      "type": "local",
+      "location": "ci/build.yml",
+      "blob": "http://gitlab.example.com/lab/discover/-/blob/ce3913a5047023c1e545e38d66b2938d23df9042/ci/build.yml",
+      "raw": "http://gitlab.example.com/lab/discover/-/raw/ce3913a5047023c1e545e38d66b2938d23df9042/ci/build.yml",
+      "extra": {},
+      "context_project": "lab/discover",
+      "context_sha": "ce3913a5047023c1e545e38d66b2938d23df9042"
+    },
+    {
+      "type": "file",
+      "location": "python.yml",
+      "blob": "http://gitlab.example.com/platform/templates/-/blob/a63b844eb2160624f07b8895b7ccecf2074e482e/python.yml",
+      "raw": "http://gitlab.example.com/platform/templates/-/raw/a63b844eb2160624f07b8895b7ccecf2074e482e/python.yml",
+      "extra": {
+        "project": "platform/templates",
+        "ref": "v1.0.0"
+      },
+      "context_project": "lab/discover",
+      "context_sha": "ce3913a5047023c1e545e38d66b2938d23df9042"
+    },
+    {
+      "type": "file",
+      "location": "common.yml",
+      "blob": "http://gitlab.example.com/platform/templates/-/blob/f26c2bf2ed0e4befc020e4c355331ca11b2ddfd0/common.yml",
+      "raw": "http://gitlab.example.com/platform/templates/-/raw/f26c2bf2ed0e4befc020e4c355331ca11b2ddfd0/common.yml",
+      "extra": {
+        "project": "platform/templates",
+        "ref": "HEAD"
+      },
+      "context_project": "lab/discover",
+      "context_sha": "ce3913a5047023c1e545e38d66b2938d23df9042"
+    },
+    {
+      "type": "component",
+      "location": "gitlab.example.com/platform/ci-components/python-checks@1.3.0",
+      "blob": "http://gitlab.example.com/platform/ci-components/-/blob/08725cb6f25b9fa91a8a1ef6ca43e8c30cb98a43/templates/python-checks.yml",
+      "raw": null,
+      "extra": {},
+      "context_project": "lab/discover",
+      "context_sha": "ce3913a5047023c1e545e38d66b2938d23df9042"
+    },
+    {
+      "type": "local",
+      "location": "ci/deploy.yml",
+      "blob": "http://gitlab.example.com/lab/discover/-/blob/ce3913a5047023c1e545e38d66b2938d23df9042/ci/deploy.yml",
+      "raw": "http://gitlab.example.com/lab/discover/-/raw/ce3913a5047023c1e545e38d66b2938d23df9042/ci/deploy.yml",
+      "extra": {
+        "rules": [
+          {
+            "if": "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+          }
+        ]
+      },
+      "context_project": "lab/discover",
+      "context_sha": "ce3913a5047023c1e545e38d66b2938d23df9042"
+    },
+    {
+      "type": "local",
+      "location": "ci/nested.yml",
+      "blob": "http://gitlab.example.com/lab/discover/-/blob/ce3913a5047023c1e545e38d66b2938d23df9042/ci/nested.yml",
+      "raw": "http://gitlab.example.com/lab/discover/-/raw/ce3913a5047023c1e545e38d66b2938d23df9042/ci/nested.yml",
+      "extra": {},
+      "context_project": "lab/discover",
+      "context_sha": "ce3913a5047023c1e545e38d66b2938d23df9042"
+    },
+    {
+      "type": "local",
+      "location": "common.yml",
+      "blob": "http://gitlab.example.com/platform/templates/-/blob/a63b844eb2160624f07b8895b7ccecf2074e482e/common.yml",
+      "raw": "http://gitlab.example.com/platform/templates/-/raw/a63b844eb2160624f07b8895b7ccecf2074e482e/common.yml",
+      "extra": {},
+      "context_project": "platform/templates",
+      "context_sha": "a63b844eb2160624f07b8895b7ccecf2074e482e"
+    }
+  ],
+  "merged_yaml": "---\n\".nested-base\":\n  tags: []\n  variables:\n    NESTED: '1'\nbuild:\n  tags: []\n  variables:\n    NESTED: '1'\n  stage: build\n  extends: \".nested-base\"\n  script:\n  - echo build\n\".common-base\":\n  interruptible: true\n  variables:\n    FROM_COMMON: 'yes'\n\".login\":\n  script:\n  - echo \"login step\"\n\".python-base\":\n  interruptible: true\n  variables:\n    FROM_COMMON: 'yes'\n  extends: \".common-base\"\n  image: \"$PYTHON_IMAGE\"\n  before_script:\n  - echo \"python-base setup\"\n\".disc-uv\":\n  image: \"$PYTHON_IMAGE\"\n  stage: test\n  interruptible: true\n  variables:\n    UV_CACHE_DIR: \"$CI_PROJECT_DIR/.uv-cache\"\n    UV_LINK_MODE: copy\n    UV_PYTHON_DOWNLOADS: never\n    PACKAGE: ''\n  cache:\n    key: uv-disc\n    paths:\n    - \".uv-cache\"\n  before_script:\n  - cd \".\"\n  - if [ -n \"$PACKAGE\" ]; then uv sync --locked --package \"$PACKAGE\"; else uv sync\n    --locked; fi\n  after_script:\n  - uv cache prune --ci\ndisc-lint:\n  image: \"$PYTHON_IMAGE\"\n  stage: test\n  interruptible: true\n  variables:\n    UV_CACHE_DIR: \"$CI_PROJECT_DIR/.uv-cache\"\n    UV_LINK_MODE: copy\n    UV_PYTHON_DOWNLOADS: never\n    PACKAGE: ''\n    RUFF: true\n  cache:\n    key: uv-disc\n    paths:\n    - \".uv-cache\"\n  before_script:\n  - cd \".\"\n  - if [ -n \"$PACKAGE\" ]; then uv sync --locked --package \"$PACKAGE\"; else uv sync\n    --locked; fi\n  after_script:\n  - uv cache prune --ci\n  extends: \".disc-uv\"\n  rules:\n  - if: $RUFF == \"true\"\n  script:\n  - uv run --no-sync ruff check .\n  - uv run --no-sync ruff format --check .\ndisc-test:\n  image: \"$PYTHON_IMAGE\"\n  stage: test\n  interruptible: true\n  variables:\n    UV_CACHE_DIR: \"$CI_PROJECT_DIR/.uv-cache\"\n    UV_LINK_MODE: copy\n    UV_PYTHON_DOWNLOADS: never\n    PACKAGE: ''\n  cache:\n    key: uv-disc\n    paths:\n    - \".uv-cache\"\n  before_script:\n  - cd \".\"\n  - if [ -n \"$PACKAGE\" ]; then uv sync --locked --package \"$PACKAGE\"; else uv sync\n    --locked; fi\n  after_script:\n  - uv cache prune --ci\n  extends: \".disc-uv\"\n  script:\n  - uv run --no-sync pytest --junitxml=\"$CI_PROJECT_DIR/report-disc.xml\"\n  artifacts:\n    when: always\n    reports:\n      junit:\n      - report-disc.xml\ndeploy:\n  stage: deploy\n  script:\n  - echo deploy\nstages:\n- \".pre\"\n- test\n- build\n- deploy\n- downstream\n- \".post\"\nunit:\n  interruptible: true\n  variables:\n    FROM_COMMON: 'yes'\n  extends: \".python-base\"\n  image: \"$PYTHON_IMAGE\"\n  before_script:\n  - echo \"python-base setup\"\n  stage: test\n  script:\n  - - echo \"login step\"\n  - echo \"unit tests\"\nchild:\n  stage: downstream\n  trigger:\n    include: ci/child.yml\n    strategy: mirror\ngenerate:\n  stage: build\n  script:\n  - printf 'generated-job:\\n  script:\\n    - echo generated\\n' > generated.yml\n  artifacts:\n    paths:\n    - generated.yml\ndynamic-child:\n  stage: downstream\n  needs:\n  - generate\n  trigger:\n    include:\n    - artifact: generated.yml\n      job: generate\n    strategy: mirror\ncharts-pipeline:\n  stage: downstream\n  trigger:\n    project: platform/charts\n    branch: main\n"
+}

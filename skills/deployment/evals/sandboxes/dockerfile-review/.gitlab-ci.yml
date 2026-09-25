@@ -1,0 +1,12 @@
+build-image:
+  stage: build
+  image: registry.example.com/mirror/buildah/stable:v1.43
+  variables:
+    STORAGE_DRIVER: vfs
+    BUILDAH_ISOLATION: chroot
+  script:
+    - echo "$CI_REGISTRY_PASSWORD" | buildah login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - buildah build --build-arg PIP_TOKEN="$PIP_TOKEN" -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA" .
+    - buildah push "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA"
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

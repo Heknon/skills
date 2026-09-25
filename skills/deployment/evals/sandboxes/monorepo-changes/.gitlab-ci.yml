@@ -1,0 +1,26 @@
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+
+stages: [units]
+
+api:
+  stage: units
+  trigger:
+    include: services/api/.gitlab-ci.yml
+    strategy: mirror
+  rules:
+    - changes:
+        - services/api/**/*
+
+worker:
+  stage: units
+  trigger:
+    include: services/worker/.gitlab-ci.yml
+    strategy: mirror
+  rules:
+    - changes:
+        - services/worker/**/*

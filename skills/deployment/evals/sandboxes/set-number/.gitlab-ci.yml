@@ -1,0 +1,15 @@
+deploy-staging:
+  stage: deploy
+  image:
+    name: registry.example.com/mirror/alpine/helm:4.3.0
+    entrypoint: [""]
+  environment:
+    name: staging
+  script:
+    - helm upgrade --install web platform/app --version 1.0.0 -n shop-staging
+      -f deploy/values.yaml
+      --set image.repository=$CI_REGISTRY_IMAGE
+      --set image.tag=$CI_COMMIT_SHORT_SHA
+      --wait --rollback-on-failure
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

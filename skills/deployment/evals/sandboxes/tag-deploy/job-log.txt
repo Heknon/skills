@@ -1,0 +1,11 @@
+Running with gitlab-runner 19.4.1 (3c39fceb)
+  on shared-docker-1 Qk3m9qUA8, system ID: r_vEP6F6DCd35c
+Preparing the "docker" executor
+Using Docker executor with image registry.example.com/mirror/alpine/helm:4.3.0 ...
+Getting source from Git repository
+Checking out 8c1d2e4f as detached HEAD (ref is v1.4.0)...
+Executing "step_script" stage of the job script
+$ helm upgrade --install web ./chart -n shop-production --wait --rollback-on-failure
+Error: kubernetes cluster unreachable: Get "http://localhost:8080/version": dial tcp 127.0.0.1:8080: connect: connection refused
+Cleaning up project directory and file based variables
+ERROR: Job failed: exit code 1

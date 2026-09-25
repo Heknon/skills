@@ -1,0 +1,4 @@
+.nested-base:
+  tags: []
+  variables:
+    NESTED: "1"

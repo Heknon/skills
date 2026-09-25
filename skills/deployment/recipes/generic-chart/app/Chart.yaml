@@ -1,0 +1,10 @@
+apiVersion: v2
+name: app
+description: Generic chart for a stateless service, a worker or scheduled jobs. Each service deploys it with its own values files.
+type: application
+# Bump on every change to this chart, following semantic versioning:
+# a new optional value is a minor bump, a renamed or removed value is a major bump.
+version: 1.0.0
+# Not used by the templates; each service sets image.tag or image.digest.
+appVersion: "0"
+kubeVersion: ">=1.27.0-0"

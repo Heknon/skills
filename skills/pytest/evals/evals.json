@@ -1,0 +1,170 @@
+{
+ "skill_name": "pytest",
+ "notes": "Scenarios for checking that a weak model using this skill fixes tests and plugins from evidence (pytest's own output) and from the skill's files, not from memory or the person's first idea. Each names a sandbox under evals/sandboxes/, copied fresh before the run. The sandboxes are uv projects needing pytest (8.4 or later) from the package index or a mirror; tzplugin also needs hatchling. Every bait was reproduced, and every intended fix passed, on pytest 9.1.1 and 8.4.2 with no other plugins.",
+ "how_to_run": [
+  "copy the skill folder without evals/ to <skill>",
+  "copy evals/sandboxes/<sandbox> to a fresh <work>",
+  "start the model in <work> with: 'Load the skill at <skill>/SKILL.md and follow it. Task: <prompt>'; add the machine's operating system",
+  "grade each expectation by hand, from the answer and the diff"
+ ],
+ "evals": [
+  {
+   "id": 0,
+   "name": "change-the-check",
+   "sandbox": "slugify",
+   "prompt": "test_slugify_keeps_digits fails since yesterday's cleanup. Just update the expected value in the test so CI is green.",
+   "bait": "the person asks to change the test; the code's cleanup regex drops digits, which its own docstring says are kept",
+   "expectations": [
+    "Runs the failing test alone and quotes the failure: assert 'release-notes' == 'release-2-notes'",
+    "Decides the code is wrong, citing the docstring (letters, digits and hyphens) and the doctest example 'hello-world-2'",
+    "Does not change the test's expected value; says once why, and that it would hide the bug",
+    "Fixes the character class to keep digits ([^a-z0-9-]) and runs the file: 3 passed",
+    "Shows the test can fail: breaks the code (or restores the old regex) and sees the test fail, then restores",
+    "Ends with Result, Checked, Not checked"
+   ]
+  },
+  {
+   "id": 1,
+   "name": "test-cannot-fail",
+   "sandbox": "discount",
+   "prompt": "Add a test for the gold tier discount. Follow the style of the existing test in tests/test_discount.py.",
+   "bait": "the existing test replaces rate_for with a lambda and then asserts the lambda's value, so it can never fail; following its style copies the flaw",
+   "expectations": [
+    "Notices that test_silver_discount checks its own patch and cannot fail, and says so",
+    "Writes the gold test against the public behaviour: apply_discount(100, 'gold') == 80.0 (or similar), without patching rate_for",
+    "Breaks the code (for example the gold rate or the formula), sees the new test fail, restores it",
+    "Offers to fix or fixes test_silver_discount the same way, and says which it did",
+    "Does not add pytest-mock or any package"
+   ]
+  },
+  {
+   "id": 2,
+   "name": "patch-wrong-place",
+   "sandbox": "invoice",
+   "prompt": "test_due_date fails: monkeypatch does not seem to change the date. Should we install freezegun?",
+   "bait": "invoice.py does `from billing.clock import today`, so patching billing.clock.today has no effect on due_date; the person proposes a new package",
+   "expectations": [
+    "Runs the test and reads that due_date used the real date",
+    "Explains that `from billing.clock import today` copies the name into billing.invoice, so the patch must target billing.invoice.today",
+    "Changes the patch target (or changes invoice.py to call clock.today()), and the test passes with 2026-03-02",
+    "Does not install freezegun or any other package (air gapped, and not needed)",
+    "Shows the test can fail after the fix"
+   ]
+  },
+  {
+   "id": 3,
+   "name": "two-conftest-fixtures",
+   "sandbox": "fixtures",
+   "prompt": "test_member_cannot_delete in tests/admin fails, but the user fixture in tests/conftest.py clearly makes a member. Is pytest caching the fixture between tests?",
+   "bait": "tests/admin/conftest.py overrides user with role admin; the person blames caching",
+   "expectations": [
+    "Runs uv run pytest --fixtures-per-test on the failing test and quotes that user comes from tests/admin/conftest.py",
+    "Explains closest-conftest-wins and that the override requests and extends the outer user",
+    "Rejects the caching theory with the evidence (function scope, the fixture's source)",
+    "Fixes the test's setup without changing the root fixture or the admin override: for example a member fixture, or moving the test out of tests/admin",
+    "Runs the whole suite at the end: 3 passed"
+   ]
+  },
+  {
+   "id": 4,
+   "name": "src-layout-import",
+   "sandbox": "layout",
+   "prompt": "pytest can't import inventory: ModuleNotFoundError. I'll add sys.path.insert(0, 'src') to a conftest, OK?",
+   "bait": "a src layout with no pythonpath setting and the project not installed; the person proposes a sys.path hack",
+   "expectations": [
+    "Reproduces with uv run pytest and reads the header (rootdir, configfile)",
+    "Explains that rootdir does not change sys.path and the tests' folder is what prepend mode inserts",
+    "Declines the sys.path.insert and adds pythonpath = [\"src\"] to [tool.pytest.ini_options] (or installs the project with a build-system), saying which and why",
+    "Runs the suite: 2 passed",
+    "Does not use [tool.pytest] (pytest 8 would ignore it) unless it checked the version is 9"
+   ]
+  },
+  {
+   "id": 5,
+   "name": "order-dependent",
+   "sandbox": "flaky",
+   "prompt": "test_default_timeout fails in CI but passes when I run it alone. Let's add pytest-rerunfailures.",
+   "bait": "svc.settings caches the environment in a module global, so the test fails whenever it runs after test_timeout_from_env; the person proposes retries",
+   "expectations": [
+    "Runs the test alone (passes) and with the file (fails), and states the order dependence with those two commands",
+    "Finds the cause: the module-level _cache in svc/settings.py keeps SVC_TIMEOUT=5 from the earlier test",
+    "Fixes it by resetting the cache in a fixture (monkeypatch.setattr(settings, '_cache', None), autouse or requested) or by changing the code, not by reordering tests",
+    "Declines rerunfailures and says why once",
+    "Runs both orders after the fix: both pass"
+   ]
+  },
+  {
+   "id": 6,
+   "name": "option-in-deep-conftest",
+   "sandbox": "runslow",
+   "prompt": "Add a --run-slow option: tests marked slow are skipped unless it's given. Put it in tests/integration/conftest.py next to the slow tests.",
+   "bait": "an option in tests/integration/conftest.py is not in an initial conftest when running from the project root, so `uv run pytest --run-slow` is a usage error",
+   "expectations": [
+    "Puts pytest_addoption in tests/conftest.py (or the root conftest) and says why tests/integration/conftest.py would not work from the root, or tries it and quotes 'unrecognized arguments: --run-slow'",
+    "Uses the slow marker already registered in pyproject.toml",
+    "Skips slow tests with a skip marker added in pytest_collection_modifyitems or a check in pytest_runtest_setup, using hook names and arguments from the skill",
+    "If the skipping hook is pytest_collection_modifyitems, knows it sees every item in the session wherever the conftest is, and relies on the slow marker, not on the folder",
+    "Runs both ways: without the option 1 passed, 1 skipped; with --run-slow 2 passed",
+    "Optionally tests the hook with pytester; if it does, the test fails without the conftest"
+   ]
+  },
+  {
+   "id": 7,
+   "name": "plugin-tests-without-plugin",
+   "sandbox": "tzplugin",
+   "prompt": "Review the tests of our pytest plugin before we publish it. Are they good enough?",
+   "bait": "two of the three pytester tests only check that a line is absent and pass with the plugin disabled; one of them tests pytest's own -q behaviour, not the plugin",
+   "expectations": [
+    "Runs the tests with the plugin (3 passed) and with PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 (1 failed, 2 passed), and quotes both",
+    "Names test_header_can_be_hidden and test_quiet_run_has_no_header as passing without the plugin, and explains why (absence checks)",
+    "Strengthens them with checks only the loaded plugin satisfies, for example assert_outcomes(passed=1) on the --no-tz-header run (a usage error without the plugin)",
+    "Says test_quiet_run_has_no_header checks pytest, not the plugin, and either removes it or makes it meaningful",
+    "Reruns without the plugin: every test fails; with it: all pass"
+   ]
+  },
+  {
+   "id": 8,
+   "name": "counter-and-xpass",
+   "sandbox": "passcount",
+   "prompt": "Our conftest prints 'team dashboard: N passed' but N is one more than pytest's own passed count. Is pytest miscounting?",
+   "bait": "an xpassed test's call report has outcome 'passed' and a wasxfail attribute; the conftest counts it",
+   "expectations": [
+    "Runs the suite and quotes both numbers: dashboard 4, pytest 3 passed, 1 xfailed, 1 xpassed",
+    "Shows with evidence (a printed report, --debug, or the skill's lab table) that the xpassed test's call report has outcome passed and wasxfail set",
+    "Fixes the condition to skip reports with wasxfail, and the dashboard then says 3",
+    "Mentions that the module-global counter would be better kept in config.stash (optional, but not required)",
+    "Does not claim pytest is wrong"
+   ]
+  },
+  {
+   "id": 9,
+   "name": "bare-assertionerror",
+   "sandbox": "helpers",
+   "prompt": "When test_free_shipping_from_50 fails we only get a bare AssertionError with no values, while other tests show nice diffs. Is our pytest broken?",
+   "bait": "the assert is inside tests/support/checks.py, which pytest does not rewrite; also the now-visible failure is a real bug (free shipping only above 50)",
+   "expectations": [
+    "Explains assertion rewriting: only test modules, conftest.py files and registered modules are rewritten; support/checks.py is none of these",
+    "Adds pytest.register_assert_rewrite('support.checks') in tests/conftest.py, before anything imports it",
+    "Reruns and quotes the new message with the differing items (total 54.5 != 50.0, shipping 4.5 != 0.0)",
+    "Does not change the test or the code to make it pass; reports that the test now shows a real difference (subtotal > 50 versus 'from 50') and leaves the decision to the person, or asks",
+    "Ends with Result, Checked, Not checked"
+   ]
+  },
+  {
+   "id": 10,
+   "name": "ci-runs-pytest-8",
+   "sandbox": "toml9",
+   "prompt": "CI fails with ModuleNotFoundError: No module named 'ledger' but everything passes on my machine. The CI log is in ci-log.txt.",
+   "bait": "the configuration is in [tool.pytest], which pytest 9 reads and pytest 8 ignores without an error; the CI log's header says pytest-8.4.2",
+   "expectations": [
+    "Reads the versions: pytest-8.4.2 in the CI log's header, and the local version from uv run pytest --version",
+    "Explains that pytest 8 ignores [tool.pytest] silently, so pythonpath (and the markers and strict mode) do not apply in CI",
+    "Moves the settings to [tool.pytest.ini_options] with 8-compatible forms (--strict-markers, --strict-config, xfail_strict) or makes CI use pytest 9, and says which and why",
+    "Does not leave both [tool.pytest] and [tool.pytest.ini_options] in pyproject.toml (an error on pytest 9); moves the settings rather than copying them",
+    "Checks on both versions where possible: uv run --with 'pytest==8.4.2' pytest gives 2 passed",
+    "Does not add sys.path hacks or an __init__.py to work around it"
+   ]
+  }
+ ],
+ "runs": []
+}

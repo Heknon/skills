@@ -1,0 +1,36 @@
+{{- if .Values.route.enabled }}
+{{- if not .Values.service.enabled }}
+{{- fail "route.enabled needs service.enabled" }}
+{{- end }}
+{{- if .Values.ingress.enabled }}
+{{- fail "enable route or ingress, not both" }}
+{{- end }}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ include "app.fullname" . }}
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+  {{- with .Values.route.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.route.host }}
+  host: {{ . }}
+  {{- end }}
+  {{- with .Values.route.path }}
+  path: {{ . }}
+  {{- end }}
+  to:
+    kind: Service
+    name: {{ include "app.fullname" . }}
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: {{ .Values.route.termination }}
+    {{- if ne .Values.route.termination "passthrough" }}
+    insecureEdgeTerminationPolicy: {{ .Values.route.insecureEdgeTerminationPolicy }}
+    {{- end }}
+{{- end }}

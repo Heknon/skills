@@ -1,0 +1,17 @@
+[project]
+name = "app"
+version = "0.1.0"
+requires-python = ">=3.10"
+
+# Works on pytest 8 and 9. Values are strings or lists of strings, as in
+# an ini file. pytest 8 does not read [tool.pytest]; keep this table.
+[tool.pytest.ini_options]
+minversion = "8.4"
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = ["--strict-markers", "--strict-config", "-ra"]
+xfail_strict = true
+markers = [
+    "slow: slow tests, deselect with -m 'not slow'",
+]
+filterwarnings = ["error"]

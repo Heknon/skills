@@ -1,0 +1,115 @@
+# Values of the generic app chart. Every key is described in values.schema.json,
+# which rejects unknown keys, so a typo fails at install time instead of being ignored.
+
+# -- Replaces the release name in object names. Leave empty to use the release name.
+fullnameOverride: ""
+
+image:
+  # -- Registry and path, without tag. Required.
+  repository: ""
+  # -- Immutable tag, such as the commit SHA. Used when digest is empty.
+  tag: ""
+  # -- sha256:... digest. When set, it is used instead of tag.
+  digest: ""
+  pullPolicy: IfNotPresent
+
+# -- Names of existing Secrets of type kubernetes.io/dockerconfigjson.
+imagePullSecrets: []
+
+# -- Ignored when autoscaling.enabled is true.
+replicaCount: 2
+
+# -- Overrides the image ENTRYPOINT. Empty keeps the image's.
+command: []
+# -- Overrides the image CMD. Empty keeps the image's.
+args: []
+
+# -- Port the container listens on. Must be 1024 or higher on OpenShift.
+containerPort: 8080
+
+# -- Plain environment variables, name: value. Values are strings.
+env: {}
+# -- Names of existing Secrets whose keys all become environment variables.
+envFromSecrets: []
+# -- Files mounted under config.mountPath from a ConfigMap this chart creates.
+#    A change here restarts the pods through a checksum annotation.
+config:
+  files: {}
+  mountPath: /etc/app
+
+service:
+  # -- false for a worker that takes no traffic.
+  enabled: true
+  port: 8080
+
+# -- OpenShift Route. Use this or ingress, not both.
+route:
+  enabled: false
+  # -- Empty lets OpenShift generate <route>-<namespace>.<apps domain>.
+  host: ""
+  path: ""
+  # -- edge, reencrypt or passthrough.
+  termination: edge
+  insecureEdgeTerminationPolicy: Redirect
+  annotations: {}
+
+# -- Kubernetes Ingress, for clusters without Routes.
+ingress:
+  enabled: false
+  className: ""
+  host: ""
+  path: /
+  # -- Name of an existing TLS Secret. Empty serves HTTP only.
+  tlsSecretName: ""
+  annotations: {}
+
+probes:
+  # -- Path answered with 200 when the process can serve. Empty disables HTTP probes.
+  path: /healthz
+  # -- Path answered with 200 when the process is alive. Defaults to probes.path.
+  livenessPath: ""
+  # -- Seconds the process may take to start before liveness applies.
+  startupSeconds: 60
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 75
+
+# -- A PodDisruptionBudget with maxUnavailable 1, created when more than one replica can run.
+podDisruptionBudget:
+  enabled: true
+
+serviceAccount:
+  # -- Create a ServiceAccount named after the release.
+  create: false
+  # -- Existing ServiceAccount to use when create is false. Empty uses "default".
+  name: ""
+
+# -- Seconds between SIGTERM and SIGKILL. Must exceed the longest request.
+terminationGracePeriodSeconds: 30
+
+# -- A Job run before install and upgrade, with the same image and env, such as database migrations.
+migration:
+  enabled: false
+  command: []
+  args: []
+  # -- Seconds before the Job, and so the release, fails.
+  activeDeadlineSeconds: 600
+
+# -- Scheduled jobs with the same image and env. name: {schedule, command, args}.
+cronJobs: {}
+
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

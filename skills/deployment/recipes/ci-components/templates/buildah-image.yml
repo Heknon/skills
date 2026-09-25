@@ -1,0 +1,61 @@
+spec:
+  description: Build an image with rootless Buildah once per commit, push it tagged with the commit SHA, and pass its digest to later jobs as IMAGE_DIGEST.
+  inputs:
+    job-name:
+      default: build-image
+    stage:
+      default: build
+    image:
+      description: Image repository without tag, such as $CI_REGISTRY_IMAGE or $CI_REGISTRY_IMAGE/api.
+      default: $CI_REGISTRY_IMAGE
+    context:
+      description: Build context folder, relative to the repository root.
+      default: .
+    dockerfile:
+      description: Path of the Dockerfile, relative to the repository root.
+      default: Dockerfile
+    build-args:
+      description: Extra build arguments, NAME=value separated by spaces. Values cannot contain spaces.
+      default: ""
+    buildah-image:
+      default: registry.example.com/mirror/buildah/stable:v1.43
+    dotenv-prefix:
+      description: Prefix of the variable holding the digest, so several images in one pipeline do not collide. The variable is <prefix>IMAGE_DIGEST.
+      default: ""
+---
+"$[[ inputs.job-name ]]":
+  stage: $[[ inputs.stage ]]
+  image: $[[ inputs.buildah-image ]]
+  variables:
+    STORAGE_DRIVER: vfs
+    BUILDAH_ISOLATION: chroot
+    BUILDAH_FORMAT: docker
+    TARGET: $[[ inputs.image ]]
+    BUILD_ARGS: $[[ inputs.build-args ]]
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | buildah login --username "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+  script:
+    - |
+      if buildah pull --quiet "$TARGET:$CI_COMMIT_SHA" > /dev/null 2>&1; then
+        echo "image $TARGET:$CI_COMMIT_SHA exists, not rebuilding"
+      else
+        secrets=""
+        if [ -n "$INTERNAL_CA" ]; then secrets="$secrets --secret id=ca,src=$INTERNAL_CA"; fi
+        if [ -n "$INDEX_NETRC" ]; then secrets="$secrets --secret id=netrc,src=$INDEX_NETRC"; fi
+        args=""
+        for a in $BUILD_ARGS; do args="$args --build-arg $a"; done
+        # --layers with a cache repository: unchanged steps (the dependency install)
+        # are reused from earlier pipelines; Buildah caches nothing by default.
+        buildah build --layers --cache-from "$TARGET/cache" --cache-to "$TARGET/cache" $secrets $args \
+          --file "$[[ inputs.dockerfile ]]" \
+          --label org.opencontainers.image.revision="$CI_COMMIT_SHA" \
+          --label org.opencontainers.image.source="$CI_PROJECT_URL" \
+          --tag "$TARGET:$CI_COMMIT_SHA" "$[[ inputs.context ]]"
+      fi
+    - buildah push --digestfile image.digest "$TARGET:$CI_COMMIT_SHA"
+    - if [ -n "$CI_COMMIT_TAG" ]; then buildah push "$TARGET:$CI_COMMIT_SHA" "docker://$TARGET:$CI_COMMIT_TAG"; fi
+    - echo "$[[ inputs.dotenv-prefix ]]IMAGE_DIGEST=$(cat image.digest)" > image.env
+    - cat image.env
+  artifacts:
+    reports:
+      dotenv: image.env
