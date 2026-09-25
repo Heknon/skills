@@ -30,6 +30,13 @@ spec:
 - `backoffLimit: 0`: a migration is not retried blindly.
 - Hooks wait on `--timeout`, per hook; set it above the migration's
   longest run.
+- On a first install, `pre-install` runs before any other object of the
+  release exists. The chart's migration Job therefore uses the `default`
+  ServiceAccount (not the one the chart creates) and does not mount the
+  chart's ConfigMap; it gets `env` and `envFromSecrets`, whose Secrets
+  exist before the release. *lab:* when it used the chart's own
+  ServiceAccount, the first install timed out with `error looking up
+  service account mig-test/full: serviceaccount "full" not found`.
 
 ## Hook points
 

@@ -65,11 +65,11 @@ skill uses. `helm/versions.md` has the Helm 3 and Helm 4 flag differences.
 When a fact is not in this skill, the instance's own documentation for its
 exact version is the next source, at `https://<gitlab>/help/<path>.md`,
 such as `/help/ci/yaml/_index.md`. By default `/help` redirects to
-docs.gitlab.com, which an air-gapped network cannot reach. An
-administrator makes the instance serve the pages itself by emptying
+docs.gitlab.com, which an air-gapped network cannot reach. Ask an
+administrator to make the instance serve the pages itself by emptying
 **Admin > Settings > Preferences > Help page > Documentation pages URL**
-(verified on 19.4; the change takes about a minute). If neither works,
-say the fact is unverified instead of recalling it.
+(verified on 19.4; it takes effect in about a minute); never change it
+yourself. Without it, say the fact is unverified instead of recalling it.
 
 ## Invariants
 

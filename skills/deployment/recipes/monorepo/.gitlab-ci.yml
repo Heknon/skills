@@ -68,7 +68,7 @@ common:
     - if: $CI_COMMIT_BRANCH
       changes:
         paths: *common-paths
-        compare_to: refs/heads/main
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH
 
 api:
   extends: .unit
@@ -82,4 +82,4 @@ api:
     - if: $CI_COMMIT_BRANCH
       changes:
         paths: *api-paths
-        compare_to: refs/heads/main
+        compare_to: refs/heads/$CI_DEFAULT_BRANCH

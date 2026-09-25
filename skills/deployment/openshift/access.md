@@ -4,10 +4,11 @@
 
 The same deployer as on Kubernetes (`core/access.md`,
 `recipes/cluster-access/deployer.yaml`), applied with `oc apply -n
-<project> -f deployer.yaml` by a project admin. On OpenShift 4.11 and
-later, a service account no longer gets a long-lived token Secret by
-itself; the recipe's `kubernetes.io/service-account-token` Secret asks
-for one.
+<project> -f deployer.yaml` by a project admin. Recent Kubernetes and
+OpenShift versions no longer create a long-lived token Secret for every
+service account (Kubernetes from 1.24; OpenShift later, around 4.16, not
+checked here); the recipe's `kubernetes.io/service-account-token` Secret
+asks for one, and works either way.
 
 - `oc create token gitlab-deployer -n <p> --duration=...` makes a
   short-lived token; useful for a test, not for a stored variable.
@@ -31,17 +32,20 @@ for one.
 
 A pull secret, created by a person with rights, once per project:
 
-```
+```powershell
+$s = Read-Host -AsSecureString "deploy token"
+$pw = [Net.NetworkCredential]::new("", $s).Password
 oc create secret docker-registry gitlab-pull -n <p> `
   --docker-server=registry.gitlab.example.com `
-  --docker-username=<deploy token username> --docker-password=<deploy token>
+  --docker-username=<deploy token username> --docker-password=$pw
+Remove-Variable pw, s
 oc secrets link default gitlab-pull --for=pull -n <p>
 ```
 
-(PowerShell continues lines with a backtick.) Linking it to `default`
-makes every pod of that service account use it; the alternative is the
-chart's `imagePullSecrets: [gitlab-pull]`. The token then sits in the
-shell history: type it at a prompt or clear the history after.
+(PowerShell continues lines with a backtick.) The token is typed at a
+prompt, so it is neither in the command history nor in a file. Linking
+the Secret to `default` makes every pod of that service account use it;
+the alternative is the chart's `imagePullSecrets: [gitlab-pull]`.
 
 ## The internal registry
 

@@ -26,4 +26,8 @@ spec:
   script:
     - cd "$[[ inputs.working-directory ]]"
     - if [ -n "$PACKAGE" ]; then uv build --package "$PACKAGE" --out-dir dist; else uv build --out-dir dist; fi
-    - UV_PUBLISH_PASSWORD="$CI_JOB_TOKEN" uv publish dist/*
+    # --check-url skips files the registry already has with the same hash, so a re-run does not
+    # fail with "File name has already been taken". The index needs the token too, in the URL.
+    - api_host="${CI_API_V4_URL#*://}"
+    - check_url="${CI_API_V4_URL%%://*}://gitlab-ci-token:${CI_JOB_TOKEN}@${api_host}/projects/${CI_PROJECT_ID}/packages/pypi/simple"
+    - UV_PUBLISH_PASSWORD="$CI_JOB_TOKEN" uv publish --check-url "$check_url" dist/*

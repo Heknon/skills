@@ -97,10 +97,11 @@ rules:
 | any, with `compare_to: <ref>` | that ref |
 
 - Globs: `**` crosses folders; `dir/**/*` matches every file under `dir`.
-- `compare_to` takes a branch (`refs/heads/main`), tag or SHA; variables
-  are not expanded in it, nor in `changes` paths.
-- `exists:` checks files in the repository at the commit; also not
-  expanded.
+- `compare_to` takes a branch (`refs/heads/main`), tag or SHA. Variables
+  known at pipeline creation are expanded in it and in `changes` paths
+  (*lab:* `refs/heads/$CI_DEFAULT_BRANCH` and `$SVC_DIR/**/*` worked on
+  19.4.1, although the documentation's table says otherwise).
+- `exists:` checks files in the repository at the commit.
 
 ## `include` with rules
 

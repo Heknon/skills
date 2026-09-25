@@ -43,12 +43,12 @@ changes compared with: <per event, from the table below>
 | --- | --- | --- |
 | merge request | the merge request's target branch | the right set, every push |
 | default branch | the previous push to the branch | only what this push changed |
-| other branch | the previous push; for a new branch, nothing: always true | add `compare_to: refs/heads/main` |
+| other branch | the previous push; for a new branch, nothing: always true | add `compare_to: refs/heads/$CI_DEFAULT_BRANCH` |
 | tag, schedule, web, API | nothing: always true | every unit runs; add `compare_to` or accept it |
 
-`compare_to` takes a literal ref; variables are not expanded in it.
+`compare_to` takes a ref; `refs/heads/$CI_DEFAULT_BRANCH` works (lab).
 The recipe's rules use `changes` in merge requests and on the default
-branch, and `compare_to: refs/heads/main` on other branches. In the lab, a
+branch, and `compare_to: refs/heads/$CI_DEFAULT_BRANCH` on other branches. In the lab, a
 change to `packages/common` ran the library and the service that depends
 on it; a change to the service alone ran only the service; a change to the
 root CI file ran no unit.

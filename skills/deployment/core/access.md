@@ -59,6 +59,8 @@ Done by a namespace administrator, not by the pipeline.
    kubectl config use-context deploy --kubeconfig $kc
    kubectl get pods --kubeconfig $kc
    ```
+   `$token` stays in a variable: never paste a token into a command line,
+   which the shell's history keeps. `Remove-Variable token` afterwards.
    The last command must answer (or say `No resources found`), not
    `Forbidden` or a certificate error. If it is `x509: certificate signed
    by unknown authority`, the API server's certificate comes from another
@@ -85,7 +87,9 @@ Done by a namespace administrator, not by the pipeline.
 
 Keep a personal token out of files and history: in PowerShell, read it
 into a session variable with
-`$env:GITLAB_TOKEN = Read-Host -MaskInput "token"` (PowerShell 7) and use
+`$env:GITLAB_TOKEN = Read-Host -MaskInput "token"` (PowerShell 7; in
+Windows PowerShell 5.1: `$s = Read-Host -AsSecureString "token"` then
+`$env:GITLAB_TOKEN = [Net.NetworkCredential]::new("", $s).Password`) and use
 `glab` (`gitlab/glab.md`) or the API (`gitlab/api.md`), which both read it.
 
 ## Never

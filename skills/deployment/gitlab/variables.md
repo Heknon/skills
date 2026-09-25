@@ -55,7 +55,8 @@ never printing are.
 | `environment:name`, `environment:url`, `resource_group` | yes, without job-time (persisted) variables | GitLab |
 | `include` | yes, only predefined (pre-pipeline), project, group, instance, trigger and schedule variables | GitLab |
 | `rules:if` | compared, `$VAR` form only; not persisted variables, not `CI_ENVIRONMENT_SLUG` | GitLab |
-| `rules:changes`, `rules:changes:compare_to`, `rules:exists` | no | |
+| `rules:changes` paths and `rules:changes:compare_to` | yes, with variables known at pipeline creation. *lab:* `changes: [$SVC_DIR/**/*]` and `compare_to: refs/heads/$CI_DEFAULT_BRANCH` both matched as expanded; the 19.4 table in the documentation says "no", the behaviour says yes | GitLab |
+| `rules:exists` | not tested here; check the instance's `/help` | GitLab |
 | `tags`, `trigger:project` | yes | GitLab |
 
 Predefined variables have an availability: **Pre-pipeline** (usable in
@@ -99,10 +100,14 @@ later).
 In a job:
 
 ```sh
-echo "KUBECONFIG is ${KUBECONFIG:+set}${KUBECONFIG:-unset}"
+if [ -n "$KUBECONFIG" ]; then echo "KUBECONFIG set"; else echo "KUBECONFIG unset"; fi
 test -s "$KUBECONFIG" && echo "kubeconfig file has $(wc -l < "$KUBECONFIG") lines"
 test -n "$DEPLOY_TOKEN" && echo "DEPLOY_TOKEN length ${#DEPLOY_TOKEN}"
 ```
+
+Never `echo "${VAR:-unset}"` or `${VAR:+...}${VAR:-...}` to report
+presence: `${VAR:-x}` expands to the value when it is set, unmasked if the
+variable is not masked (a File variable holding a kubeconfig cannot be).
 
 Through the API or `glab`, list keys and flags only (`gitlab/api.md`,
 `gitlab/glab.md`). `glab variable get` and `glab variable export` print

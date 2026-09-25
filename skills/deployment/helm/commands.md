@@ -40,8 +40,9 @@ lost). The next upgrade fails with `another operation
 4. Run the deploy again.
 
 For a `pending-install` of a first install there is nothing to roll back
-to: `helm uninstall <release> -n <ns>` removes it, after the person
-agrees, since the objects it created go too.
+to. The way out is `helm uninstall <release> -n <ns>`, which deletes what
+the install created. Propose it and let the person decide; never run it
+yourself, and in production only after the challenge in `core/deploy.md`.
 
 ## Plugins
 

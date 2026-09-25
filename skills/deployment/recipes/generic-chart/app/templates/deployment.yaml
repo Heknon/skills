@@ -80,12 +80,12 @@ spec:
             periodSeconds: 10
             failureThreshold: 6
           {{- end }}
-          {{- include "app.volumeMounts" . | nindent 10 }}
+          {{- include "app.volumeMounts" (dict "root" . "config" true) | nindent 10 }}
           securityContext:
             {{- include "app.containerSecurityContext" . | nindent 12 }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-      {{- include "app.volumes" . | nindent 6 }}
+      {{- include "app.volumes" (dict "root" . "config" true) | nindent 6 }}
       {{- if not .Values.affinity }}
       topologySpreadConstraints:
         - maxSkew: 1

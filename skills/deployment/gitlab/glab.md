@@ -39,7 +39,7 @@ glab auth login --hostname gitlab.example.com --stdin
 | variables: keys and flags | `glab variable list -R group/project`, `--group <group>`, `--instance` | no |
 | start a pipeline | `glab ci run -b main`; inputs `--input key:value`; variables `--variables-env KEY:value` | yes |
 | retry a job | `glab ci retry <job id>` | yes |
-| set a variable | `glab variable set KEY -v value --scope production --protected --masked --type file` | yes |
+| set a variable | `glab variable set KEY --scope production --protected --type file < kubeconfig` (the value from a file on stdin, never `-v <secret>` on the command line) | yes |
 | any API call | `glab api projects/:id/pipelines` (`:id` is filled from the repository) | depends on the method |
 
 ## Never

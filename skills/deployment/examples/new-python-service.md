@@ -79,4 +79,9 @@ by hand. Deploys use platform/app 1.0.0 with --wait and --rollback-on-failure.
   Protected tags), so production credentials reach tag pipelines only.
 - An administrator of the namespace: the Secret web-secrets in
   shop-production, which values-production.yaml references.
+- A project admin of each namespace, if shop/web's registry is private:
+  a pull secret from a deploy token with read_registry, linked to the
+  default service account or named in imagePullSecrets
+  (openshift/access.md). Without it the first deploy ends in
+  ImagePullBackOff.
 ```

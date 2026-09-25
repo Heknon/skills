@@ -8,7 +8,9 @@
 #   KUBECONFIG  File variable, protected, one per environment scope (staging, production),
 #               holding the kubeconfig of a deployer service account in that namespace.
 #   The chart project allows this project in its CI/CD job token allowlist.
-#   Protected tags v*, and a protected environment "production" with its approvers.
+#   Protected tags v*, so the protected production KUBECONFIG reaches tag pipelines only.
+#   Optional, Premium: a protected environment "production" with its approvers.
+#   A private registry: a pull secret in each namespace, named in imagePullSecrets.
 # Optional File variables, usually set once for the whole instance or group:
 #   INTERNAL_CA   the internal CA certificate (PEM), when the package index uses it
 #   INDEX_NETRC   .netrc lines with credentials for a private package index

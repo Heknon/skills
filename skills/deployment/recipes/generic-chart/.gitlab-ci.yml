@@ -4,8 +4,8 @@
 # change to app/ without a new chart version. Tag vX.Y.Z: publish app-X.Y.Z to
 # this project's Helm repository, channel "stable".
 # Services add the repository with:
-#   helm repo add platform "$CI_API_V4_URL/projects/<this project id>/packages/helm/stable"
-#     --username gitlab-ci-token --password "$CI_JOB_TOKEN"
+#   echo "$CI_JOB_TOKEN" | helm repo add platform "$CI_API_V4_URL/projects/<this project id>/packages/helm/stable"
+#     --username gitlab-ci-token --password-stdin
 # and this project must list them under Settings > CI/CD > Job token permissions.
 
 workflow:

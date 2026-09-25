@@ -3,7 +3,8 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: {{ include "app.fullname" $ | trunc 40 | trimSuffix "-" }}-{{ $name | trunc 12 | trimSuffix "-" }}
+  {{- /* CronJob names are limited to 52 characters: 39 + "-" + 12. */}}
+  name: {{ include "app.fullname" $ | trunc 39 | trimSuffix "-" }}-{{ $name | trunc 12 | trimSuffix "-" }}
   labels:
     {{- include "app.labels" $ | nindent 4 }}
 spec:
@@ -23,6 +24,7 @@ spec:
         spec:
           restartPolicy: Never
           serviceAccountName: {{ include "app.serviceAccountName" $ }}
+          automountServiceAccountToken: {{ $.Values.serviceAccount.create }}
           {{- with $.Values.imagePullSecrets }}
           imagePullSecrets:
             {{- range . }}
@@ -32,6 +34,6 @@ spec:
           securityContext:
             {{- include "app.podSecurityContext" $ | nindent 12 }}
           containers:
-            {{- include "app.jobContainer" (dict "root" $ "command" $job.command "args" $job.args) | nindent 12 }}
-          {{- include "app.volumes" $ | nindent 10 }}
+            {{- include "app.jobContainer" (dict "root" $ "command" $job.command "args" $job.args "config" true) | nindent 12 }}
+          {{- include "app.volumes" (dict "root" $ "config" true) | nindent 10 }}
 {{- end }}

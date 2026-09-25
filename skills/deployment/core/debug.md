@@ -52,9 +52,10 @@ way is not new evidence.
 
 ## Never
 
-- Never retry a failed job, a pipeline or a deploy hoping it passes,
-  unless the evidence shows a transient cause (a registry timeout, a
-  runner lost), and say which.
+- Never retry a failed job, a pipeline or a deploy hoping it passes.
+  When the evidence shows a transient cause (a registry timeout, a runner
+  lost), say which, and propose the retry; retry only a job the person
+  asked you to, and never a production deploy without their go-ahead.
 - Never "fix" by widening access: privileged runners, `anyuid`, cluster
   roles, unprotected variables, disabled TLS checks.
 - Never report "network issue" or "flaky" without the error line that

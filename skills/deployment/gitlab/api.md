@@ -93,7 +93,7 @@ A self-signed or internal CA must be trusted by Windows (the certificate
 store), or `Invoke-RestMethod` fails with a trust error; never skip the
 check.
 
-With `curl.exe`:
+With `curl.exe` (the history keeps `$env:GITLAB_TOKEN`, not the token):
 
 ```powershell
 curl.exe -sS --header "PRIVATE-TOKEN: $env:GITLAB_TOKEN" "$GitLab/api/v4/version"

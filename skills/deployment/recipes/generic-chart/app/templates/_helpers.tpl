@@ -69,29 +69,32 @@ envFrom:
 {{- end -}}
 
 {{/* Volumes: a writable /tmp, since the root filesystem is read only, and the config files. */}}
+{{/* Call with (dict "root" $ "config" true|false). */}}
 {{- define "app.volumes" -}}
 volumes:
   - name: tmp
     emptyDir: {}
-{{- if .Values.config.files }}
+{{- if and .config .root.Values.config.files }}
   - name: config
     configMap:
-      name: {{ include "app.fullname" . }}
+      name: {{ include "app.fullname" .root }}
 {{- end }}
 {{- end -}}
 
+{{/* Call with (dict "root" $ "config" true|false); config false leaves the ConfigMap out. */}}
 {{- define "app.volumeMounts" -}}
 volumeMounts:
   - name: tmp
     mountPath: /tmp
-{{- if .Values.config.files }}
+{{- if and .config .root.Values.config.files }}
   - name: config
-    mountPath: {{ .Values.config.mountPath }}
+    mountPath: {{ .root.Values.config.mountPath }}
     readOnly: true
 {{- end }}
 {{- end -}}
 
-{{/* A container running the image with the shared env, for Jobs. Call with (dict "root" $ "command" ... "args" ...). */}}
+{{/* A container running the image with the shared env, for Jobs.
+     Call with (dict "root" $ "command" ... "args" ... "config" true|false). */}}
 {{- define "app.jobContainer" -}}
 - name: job
   image: {{ include "app.image" .root }}
@@ -103,7 +106,7 @@ volumeMounts:
   args: {{ toJson . }}
   {{- end }}
   {{- include "app.envBlock" .root | nindent 2 }}
-  {{- include "app.volumeMounts" .root | nindent 2 }}
+  {{- include "app.volumeMounts" (dict "root" .root "config" .config) | nindent 2 }}
   securityContext:
     {{- include "app.containerSecurityContext" .root | nindent 4 }}
   resources:

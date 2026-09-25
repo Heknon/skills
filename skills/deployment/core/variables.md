@@ -20,11 +20,12 @@ Answer in order; the first yes decides.
      referenced by name in the values (`envFromSecrets`). Not a CI/CD
      variable, and never in a values file.
    - Needed by the pipeline (registry login, cluster access, index
-     credentials): a **CI/CD variable**, masked, and protected if only
-     protected branches and tags use it. Masked and hidden when nobody
-     needs to read it back. A kubeconfig, certificate or `.netrc` is a
-     **file** variable. Scoped to the environment when each environment
-     has its own.
+     credentials): a **CI/CD variable**, protected if only protected
+     branches and tags use it, and scoped to the environment when each
+     environment has its own. A one-line token is masked (masked and
+     hidden when nobody needs to read it back). A kubeconfig, certificate
+     or `.netrc` is a **file** variable; being several lines, it cannot be
+     masked, so it must never be printed.
 2. **Does it differ per environment and is it not secret?** A **values
    file** per environment (`deploy/values-<env>.yaml`) for the
    application, or the deploy job's `variables:` for the pipeline (such as
@@ -74,9 +75,11 @@ made it win or be absent.
    `true`, and `1.10` arrives as `1.1` (seen on 19.4). Quote every value
    that is not plain text.
 4. **Check with evidence that reveals nothing.** In a job:
-   `echo "KUBECONFIG is ${KUBECONFIG:+set}${KUBECONFIG:-unset}"` or
-   `test -n "$TOKEN" && echo "TOKEN length ${#TOKEN}"`. Through the API,
-   list keys, scopes and flags without values (`gitlab/api.md`).
+   `if [ -n "$KUBECONFIG" ]; then echo "KUBECONFIG set"; else echo "KUBECONFIG unset"; fi`
+   or `test -n "$TOKEN" && echo "TOKEN length ${#TOKEN}"`. Never
+   `${VAR:-default}` in a message: when the variable is set, it prints
+   the value. Through the API, list keys, scopes and flags without values
+   (`gitlab/api.md`).
 
 ## Never
 

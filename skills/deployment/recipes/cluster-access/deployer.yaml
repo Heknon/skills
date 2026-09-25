@@ -21,7 +21,7 @@ subjects:
   - kind: ServiceAccount
     name: gitlab-deployer
 ---
-# A long-lived token. Kubernetes 1.24 and later, and OpenShift 4.11 and later, no
+# A long-lived token. Kubernetes 1.24 and later, and recent OpenShift versions, no
 # longer create one for a ServiceAccount; this Secret asks the token controller to.
 # Delete and re-apply this Secret to rotate the token.
 apiVersion: v1

@@ -18,8 +18,8 @@ OpenShift Route API added.
 | `config.files` | ConfigMap mounted at `config.mountPath`; pods restart when it changes |
 | `autoscaling.enabled` | HorizontalPodAutoscaler on CPU |
 | `podDisruptionBudget.enabled` and more than one replica | PodDisruptionBudget, `maxUnavailable: 1` |
-| `serviceAccount.create` | ServiceAccount, with its token mounted; otherwise no token is mounted |
-| `migration.enabled` | Job run as a `pre-install,pre-upgrade` hook (`helm/hooks.md`) |
+| `serviceAccount.create` | ServiceAccount, with its token mounted in the Deployment's and CronJobs' pods; otherwise no token is mounted |
+| `migration.enabled` | Job run as a `pre-install,pre-upgrade` hook, with the `default` ServiceAccount, no token and no ConfigMap, since on a first install neither exists yet (`helm/hooks.md`) |
 | `cronJobs.<name>` | CronJob per entry, `concurrencyPolicy: Forbid` |
 
 Every pod: `runAsNonRoot`, `seccompProfile: RuntimeDefault`, no privilege

@@ -1,7 +1,9 @@
 {{- if .Values.migration.enabled }}
 {{- /* A hook runs before the new pods; the release fails if it fails.
        before-hook-creation deletes the previous run's Job before a new one is created;
-       hook-succeeded deletes it after success, so a failed Job stays for its logs. */}}
+       hook-succeeded deletes it after success, so a failed Job stays for its logs.
+       On a first install the hook runs before the release's other objects exist, so it
+       uses neither the ServiceAccount nor the ConfigMap this chart creates. */}}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -23,7 +25,8 @@ spec:
         app.kubernetes.io/component: migration
     spec:
       restartPolicy: Never
-      serviceAccountName: {{ include "app.serviceAccountName" . }}
+      serviceAccountName: {{ ternary "default" (include "app.serviceAccountName" .) .Values.serviceAccount.create }}
+      automountServiceAccountToken: false
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- range . }}
@@ -33,6 +36,6 @@ spec:
       securityContext:
         {{- include "app.podSecurityContext" . | nindent 8 }}
       containers:
-        {{- include "app.jobContainer" (dict "root" $ "command" .Values.migration.command "args" .Values.migration.args) | nindent 8 }}
-      {{- include "app.volumes" . | nindent 6 }}
+        {{- include "app.jobContainer" (dict "root" $ "command" .Values.migration.command "args" .Values.migration.args "config" false) | nindent 8 }}
+      {{- include "app.volumes" (dict "root" . "config" false) | nindent 6 }}
 {{- end }}
