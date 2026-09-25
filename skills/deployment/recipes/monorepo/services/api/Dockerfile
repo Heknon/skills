@@ -19,12 +19,15 @@ RUN --mount=type=secret,id=netrc,target=/root/.netrc,required=false \
     uv sync --locked --no-dev --no-editable --package api
 
 FROM ${PYTHON_IMAGE}
-COPY --from=build /app/.venv /app/.venv
+# Owned by group 0 as it is copied: a later chgrp -R would store every file a second time
+# in a new layer (seen with Docker: 50 MB file, 50 MB more).
+COPY --from=build --chown=1001:0 /app/.venv /app/.venv
 ENV PATH=/app/.venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     HOME=/tmp
 WORKDIR /app
-RUN chgrp -R 0 /app && chmod -R g=u /app
+# A folder the process writes to at run time must be group 0 and group writable.
+RUN chgrp 0 /app && chmod g=u /app
 USER 1001
 CMD ["python", "-m", "api"]

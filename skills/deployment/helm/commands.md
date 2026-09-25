@@ -1,6 +1,7 @@
 # Helm commands
 
-Flags differ between Helm 3 and 4 (`helm/versions.md`). Commands marked
+Flags differ between Helm 3 and 4 (`helm/versions.md`). Every command,
+Helm's paths, variables and plugins: `helm/cli.md`. Commands marked
 *changes* act on the cluster: invariant 1 applies.
 
 ## Look

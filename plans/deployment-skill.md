@@ -78,9 +78,10 @@ skills/deployment/
   gitlab/                keywords, rules, variables, includes and components,
                          downstream pipelines, Python, images, API, glab,
                          runners, job token, versions
-  helm/                  chart anatomy, templating, generic charts, repositories,
-                         commands with Helm 3 and 4 differences, testing
+  helm/                  the CLI, chart anatomy, templating, generic charts,
+                         repositories, commands with Helm 3 and 4 differences
   kubernetes/            workloads, configuration, debugging, jobs and hooks
+  containers/            writing Dockerfiles; the Buildah CLI
   openshift/             what differs, security context constraints, routes,
                          access from CI, oc
   recipes/               complete files, verified: a Python service pipeline,
@@ -177,6 +178,24 @@ into the file named:
   `recipes/generic-chart/app/templates/migration-job.yaml`.
 - In `variables:`, `yes` and `on` arrive as `true` and `1.10` as `1.1`
   (`gitlab/keywords.md`).
+- `rules:changes` paths and `compare_to` expand variables, although the
+  documentation's table says they do not (`gitlab/rules.md`).
+- A recursive `chgrp` after `COPY` doubled a 50 MB file's size under
+  Docker; the recipes now set ownership with `COPY --chown`
+  (`containers/dockerfile.md`).
+- A process as PID 1 ignores SIGTERM without a handler, and a shell-form
+  `CMD` never forwards it: both waited out the full stop timeout
+  (`containers/dockerfile.md`).
+- Buildah caches no layers unless `--layers`; with a registry cache the
+  recipes' second build reused the dependency install
+  (`containers/buildah.md`).
+- A registries.conf mirror served `FROM docker.io/...` with docker.io
+  unreachable, though the log still named docker.io (`containers/buildah.md`).
+- Helm 4 refuses a plugin archive without a `.prov` file; installing from
+  the unpacked folder works (`helm/cli.md`).
+- The publish component failed on a second tag with `File name has
+  already been taken` until `--check-url` got the job token
+  (`recipes/ci-components/templates/python-publish.yml`).
 
 ## 9. Not yet done
 

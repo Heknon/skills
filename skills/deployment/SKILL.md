@@ -1,6 +1,6 @@
 ---
 name: deployment
-description: Get code from a merge request to a running workload on Kubernetes or OpenShift, with GitLab CI/CD and Helm. Write and fix .gitlab-ci.yml for Python projects and monorepos, build shared CI components and templates, decide where a CI/CD variable or secret lives and why it has the value it has, use the GitLab REST API and glab, build images with Buildah, write a generic Helm chart and publish it to a chart repository, deploy, promote and roll back releases, connect a pipeline to a cluster, make images and charts pass OpenShift's security constraints, and debug a failing pipeline, job, image or rollout from its evidence. Verified against GitLab 19.4, Helm 4.3 and 3.22, Kubernetes 1.37 and OpenShift 4.22 clients.
+description: Get code from a merge request to a running workload on Kubernetes or OpenShift, with GitLab CI/CD and Helm. Write and fix .gitlab-ci.yml for Python projects and monorepos, build shared CI components and templates, decide where a CI/CD variable or secret lives and why it has the value it has, use the GitLab REST API and glab, write Dockerfiles and build images with Buildah, use the Helm CLI, write a generic Helm chart and publish it to a chart repository, deploy, promote and roll back releases, connect a pipeline to a cluster, make images and charts pass OpenShift's security constraints, and debug a failing pipeline, job, image or rollout from its evidence. Verified against GitLab 19.4, Helm 4.3 and 3.22, Kubernetes 1.37 and OpenShift 4.22 clients.
 ---
 
 # Deployment
@@ -13,7 +13,7 @@ in the tool's `--help`.
 
 Read this file, then load only the files the task needs.
 
-## The nine kinds of task
+## The ten kinds of task
 
 Decide which kind you have. Most tasks start with **Orient**. A task often
 needs several kinds in turn, such as Orient, then Pipeline, then Deploy.
@@ -24,6 +24,7 @@ needs several kinds in turn, such as Orient, then Pipeline, then Deploy.
 | **Pipeline** | write or change `.gitlab-ci.yml`; make a job run or not run | `core/pipeline.md`, `core/when-jobs-run.md` |
 | **Shared CI** | build or change templates, includes or CI/CD components | `core/shared-ci.md` |
 | **Monorepo** | run only what changed in a repository with many units | `core/monorepo.md` |
+| **Image** | write or fix a Dockerfile; build, tag, push or inspect an image; use Buildah | `core/images.md`, `containers/dockerfile.md`, `containers/buildah.md` |
 | **Variables** | decide where a value or secret lives; find why a variable has a wrong or empty value | `core/variables.md` |
 | **Chart** | write or change a Helm chart, a generic chart, or a chart repository | `core/chart-design.md` |
 | **Deploy** | deploy, promote or roll back a release; choose image tags | `core/deploy.md`, `core/images.md` |
@@ -37,7 +38,8 @@ Before you say any change is done, load `core/verify.md`.
 | Folder | Holds |
 | --- | --- |
 | `gitlab/` | keywords, rules, variables, includes and components, downstream pipelines, environments, Python jobs, image builds, runners, job token, REST API, `glab`, and which GitLab version added what |
-| `helm/` | Helm 3 and 4 differences, chart anatomy, templating, the generic chart, repositories, commands, hooks |
+| `containers/` | writing Dockerfiles; the Buildah CLI, its configuration and errors |
+| `helm/` | Helm 3 and 4 differences, the CLI, chart anatomy, templating, the generic chart, repositories, commands, hooks |
 | `kubernetes/` | workloads, configuration and secrets, security context, RBAC, debugging |
 | `openshift/` | what OpenShift changes, security context constraints, Routes, access from CI, in-cluster builds, `oc` |
 | `recipes/` | complete files that ran: `python-service/`, `monorepo/`, `ci-components/`, `generic-chart/`, `cluster-access/` |

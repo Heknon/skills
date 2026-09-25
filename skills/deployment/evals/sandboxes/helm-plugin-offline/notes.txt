@@ -1,0 +1,11 @@
+PS C:\tools> helm version
+version.BuildInfo{Version:"v4.3.0", GitCommit:"bec5b06ed841fe5269972d864d5177944fd5970f", GitTreeState:"clean", GoVersion:"go1.27.1", KubeClientVersion:"v1.37"}
+
+PS C:\tools> dir
+    Directory: C:\tools
+Mode   Length Name
+-a---  23145678 helm-diff-windows-amd64.tgz     (copied from the internal mirror)
+
+PS C:\tools> helm plugin install .\helm-diff-windows-amd64.tgz
+Verifying plugin signature...
+Error: plugin verification failed: no provenance file (.prov) found

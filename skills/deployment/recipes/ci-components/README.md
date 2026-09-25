@@ -5,7 +5,7 @@ in a production pipeline.
 
 ```yaml
 include:
-  - component: $CI_SERVER_FQDN/platform/ci-components/python-checks@1.1.0
+  - component: $CI_SERVER_FQDN/platform/ci-components/python-checks@1.3.0
     inputs:
       job-prefix: api
       working-directory: services/api

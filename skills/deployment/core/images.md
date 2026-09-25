@@ -3,6 +3,10 @@
 **Verdict you produce:** how the image is built, named, tagged, found by
 the deploy, and pulled by the cluster.
 
+How to write the Dockerfile is in `containers/dockerfile.md`; Buildah's
+commands, flags and errors in `containers/buildah.md`; the CI job in
+`gitlab/images.md`.
+
 ```
 builder:   <buildah | docker-in-docker | buildkit rootless | OpenShift build>  (gitlab/images.md)
 name:      <registry/path>

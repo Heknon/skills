@@ -30,7 +30,9 @@ RUN --mount=type=secret,id=netrc,target=/root/.netrc,required=false \
     uv sync --locked --no-dev --no-editable
 
 FROM ${PYTHON_IMAGE}
-COPY --from=build /app/.venv /app/.venv
+# Owned by group 0 as it is copied: a later chgrp -R would store every file a second time
+# in a new layer (seen with Docker: 50 MB file, 50 MB more).
+COPY --from=build --chown=1001:0 /app/.venv /app/.venv
 ENV PATH=/app/.venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -38,8 +40,9 @@ ENV PATH=/app/.venv/bin:$PATH \
     PORT=8080
 WORKDIR /app
 # OpenShift runs the container as a random UID that belongs to group 0.
-# Anything the process writes at run time must be owned by group 0 and group writable.
-RUN chgrp -R 0 /app && chmod -R g=u /app
+# A folder the process writes to at run time must be group 0 and group writable;
+# only the folder, so no file is copied into a new layer.
+RUN chgrp 0 /app && chmod g=u /app
 # A numeric non-root user, so runAsNonRoot can be checked on plain Kubernetes too.
 USER 1001
 EXPOSE 8080

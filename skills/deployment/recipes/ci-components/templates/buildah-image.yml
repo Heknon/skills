@@ -44,7 +44,9 @@ spec:
         if [ -n "$INDEX_NETRC" ]; then secrets="$secrets --secret id=netrc,src=$INDEX_NETRC"; fi
         args=""
         for a in $BUILD_ARGS; do args="$args --build-arg $a"; done
-        buildah build $secrets $args \
+        # --layers with a cache repository: unchanged steps (the dependency install)
+        # are reused from earlier pipelines; Buildah caches nothing by default.
+        buildah build --layers --cache-from "$TARGET/cache" --cache-to "$TARGET/cache" $secrets $args \
           --file "$[[ inputs.dockerfile ]]" \
           --label org.opencontainers.image.revision="$CI_COMMIT_SHA" \
           --label org.opencontainers.image.source="$CI_PROJECT_URL" \
