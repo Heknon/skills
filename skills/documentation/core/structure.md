@@ -32,13 +32,17 @@ Backstage runs here.
    topics it publishes and subscribes to. An arrow exists only where you
    found both ends: a call to `POST /entries` in one repository and the
    route `/entries` in another. Write each arrow with its two `path:line`.
-4. **Group the components** (below: System or Component). A system's name
+4. **Group the components** (below: System or Component). A component
+   whose owners file names a different owner from the rest is its own
+   system, linked from the others, even when they talk to it. A system's name
    comes from the people or the records. If none gives one, name the
    group by its repositories ("billing-api and billing-worker") and list
    the missing name under *Not done*. Never invent a name.
 5. **Write the pages**: the team page with the catalog, one page per
-   system, and links to each component's docs. Take out anything the site
-   copies from a repository (install steps, run commands) and link to it.
+   system, and links to each component's docs. On the site, a component
+   gets one line saying what it does and a link. Install, run and test
+   steps stay in the repository's README: take them out of the site, do
+   not copy them into new site pages.
 6. **Link to a repository's own docs by the full address** where the site
    publishes them, or by its repository address. A relative path from the
    site into another repository (`../../ledger/README.md`) never works.
