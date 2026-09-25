@@ -165,6 +165,24 @@
         ],
         "notes": "Strong on resolution: re-exports with an alias, the vendored copy on sys.path, the route composed from two prefixes, the dotted string with importlib, the commit and its reason. 1 traced the decorator, table, dispatch and producer correctly, then called handle_refund dead because the producer function was itself not called in the sandbox. 6 gave the right type by reading the body instead of a checker, and left two scratch files in the project; checking by hand showed ty says Unknown and mypy says Any for the unannotated function, only Pyright infers list[dict[str, str]]. 0 and 8 were right but thin: no chain shown for 0, the overridden tests/conftest.py not mentioned for 8, and several answers skipped the Found / How I know / Not covered headings.",
         "changes": "trace-in gains step 6: follow each use to where it can be reached from; public functions, entry points and dispatch on outside data are reachable, so a handler for a message kind is live even if no line here sends it. The registry sandbox gains events/consumer.py, a queue entry point. types.md and type-checkers.md record that only Pyright infers an unannotated function's return type (ty Unknown, mypy Any, measured), forbid answering from reading the body, and limit probes to one deleted file."
+      },
+      "second_run": {
+        "rerun": [
+          0,
+          1,
+          6,
+          8
+        ],
+        "pass": [
+          0,
+          1,
+          8
+        ],
+        "partial": [
+          6
+        ],
+        "notes": "0 now shows the import chain. 1 says not safe to delete and names the queue consumer whose outside messages can carry kind refund, as well as the in-repository producer. 8 names the nearest conftest and that it overrides tests/conftest.py. 6 again reached list[dict[str, str]] by reading the body and then checking its own annotation with Pyright and mypy, rather than asking Pyright with reveal_type, and left four scratch files in app/ although the skill says one probe file, deleted.",
+        "overall": "After the rerun: 9 pass, 1 partial of 10. What remains is housekeeping on every action (one probe file, deleted), which, as with the seniority skill, a harness enforces better than a skill: a check for new untracked files at the end of a task would catch it."
       }
     }
   ]
