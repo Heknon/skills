@@ -220,6 +220,24 @@
     ],
     "notes": "The check before saving held where a value was at stake: 1 wrote the code's 30 and 4 and told the person; 0 wrote 'unit not verified' for the forwarded timeout; 10 read the numpy style. 9 recommended moving with the dates and the copy-step path, without calling 0.0.65 stable. 8 now draws only arrows found in code, reports the CODEOWNERS conflict and passes the strict build, but again copies install steps into site pages and keeps ledger, with its other owner, inside the billing system. 2 dropped the invented reasons from Reasons but still opened with 'to balance freshness and performance' and a Trade-offs section of motives. 3 no longer invents output and deleted the unsourced history, but moved the settings table to the end of the tutorial instead of to a reference page, and again rewrote PowerShell as bash (the eval instruction to adapt commands invites it). 6 added orders to the copy list but skipped the menu, .gitignore and home link, and linked by the site path.",
     "changes": "The explanation template loses its default Trade-offs section and forbids purpose sentences without a record. The tutorial template says a settings table moves to a reference page, not to the end. aggregation.md moves the six steps for adding a repository up to Step 2, right after finding the style. The eval instruction now says to adapt only the commands the model runs."
+   },
+   "third_run": {
+    "rerun": [
+     2,
+     3,
+     6,
+     8
+    ],
+    "pass": [
+     2
+    ],
+    "partial": [
+     3,
+     6,
+     8
+    ],
+    "notes": "2 now describes only what the code does, with 'Reason: not recorded' and no purpose sentences. 3 split the settings table into a reference page and fixed the port, but again wrote output it did not see (listed as not verified), rewrote PowerShell as bash despite being told not to, and moved the unsourced SQLite history into an explanation page. 6 added orders to the copy list and the menu, but skipped .gitignore and the home-page link and linked through the site path. 8 regressed: read ledger's CODEOWNERS as owning all three repositories, kept ledger inside the billing system, and linked to repositories by relative folder paths. These three vary between runs on multi-step judgement tasks.",
+    "overall": "After three runs: 8 pass (0, 1, 2, 4, 5, 7, 9, 10), 3 partial (3, 6, 8), 0 fail, of 11. The rule that held once stated at the moment of writing: every number, unit, output and reason names its source or goes. What remains is multi-step housekeeping (every step of adding a repository, keeping page commands untouched, never moving an unsourced sentence), which, as with the seniority and navigation skills, a harness or CI check enforces better than a skill: a strict build with validation, a link check for relative paths out of docs/, and a diff check on fenced command blocks."
    }
   }
  ]

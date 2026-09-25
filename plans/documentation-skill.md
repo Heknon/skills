@@ -1,7 +1,7 @@
 # Plan: the documentation skill
 
-Status: draft, revised on 2026-09-25 after the seniority and navigation
-skills. Nothing is built yet. Read section 0 first: it overrides the older
+Status: built on 2026-09-25 as `skills/documentation/`; eval results are in
+its `evals/evals.json`. This plan is kept as the design record. Read section 0 first: it overrides the older
 sections where they disagree.
 
 ## 0. What changed since the first draft
