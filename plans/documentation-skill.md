@@ -430,12 +430,11 @@ skill is much less useful.
 
 Proposed family, in three layers:
 
-1. **Seniority: the orchestrator.** A thin router over the other skills: for
-   a kind of task, which skills to load, in which order, and what each hands
-   the next. It holds the shared canon (router shape, procedure format, law
-   files, fixed answer headings, checker contract, eval format). It does not
-   contain domain knowledge; a weak model does badly with one huge skill,
-   and well with a small router that sends it to one short file.
+1. **Seniority: sharper reasoning, for any task.** It knows no other skill
+   by name. It teaches scoping, choosing tools by reading their
+   descriptions, telling evidence from memory, challenging ideas, breaking
+   loops, and checking before saying done. Its own plan is
+   `plans/seniority-skill.md`.
 2. **Capability skills.** Used by every domain skill.
    - **Navigation**: find the entry points, follow a call path, resolve what
      a name refers to, read inferred types, locate and activate the right
@@ -443,9 +442,7 @@ Proposed family, in three layers:
      tools are backends, the way Elastic and Grafana are for observability:
      ripgrep, universal-ctags, a language server, and **Sourcegraph** for
      cross-repository search. Same questions, a folder per tool, a choosing
-     procedure for which one is available. This is where a Sourcegraph skill
-     plugs in: either as the Sourcegraph folder inside navigation, or as its
-     own skill that navigation points to.
+     procedure for which one is available.
    - **Execution**: install dependencies from an offline mirror, run a
      command, capture output. Needed so examples are run, not guessed.
    - **Git archaeology**: blame, the commit and pull request behind a line,
@@ -454,32 +451,37 @@ Proposed family, in three layers:
    Diagramming (C4, Mermaid) and writing style stay inside documentation
    until a second skill needs them.
 
+No skill routes to another by name. A skill names the **question** it needs
+answered; the model finds a skill whose description answers it, as
+seniority's tool choosing procedure teaches. The authoring rules shared by
+all skills (procedure shape, law files, answer headings, checker contract,
+eval format) live in `CANON.md` at the repository root, for authors.
+
 **The contract between them.** Each capability skill answers a fixed set of
 questions in a fixed shape, so a domain skill can rely on it:
 
-| Question from documentation | Answered by | Answer shape |
+| Question from documentation | Typically answered by | Answer shape |
 | --- | --- | --- |
-| Where is this surface implemented | navigation | `path:line`, symbol |
-| Who calls this, what does it call | navigation | list of `path:line` |
-| Is this claim true | navigation | yes or no, with `path:line` |
-| What does this command print | execution | the command, its exit code, its output |
-| Why is it like this | git archaeology | commit, pull request, or `not recorded` |
-| Has this changed since commit X | git archaeology | list of changed paths |
+| Where is this surface implemented | a navigation capability | `path:line`, symbol |
+| Who calls this, what does it call | a navigation capability | list of `path:line` |
+| Is this claim true | a navigation capability | yes or no, with `path:line` |
+| What does this command print | an execution capability | the command, its exit code, its output |
+| Why is it like this | a git history capability | commit, pull request, or `not recorded` |
+| Has this changed since commit X | a git history capability | list of changed paths |
 
-Documentation is written against this contract from day one. Until a
-capability skill exists, its row returns "stop and ask", and the answer
-names the missing capability.
+The answer shapes are fixed in `CANON.md`. Documentation asks the question;
+if no available skill answers it, the answer is "stop and ask", naming the
+missing capability.
 
 ## 14. Build order
 
 1. Decisions in section 15.
-2. The canon, as the first file of the seniority skill.
-3. Navigation, with ripgrep and ctags first, Sourcegraph once D2 is answered.
-   Execution and git archaeology as folders of navigation or as their own
-   skills, per D1.
-4. Documentation: evals first, from the real aggregator setup; then router,
+2. `CANON.md`, extracted from the observability skill.
+3. Seniority, per `plans/seniority-skill.md`.
+4. Navigation, with ripgrep and ctags first, Sourcegraph once D2 is answered.
+   Execution and git archaeology as folders of navigation at first.
+5. Documentation: evals first, from the real aggregator setup; then router,
    invariants, procedures, templates, scanner, checkers, examples, tooling.
-5. Seniority router, once there are enough skills to route between.
 6. Weak-model eval runs across the family, then a consistency pass against
    the canon.
 
@@ -487,10 +489,11 @@ names the missing capability.
 
 ### D1. The skill family
 
-Seniority as a thin orchestrator with the canon; navigation, execution and
-git archaeology as capability skills; documentation and observability as
-domain skills. *Recommended:* yes, with execution and git archaeology as
-folders inside navigation at first, split out when they grow.
+Seniority as a reasoning skill that knows no other skill; navigation,
+execution and git archaeology as capability skills; documentation and
+observability as domain skills; `CANON.md` for authors. *Recommended:* yes,
+with execution and git archaeology as folders inside navigation at first.
+Seniority's own decisions are in `plans/seniority-skill.md`.
 
 ### D2. Sourcegraph
 
