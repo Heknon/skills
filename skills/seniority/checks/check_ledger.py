@@ -35,6 +35,13 @@ HYPOTHESIS_RE = re.compile(r"^-\s*H(\d+)\s*\[(?P<status>[^\]]*)\]\s*(?P<text>.*)
 HYPOTHESIS_STATUS_RE = re.compile(r"^(open|confirmed at step (\d+)|ruled out at step (\d+))$", re.I)
 DONE_RE = re.compile(r"^(observed|stopped) at step (\d+)\s*:\s*(.+)$", re.I)
 BUDGET_RE = re.compile(r"^(\d+)\s+steps?$", re.I)
+BACKTICK_RE = re.compile(r"`([^`]+)`")
+RISKY_RE = re.compile(
+    r"(?<![\w/.-])(prod|production|deploy|publish|truncate)(?![\w/.-])"
+    r"|\bgit\s+push\b|\brm\s+-\w*r|--force\b|\bdrop\s+(table|database|column|schema)\b"
+    r"|\bkubectl\s+(delete|apply)\b|\bterraform\s+(apply|destroy)\b|\bhelm\s+(install|upgrade|uninstall)\b",
+    re.I,
+)
 
 
 @dataclass
@@ -70,6 +77,7 @@ class Step:
     fact: str = ""
     malformed: bool = False
     stuck: List[str] = field(default_factory=list)
+    verdicts: List[str] = field(default_factory=list)
     budget_extended_to: Optional[int] = None
 
     @property
@@ -147,6 +155,8 @@ def parse(text: str) -> Ledger:
                     ledger.steps[-1].stuck.append(continuation.group(3).strip())
                 elif kind.startswith("budget extended"):
                     ledger.steps[-1].budget_extended_to = int(continuation.group(2))
+                else:
+                    ledger.steps[-1].verdicts.append(kind.split(" ", 1)[1] + ": " + continuation.group(3).strip())
                 continue
             if raw[:1].isspace() and ledger.steps:
                 continue
@@ -254,6 +264,40 @@ def rule_stuck_changes_approach(ledger: Ledger) -> Result:
         if following.signature in before:
             offenders.append(f"step {following.number} repeats an earlier action right after 'stuck:' at step {step.number}: {following.action[:70]!r}")
     return verdict("stuck-changes-approach", offenders, note="core/loop-breaker.md step 5: change the approach, not its parameters")
+
+
+def risky_command(action: str) -> Optional[str]:
+    """The risky part of a command, or None. Reads and searches are not commands.
+
+    A command is the text in backticks, or, when the action has none, what
+    follows a leading "run" or "execute".
+    """
+    commands = BACKTICK_RE.findall(action)
+    if not commands:
+        bare = re.match(r"^\s*(run|execute|ran|executed)\s+(.+)$", action, re.I)
+        commands = [bare.group(2)] if bare else []
+    for command in commands:
+        match = RISKY_RE.search(command)
+        if match:
+            return match.group(0)
+    return None
+
+
+def rule_risky_needs_challenge(ledger: Ledger) -> Result:
+    offenders = []
+    steps = [step for step in ledger.steps if not step.malformed]
+    for index, step in enumerate(steps):
+        word = risky_command(step.action)
+        if not word or normalise(step.action).startswith("ask:"):
+            continue
+        challenge_at = next((earlier.number for earlier in steps[:index] if any(v.startswith("challenge:") for v in earlier.verdicts)), None)
+        if challenge_at is None:
+            offenders.append(f"step {step.number} runs a risky command ({word!r}) with no earlier 'verdict challenge:' line")
+            continue
+        asked = any(normalise(later.action).startswith("ask:") for later in steps[:index] if later.number > challenge_at)
+        if not asked:
+            offenders.append(f"step {step.number} runs a risky command ({word!r}) without an 'action: ask:' step after the challenge at step {challenge_at}")
+    return verdict("risky-needs-challenge", offenders, note="SKILL.md gate 2: challenge, show the person, get their answer, then act; an instruction given before the challenge is not approval")
 
 
 def rule_budget(ledger: Ledger) -> Result:
@@ -368,6 +412,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         rule_no_new_fact_streak(ledger),
         rule_stuck_changes_approach(ledger),
         rule_budget(ledger),
+        rule_risky_needs_challenge(ledger),
         rule_hypotheses(ledger),
         rule_assumptions(ledger),
         rule_done(ledger),

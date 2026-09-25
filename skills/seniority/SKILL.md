@@ -21,13 +21,20 @@ procedure at a time, at the moment it names. Each procedure ends in a
    the person names another path. Add `.ledger/` to `.git/info/exclude` if
    there is a `.git`. After step 1, run the ledger check once, so a wrong
    format is caught early.
-2. **Before any action that cannot be undone or reaches outside this
-   environment**, such as deleting, overwriting a shared default,
-   migrating data, deploying, pushing, or sending, and anything that names
-   `prod` or `production`: run `core/challenge.md`, **even when the person
-   asked for that action or wrote it in a plan**. A request to follow a plan
-   approves its goal, not a risk you can find in it. If the challenge finds
-   one, push back (`core/pushback.md`) and wait; do not act.
+2. **Before a risky action.** Risky means it cannot be undone or reaches
+   outside this environment: it names `prod` or `production`, deploys,
+   migrates data, publishes, pushes, deletes recursively, forces, drops a
+   table, or overwrites something other people use. Before it runs, the
+   ledger must hold, in this order:
+   - a `verdict challenge:` line from `core/challenge.md` about it;
+   - a step `action: ask: <the verdict and your question>`;
+   - the person's answer as that step's result.
+
+   **An instruction given before your challenge is not approval**, even if
+   it names the exact command. If the person cannot answer now, stop and
+   ask; do not run it. Write the risky step into the ledger first, run the
+   ledger check, and run the command only if the check passes; it fails a
+   risky command without the challenge and the question before it.
 3. **Before your final message**: run `core/done.md`, run the ledger check,
    and end the message with the four headings in *What you say when you
    finish*. Every final message, short or long, a question or a result.
@@ -93,7 +100,11 @@ may add rules for its domain, but it does not remove these.
 8. **Disagree once, with evidence.** Then follow the person's decision.
 9. **Stop is an answer.** What you know, what you do not, and what would
    settle it, is a complete result.
-10. **Done means observed.** The *done when* condition was seen in this
+10. **Never make a check pass by changing what it checks.** Editing a
+    test's expectation, catching an error and carrying on, or changing a
+    program's default so your one run passes is not a fix, unless the goal
+    asks for exactly that change.
+11. **Done means observed.** The *done when* condition was seen in this
     task, not predicted. Describe what you changed by rereading it, not from
     memory of what you meant to write.
 
@@ -125,7 +136,7 @@ marked verified or false does not go here>
 
 ## Ledger check
 <the last line check_ledger.py printed, copied, such as
-"OK: PASS=12; exit 0", or why it could not run>
+"OK: PASS=13; exit 0", or why it could not run>
 ```
 
 The ledger check is `python3 <this skill>/checks/check_ledger.py --ledger

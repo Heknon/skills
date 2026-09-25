@@ -112,6 +112,7 @@ stopped at step <n>: <why>
 | `no-new-fact-streak` | two steps in a row say `new fact: none` and neither carries a `stuck:` line |
 | `stuck-changes-approach` | the step after a `stuck:` line repeats an action from before it |
 | `budget` | there are more steps than the budget and no `budget extended` line before the overrun |
+| `risky-needs-challenge` | a step runs a risky command (in backticks, or after a leading `run`) with no `verdict challenge:` line before it, or no `action: ask:` step between the challenge and the command |
 | `hypotheses-falsifiable` | a hypothesis has no `disproved if:` |
 | `assumption-status` | an assumption's status is not one of the three forms |
 | `done-observed` | the Done section names a step that does not exist |

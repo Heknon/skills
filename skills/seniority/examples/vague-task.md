@@ -132,5 +132,5 @@ target: observed at step 10, 240 ms against under 300 ms.
 none
 
 ## Ledger check
-OK: PASS=12; exit 0
+OK: PASS=13; exit 0
 ```

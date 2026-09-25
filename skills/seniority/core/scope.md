@@ -44,8 +44,11 @@ Stuck and at Finish.
 6. **Is the change ask vague?** "Clean up", "improve", "refactor",
    "tidy", "modernise" name no observable result. Then `done when` always
    includes **behaviour unchanged**: the same public names, the same
-   parameter names, the same return values and the same errors, checked by
-   the tests or by running the code before and after. Anything that would
+   parameter names, the same return values and the same errors. Check it
+   by running the old and the new code on the same inputs and comparing
+   the outputs, including edge values: a whole number, zero, a negative, an
+   empty value, `None`, a missing file. Tests that exist count only for
+   what they cover. Anything that would
    change behaviour, even a clear improvement, is a finding under *Not
    done*, not an edit. Then either ask what the person wants from the
    cleanup, with options and a recommendation, or proceed on the narrowest
@@ -59,7 +62,9 @@ Stuck and at Finish.
    overwriting, pushing, sending a message, migrating data, spending money.
    Write each as an assumption line `A<n> [unverified] the person approves
    <action>`. Each passes gate 2 in `SKILL.md` before it runs, even if the
-   person asked for it.
+   person asked for it. `done when` for such an ask is the challenge shown
+   to the person and their answer recorded; the risky action itself joins
+   `done when` only after they answer.
 
 ## Verdict
 

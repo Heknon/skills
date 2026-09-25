@@ -107,5 +107,5 @@ within 5 seconds: observed at step 8.
 none
 
 ## Ledger check
-OK: PASS=12; exit 0
+OK: PASS=13; exit 0
 ```

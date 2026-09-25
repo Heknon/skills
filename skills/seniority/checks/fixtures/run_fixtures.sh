@@ -26,7 +26,7 @@ expect() {
     fi
 }
 
-for good in fixtures/good.md fixtures/in_progress.md; do
+for good in fixtures/good.md fixtures/in_progress.md fixtures/risky_good.md; do
     expect 0 check_ledger.py --ledger "$good"
 done
 for bad in fixtures/*_bad.md fixtures/template.md; do

@@ -139,6 +139,6 @@ writes out/2026-09-21.csv: observed at step 9.
 none
 
 ## Ledger check
-OK: PASS=11 WARN=1; exit 0. The warning is steps 1 and 4, the same run with
+OK: PASS=12 WARN=1; exit 0. The warning is steps 1 and 4, the same run with
 the same result, which is the loop that step 4's stuck line broke.
 ```

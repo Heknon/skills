@@ -25,15 +25,19 @@ Done is an observation, not a feeling.
    - a statement in the answer at the level recalled or guessed, stated as
      fact (`core/evidence-levels.md`).
 
-   Fix what you find, then return to question 1.
+   Then read the whole of every file you changed, not only your lines.
+   Every other defect you see there goes under *Not done*, unfixed.
+
+   Fix what you find in your own change, then return to question 1.
 4. **What was asked and not done?** And what did you find and leave, from
    `scope out`? Both go under *Not done*.
 5. **Which assumptions are still unverified?** Update every status in the
    ledger first. Only lines still `[unverified]` go under *Unverified*;
    verified and false ones do not.
-6. **Describe the result from the files, not from memory.** Reread the
-   diff or the changed lines before you describe them. Every sentence in
-   the answer about what changed must match what is there now.
+6. **Describe the result from the files and the ledger, not from
+   memory.** Reread the diff before you describe a change. Reread the
+   ledger before you describe what you did: every step in it happened, and
+   the answer never says you did not do a step the ledger shows.
 7. **Run the ledger checker.** `python3 checks/check_ledger.py --ledger
    <path>`. Fix any `FAIL` in the ledger that reflects a real gap. A `FAIL`
    because you really did loop is not hidden: it stays, and the answer says

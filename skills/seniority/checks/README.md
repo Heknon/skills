@@ -6,12 +6,12 @@ time you suspect a loop. Paste its summary line into the answer under
 
 | Script | Reads | Rules |
 | --- | --- | --- |
-| `check_ledger.py --ledger FILE [--json]` | a ledger written from `core/ledger.md` | header, done-when-observable (WARN), steps-numbered, repeated-action, oscillation, no-new-fact-streak, stuck-changes-approach, budget, hypotheses-falsifiable, assumption-status, done-observed, unverified-at-done (WARN) |
+| `check_ledger.py --ledger FILE [--json]` | a ledger written from `core/ledger.md` | header, done-when-observable (WARN), steps-numbered, repeated-action, oscillation, no-new-fact-streak, stuck-changes-approach, budget, risky-needs-challenge, hypotheses-falsifiable, assumption-status, done-observed, unverified-at-done (WARN) |
 
 Every rule prints `PASS`, `FAIL`, `WARN`, `SKIP` or `INFO`, a count, up to
 five offenders and a note that names the rule's source. `--json` prints the
 same as one JSON object. The last line is the summary, for example
-`OK: PASS=12; exit 0`.
+`OK: PASS=13; exit 0`.
 
 ## Exit codes
 
@@ -23,8 +23,12 @@ error.
 
 The checker compares action text. It cannot tell that two differently
 worded actions are the same approach, that a `new fact` is really new, or
-that an edit weakened a test. It catches the loops that leave a mark on the
-page; the loop rules in `SKILL.md` still apply to the ones that do not.
+that an edit weakened a test. Risky commands are found by pattern: `prod`,
+`production`, `deploy`, `publish`, `truncate`, `git push`, `rm -r`,
+`--force`, `drop table`, `kubectl delete` or `apply`, `terraform apply` or
+`destroy`, `helm install`, `upgrade` or `uninstall`, inside backticks or
+after a leading `run`. It catches what leaves a mark on the page; the rules
+in `SKILL.md` still apply to what does not.
 
 ## A `FAIL` at Finish
 
@@ -34,8 +38,9 @@ loop stays. The answer says so under *Ledger check*.
 
 ## Fixtures
 
-`fixtures/` holds two passing ledgers (`good.md`, finished; `in_progress.md`,
-not finished), the unfilled template, and one failing ledger per loop or
+`fixtures/` holds three passing ledgers (`good.md`, finished;
+`in_progress.md`, not finished; `risky_good.md`, a risky command after a
+challenge and the person's answer), the unfilled template, and one failing ledger per loop or
 format rule (`*_bad.md`). `sh fixtures/run_fixtures.sh` runs all of them,
 then extracts the ledger from each `examples/*.md` with
 `fixtures/extract_golden.py` and checks it. It also checks that each
