@@ -222,7 +222,8 @@ Options: validate the merged result with the full model before writing;
 write patch models by hand; make every base validator `None`-safe.
 *Recommended:* apply the patch to the stored object and validate the
 result with the full model, if the lab confirms the loss. It also catches
-rules across fields. See section 6, proposed change 4.
+rules across fields. See section 6, proposed change 4. Reconciled with
+mongodb's dotted `$set` in `plans/roadmap.md`, decision R4.
 
 ### PD5. Settings sources
 
