@@ -25,6 +25,7 @@ Standard library only, Python 3.8 or later.
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import os
 import re
@@ -134,6 +135,30 @@ def probe_part(workdir: str, before: str, probe: str, required: bool) -> List[Re
     return results
 
 
+MAX_NEIGHBOURS = 20
+
+
+def untouched_neighbours(workdir: str, before: str) -> List[Tuple[str, List[str]]]:
+    """For each changed Python file, the public top-level functions the change did not touch."""
+    found = []
+    for path in check_change.snapshot_files(before):
+        if not path.endswith(".py") or check_change.TEST_PATH_RE.search(path):
+            continue
+        old, new = read(os.path.join(before, path)), read(os.path.join(workdir, path))
+        if old is None or new is None or old == new:
+            continue
+        try:
+            old_tree, new_tree = ast.parse(old), ast.parse(new)
+        except SyntaxError:
+            continue
+        old_bodies = {node.name: ast.dump(node) for node in old_tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+        names = [node.name for node in new_tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                 and not node.name.startswith("_") and old_bodies.get(node.name) == ast.dump(node)]
+        if names and len(names) <= MAX_NEIGHBOURS:
+            found.append((path, names))
+    return found
+
+
 def sections(text: str) -> List[Tuple[str, str]]:
     found, current, lines = [], None, []
     for line in text.splitlines():
@@ -149,7 +174,7 @@ def sections(text: str) -> List[Tuple[str, str]]:
     return found
 
 
-def answer_part(answer_path: str, ledger, quoted: List[str]) -> List[Result]:
+def answer_part(answer_path: str, ledger, quoted: List[str], neighbours: Optional[List[Tuple[str, List[str]]]] = None) -> List[Result]:
     text = read(answer_path)
     if not text or not text.strip():
         return [Result("answer-present", FAIL, 1, [f"no {answer_path}"], "write the final message to .ledger/answer.md first, then run this check (SKILL.md gate 3)")]
@@ -181,6 +206,12 @@ def answer_part(answer_path: str, ledger, quoted: List[str]) -> List[Result]:
     offenders = [f"A{number} is [unverified] in the ledger and missing from ## Unverified" for number, status in statuses.items() if status == "unverified" and number not in listed]
     offenders += [f"A{number} is listed but the ledger says '{statuses[number]}'; update the answer or the ledger" for number in sorted(listed) if number in statuses and statuses[number] != "unverified"]
     results.append(verdict("answer-unverified-matches", offenders, note="## Unverified lists exactly the assumptions whose ledger status is still [unverified]"))
+
+    if neighbours is not None:
+        unnamed = [f"{path}: {name}" for path, names in neighbours for name in names if not re.search(rf"\b{re.escape(name)}\b", body["not done"])]
+        results.append(verdict("neighbours-reviewed", unnamed,
+                               note="core/done.md question 3: read the rest of every file you changed; under ## Not done name each function listed here, with the defect you saw or 'reviewed, fine'",
+                               passing_note="every untouched function in the changed files is named under Not done"))
 
     missing = [f"## Checks does not contain the line {line!r}" for line in quoted if line not in body["checks"]]
     results.append(verdict("answer-quotes-checks", missing, note="copy each 'ledger:', 'change:' and 'probe:' line this check printed, exactly, into ## Checks",
@@ -221,7 +252,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             parts.append(("probe", probe_part(workdir, before, probe, required)))
 
     quoted = [f"{name}: {check_ledger.summary_line(results)}" for name, results in parts]
-    answer_results = answer_part(answer_path, ledger, quoted)
+    neighbours = untouched_neighbours(workdir, before) if (not args.no_change_check and has_snapshot) else None
+    answer_results = answer_part(answer_path, ledger, quoted, neighbours)
     all_results = [result for _, results in parts for result in results] + answer_results
     exit_code = 1 if any(result.status == FAIL for result in all_results) else 0
 

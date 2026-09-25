@@ -27,7 +27,10 @@ Done is an observation, not a feeling.
      fact (`core/evidence-levels.md`).
 
    Then read the whole of every file you changed, not only your lines.
-   Every other defect you see there goes under *Not done*, unfixed.
+   Every other defect you see there goes under *Not done*, unfixed. Name
+   every function in those files that you did not change, each with the
+   defect you saw or `reviewed, fine`; the finish check fails a missing
+   one.
 
    Fix what you find in your own change, then return to question 1.
 4. **What was asked and not done?** And what did you find and leave, from

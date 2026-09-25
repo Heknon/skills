@@ -7,7 +7,7 @@ any risky command. Standard library only, Python 3.8 or later.
 
 | Script | Reads | Rules |
 | --- | --- | --- |
-| `check_finish.py [--dir .] [--json]` | `.ledger/ledger.md`, `.ledger/answer.md`, `.ledger/before/`, `.ledger/probe.py` | the ledger rules; the change rules when the kind is `change` or a snapshot exists; probe-present, probe-runs, behaviour-unchanged when the goal is a cleanup, refactor, tidy-up or improvement, or `done when` says unchanged, or a probe exists; answer-present, answer-headings, answer-done-matches-ledger, answer-unverified-matches, answer-quotes-checks. Prints a `ledger:`, `change:` and `probe:` line to quote, then `FINISH OK` or `FINISH NOT OK` |
+| `check_finish.py [--dir .] [--json]` | `.ledger/ledger.md`, `.ledger/answer.md`, `.ledger/before/`, `.ledger/probe.py` | the ledger rules; the change rules when the kind is `change` or a snapshot exists; probe-present, probe-runs, behaviour-unchanged when the goal is a cleanup, refactor, tidy-up or improvement, or `done when` says unchanged, or a probe exists; answer-present, answer-headings, answer-done-matches-ledger, answer-unverified-matches, neighbours-reviewed, answer-quotes-checks. Prints a `ledger:`, `change:` and `probe:` line to quote, then `FINISH OK` or `FINISH NOT OK` |
 | `check_change.py --before .ledger/before --after . [--json]` | the snapshot of each file before its first edit, and the working directory | snapshot-present, files-changed (INFO), files-deleted, public-signature, swallowed-errors, test-expectations, module-constants (WARN), tests-added (INFO) |
 | `check_ledger.py --ledger FILE [--json]` | a ledger written from `core/ledger.md` | header, done-when-observable (WARN), steps-numbered, repeated-action, oscillation, no-new-fact-streak, stuck-changes-approach, budget, risky-needs-challenge, hypotheses-falsifiable, assumption-status, done-observed, unverified-at-done (WARN) |
 
@@ -35,7 +35,7 @@ in `SKILL.md` still apply to what does not.
 
 The change check reads Python files with the `ast` module and test files
 as text. It sees renamed, removed or re-defaulted public functions and
-parameters, new `except` blocks that do not re-raise, and test lines with
+parameters, `argparse` options removed, renamed or changed, new `except` blocks that do not re-raise, and test lines with
 `assert`, `expect`, `should` or `verify` removed or changed. It does not
 see a function that returns a different value, or changes in other
 languages' signatures: those still need old and new run on the same

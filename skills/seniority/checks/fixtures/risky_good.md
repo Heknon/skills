@@ -18,7 +18,8 @@ none
 
 1. action: read ROLLOUT.md | result: step 1 runs `scripts/migrate --env prod` | new fact: the plan's first step migrates production
 2. action: search "customer_email" in app/ | result: 3 queries still read customer_email | new fact: the running code reads the column the migration renames
-   verdict challenge: proceed with a change: run on dev and update the queries first because step-by-step reading: after the migration and before the code change, 3 queries break
+   verdict challenge-steps: after the migration and before the query change, 3 queries that read customer_email break
+   verdict challenge: proceed with a change: run on dev and update the queries first because step-by-step reading: 3 live queries break in between
 3. action: ask: the migration breaks 3 live queries until the code changes; run it on dev first and ship the query change before prod? | result: person: yes, dev first | new fact: the person chose dev first
 4. action: `scripts/migrate --env dev` | result: exit 0, column renamed on dev | new fact: dev column renamed
 

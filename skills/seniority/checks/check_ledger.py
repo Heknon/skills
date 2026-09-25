@@ -291,17 +291,30 @@ def rule_risky_needs_challenge(ledger: Ledger) -> Result:
     offenders = []
     steps = [step for step in ledger.steps if not step.malformed]
     for index, step in enumerate(steps):
-        word = risky_command(step.action)
-        if not word or normalise(step.action).startswith("ask:"):
+        is_ask = normalise(step.action).startswith("ask:")
+        if is_ask:
+            match = RISKY_RE.search(step.action)
+            word = match.group(0) if match else None
+        else:
+            word = risky_command(step.action)
+        if not word:
             continue
-        challenge_at = next((earlier.number for earlier in steps[:index] if any(v.startswith("challenge:") for v in earlier.verdicts)), None)
+        through = steps[: index + 1] if is_ask else steps[:index]
+        challenge_at = next((earlier.number for earlier in through if any(v.startswith("challenge:") for v in earlier.verdicts)), None)
+        steps_read = any(any(v.startswith("challenge-steps:") for v in earlier.verdicts) for earlier in through)
+        doing = "asks to run" if is_ask else "runs"
         if challenge_at is None:
-            offenders.append(f"step {step.number} runs a risky command ({word!r}) with no earlier 'verdict challenge:' line")
+            offenders.append(f"step {step.number} {doing} a risky command ({word!r}) with no earlier 'verdict challenge:' line")
+            continue
+        if not steps_read:
+            offenders.append(f"step {step.number} {doing} a risky command ({word!r}) with no 'verdict challenge-steps:' line; search for everything that reads what it changes, then write what is broken between steps")
+            continue
+        if is_ask:
             continue
         asked = any(normalise(later.action).startswith("ask:") for later in steps[:index] if later.number > challenge_at)
         if not asked:
             offenders.append(f"step {step.number} runs a risky command ({word!r}) without an 'action: ask:' step after the challenge at step {challenge_at}")
-    return verdict("risky-needs-challenge", offenders, note="SKILL.md gate 2: challenge, show the person, get their answer, then act; an instruction given before the challenge is not approval")
+    return verdict("risky-needs-challenge", offenders, note="SKILL.md gate 2: challenge and challenge-steps, show the person, get their answer, then act; an instruction given before the challenge is not approval")
 
 
 def rule_budget(ledger: Ledger) -> Result:

@@ -35,6 +35,10 @@ procedure at a time, at the moment it names. Each procedure ends in a
    migrates data, publishes, pushes, deletes recursively, forces, drops a
    table, or overwrites something other people use. Before it runs, the
    ledger must hold, in this order:
+   - a `verdict challenge-steps:` line: search for everything that reads
+     what the action changes (a column, a file, a flag, an endpoint), then
+     write what is broken after this action and before the next step, or
+     `none` with the search that shows it;
    - a `verdict challenge:` line from `core/challenge.md` about it;
    - a step `action: ask: <the verdict and your question>`;
    - the person's answer as that step's result.
@@ -43,7 +47,8 @@ procedure at a time, at the moment it names. Each procedure ends in a
    it names the exact command. If the person cannot answer now, stop and
    ask; do not run it. Write the risky step into the ledger first, run the
    ledger check, and run the command only if the check passes; it fails a
-   risky command without the challenge and the question before it.
+   risky command, or a question asking to run one, without the two
+   verdict lines before it.
 3. **Before your final message**, every time, short or long, a result or
    a question:
    1. run `core/done.md`;
@@ -159,11 +164,13 @@ or "probe:", copied exactly, such as "ledger: OK: PASS=13; exit 0">
 ```
 
 `check_finish.py` runs everything: the ledger rules; the change rules, which
-fail a renamed or removed public function, parameter or default, a new
-`except` that does not re-raise, and a changed test expectation; the probe;
+fail a renamed or removed public function, parameter or default, a changed
+command-line option, a new `except` that does not re-raise, and a changed
+test expectation; the probe;
 and the answer rules, which fail a missing heading, a *Done when* that
 does not match the ledger, an *Unverified* list that does not match the
-ledger, and a *Checks* section that does not quote its lines. The single
+ledger, a *Not done* that does not name each untouched function in a file
+you changed, and a *Checks* section that does not quote its lines. The single
 checks can also be run alone: `check_ledger.py --ledger .ledger/ledger.md`
 after step 1 and before a risky command. All need Python 3.8 or later and
 nothing else.

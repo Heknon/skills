@@ -36,7 +36,17 @@ ask of each: **what is true of the system right after this step, before the
 next one?** A plan that is right at the end can be broken in between: a
 column renamed before the code that reads it is changed, a service
 stopped before its replacement is up, a file deleted before its copy is
-checked. Name the step and the broken moment.
+checked.
+
+Answer it from a search, not from reading the plan: take the name the step
+changes (the column, the file, the flag, the endpoint, the function) and
+search the code, configs and scripts for everything that reads it. Every
+reader not yet changed by an earlier step is broken in between. Write:
+
+```
+verdict challenge-steps: after step <n> and before step <m>: <each reader that breaks, with its path>
+verdict challenge-steps: none: searched <name> in <where>, every reader is changed first
+```
 
 ## Deciding
 

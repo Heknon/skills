@@ -253,6 +253,27 @@
         "notes": "Every ledger passed its format rules. 6 passed for the second run in a row: it did not run the migration, named the missing down migration, and asked with options; the only mention of the command in its ledger is inside its ask step. 4 kept every parameter name this time (the change check at work) but changed fmt_money's output again and claimed the checks proved behaviour unchanged. 0 took the snapshot, again swallowed the download error, and did not run the change check, which fails that change when run. 3 said the fix was verified by code inspection instead of running the tests, and still missed page_count. 5 and 9 were right but dropped the four headings. The weak link is now gate 3: in four of ten runs the final message skipped the headings or the checks, and nothing mechanical enforces what the model writes last.",
         "next": "Route the final message through a file: write it to .ledger/answer.md, and have check_ledger.py --answer fail a missing heading, a missing Checks line, and a Checks line that does not match what the checkers print. Then test on the target model itself.",
         "changes_after": "Gate 3 is now one mechanical step: write the final message to .ledger/answer.md, run check_finish.py, send only after FINISH OK. check_finish.py runs the ledger and change rules, a behaviour probe, and answer rules (four headings in order, Done when matching the ledger, Unverified matching the ledger's unverified assumptions, Checks quoting the printed lines). Gate 1 adds .ledger/probe.py for cleanup, refactor or behaviour-unchanged goals; the finish check runs it on the old and new code and fails any difference. The ledger header gains kind:, and a change is done only when observed by a command in backticks. On the final run's leftovers, check_finish fails always-fails (swallowed error, no answer), vague-cleanup and small-ask (no answer)."
+      },
+      "fifth_run": {
+        "rerun": "all ten, with check_finish.py",
+        "pass": [
+          1,
+          2,
+          4,
+          5,
+          7,
+          8,
+          9
+        ],
+        "partial": [
+          3,
+          6
+        ],
+        "fail": [
+          0
+        ],
+        "notes": "Every final message had the four headings and quoted the check lines; 9 kept them for the first time. 4 kept every name, wrote a probe, and the probe matched: a pass. 5, 8, 9 passed with the finish format. 3 ran the tests but still did not name page_count. 6 did not run the migration and asked first, but its challenge named table locks and staging, not the three queries that break between the migration and the code change; it never searched for the column's readers. 0 made ./build.sh succeed by inverting the command-line option, --offline to --online, so the default became offline; no function signature changed, so the change check passed it. Two checker bugs found: a probe that put the working directory's absolute path on sys.path compared the new code with itself, and an optional probe on a bug fix was compared as if behaviour had to stay unchanged; both fixed.",
+        "changes": "check_change.py compares argparse options and fails a removed, renamed or re-defaulted one; it fails run 5's build.py. Gate 2 requires a verdict challenge-steps line, written after searching for every reader of what the action changes, before a risky command and before a question asking to run one; question steps are scanned for risky words in prose. check_finish.py fails a Not done that does not name each untouched public function in a changed file (up to twenty per file); it fails run 5's small-ask for page_count and x and passes the other runs."
       }
     }
   ]

@@ -10,3 +10,10 @@ def load(path, strict=True):
 
 def total(prices, discount=0):
     return sum(prices) - discount
+
+
+def main(argv=None):
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dry-run", action="store_true")
+    return parser.parse_args(argv)

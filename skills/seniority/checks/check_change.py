@@ -135,6 +135,24 @@ def module_constants(source: str) -> Dict[str, str]:
     return constants
 
 
+def cli_options(source: str) -> Dict[str, str]:
+    """Every add_argument(...) call: its flag or name, mapped to its action, default, type and nargs."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return {}
+    options: Dict[str, str] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "add_argument":
+            names = [arg.value for arg in node.args if isinstance(arg, ast.Constant) and isinstance(arg.value, str)]
+            if not names:
+                continue
+            settings = {keyword.arg: default_text(keyword.value) for keyword in node.keywords
+                        if keyword.arg in ("action", "default", "type", "nargs", "required", "choices", "dest")}
+            options[" ".join(sorted(names))] = json.dumps(settings, sort_keys=True)
+    return options
+
+
 def is_public(name: str) -> bool:
     return not any(part.startswith("_") and not (part.startswith("__") and part.endswith("__")) for part in name.split("."))
 
@@ -173,6 +191,12 @@ def compare_python(path: str, old: str, new: str, api: List[str], errors: List[s
         added = after.handlers_without_raise - (before.handlers_without_raise if before else 0)
         if added > 0:
             errors.append(f"{path}: {name} has {added} new except block(s) that do not re-raise; an error that used to stop the program is now hidden")
+    old_options, new_options = cli_options(old), cli_options(new)
+    for flag, settings in old_options.items():
+        if flag not in new_options:
+            api.append(f"{path}: command-line option {flag} was removed or renamed; scripts and people that pass it break")
+        elif new_options[flag] != settings:
+            api.append(f"{path}: command-line option {flag} changed its action, default or type; running the program the same way now does something else")
     old_constants, new_constants = module_constants(old), module_constants(new)
     for name, value in old_constants.items():
         if name in new_constants and new_constants[name] != value:
