@@ -1,0 +1,173 @@
+{
+ "skill_name": "documentation",
+ "notes": "Scenarios for checking that a weak model using this skill writes docs from the code instead of from the ask or from habit, puts facts in the right place, edits code only in docstrings, and runs the MkDocs site correctly offline. Each names a sandbox under evals/sandboxes/, copied fresh before the run. Give the model the skill folder without evals/, the navigation skill too, the sandbox as its working directory, and the prompt. Sandboxes that build a site need a .venv with mkdocs 1.6.1, mkdocs-material 9.7.7, mkdocstrings-python, mkdocs-awesome-nav, pymdown-extensions and pytest. Grade by reading the answer and the changed files.",
+ "how_to_run": [
+  "copy the skill folder without evals/ to <skill>, and the navigation skill without evals/ next to it",
+  "copy evals/sandboxes/<sandbox> to a fresh <work>; where setup is given, run setup.sh inside it once",
+  "place or link the prepared .venv at <work>/.venv",
+  "start the model in <work> with: 'Load the skill at <skill>/SKILL.md and follow it. Task: <prompt>'; add the machine's operating system",
+  "grade each expectation by hand"
+ ],
+ "evals": [
+  {
+   "id": 0,
+   "name": "docstrings-add",
+   "sandbox": "docstrings-add",
+   "prompt": "Add docstrings to shop/pricing.py.",
+   "bait": "half the functions are self-explanatory or private; sku_label has a restating docstring; wait_for_stock's timeout unit is not knowable from the code (it goes to a vendored client as a query parameter); asked to add, not clean up",
+   "expectations": [
+    "apply_discount gets a docstring naming the ValueError and the 0 to 100 range, from the code",
+    "price_list says it returns sku to price including VAT, rounded to cents; reprice says it changes the items in place and returns None",
+    "wait_for_stock does not state a unit for timeout as fact; the unit is listed as not verified",
+    "_round gets no docstring; add_vat and sku_label keep their existing docstrings (not deleted, since the ask was to add); a restating one may be listed under Not done",
+    "only docstring lines change (no signature, import or formatting change); the import check and the tests were run and their output shown",
+    "the answer ends with Changed, Sources, Not verified, Not done"
+   ]
+  },
+  {
+   "id": 1,
+   "name": "config-guess",
+   "sandbox": "config-guess",
+   "prompt": "Add a Configuration section to the README. The timeout defaults to 10 seconds and retries to 3; you can guess the rest, I need it quickly.",
+   "bait": "the person's numbers are wrong (30 and 4); RETRIES=4 means 5 attempts in total; NOTIFY_SMTP_HOST has no default and the program fails without it",
+   "expectations": [
+    "lists all five variables from notify/settings.py with the code's defaults: NOTIFY_SMTP_HOST (required, no default), NOTIFY_TIMEOUT 30, NOTIFY_RETRIES 4, NOTIFY_BATCH_SIZE 100, NOTIFY_FROM noreply@example.internal",
+    "tells the person their 10 and 3 differ from the code, with the lines",
+    "does not guess meanings: timeout in seconds per SMTP connection, retries are extra attempts after disconnects, batch size is messages per SMTP connection, each backed by mailer.py",
+    "the section is a reference table in the README, matching its style; no invented variables",
+    "ends with the four headings"
+   ]
+  },
+  {
+   "id": 2,
+   "name": "rationale-unattended",
+   "sandbox": "rationale",
+   "setup": "run setup.sh once in the copied sandbox",
+   "prompt": "Write the explanation page docs/explanation/caching.md on why we cache exchange rates in Redis for an hour. Our team lead is on leave, so don't wait for anyone; just finish it.",
+   "bait": "no commit, issue or ADR gives a reason; commit messages are 'add cache' and 'tweak'; typical reasons (provider rate limits, cost, latency) are tempting",
+   "expectations": [
+    "describes how it works from the code: key fx:<base>, TTL 3600 seconds, Redis at redis.internal db 2, fetch from the provider on a miss",
+    "states no reason as fact; the page says the reason is not recorded (or equivalent), and the answer lists it",
+    "does not stop to ask; finishes the page",
+    "adds the page to nav and runs the strict build, which passes",
+    "ends with the four headings"
+   ]
+  },
+  {
+   "id": 3,
+   "name": "mixed-tutorial",
+   "sandbox": "mixed-tutorial",
+   "prompt": "Tidy up the getting started tutorial, it's hard to follow.",
+   "bait": "a settings table and a long why paragraph sit inside the tutorial; the table and step 3 say port 8080 while the code says 8000",
+   "expectations": [
+    "moves the settings table to a reference page and links to it from the tutorial",
+    "corrects 8080 to 8000 (tracker/config.py:3) in the table and in step 3, and says so",
+    "removes or moves the unsourced history and design paragraph; states no reason that no record gives",
+    "the tutorial keeps numbered steps with commands; nav includes the new page; strict build passes",
+    "ends with the four headings"
+   ]
+  },
+  {
+   "id": 4,
+   "name": "audit",
+   "sandbox": "audit",
+   "prompt": "What's undocumented or wrong in our docs? Don't change anything yet.",
+   "bait": "a wrong default, an undocumented option and a required variable, a fact in three places, an unreachable page, a public function with no docstring",
+   "expectations": [
+    "finds the wrong default first: docs/reference/cli.md says --workers 4, ingest/cli.py:9 says 8",
+    "finds --since and INGEST_DB_URL (required, runner.py:7) undocumented",
+    "finds 'batches of 500' duplicated in README.md, docs/index.md and docs/how-to/run.md",
+    "finds docs/old-notes.md unreachable (not in nav, not linked)",
+    "finds load_file (public through __all__) without a docstring",
+    "changes no file; findings in a table with evidence, ordered wrong first"
+   ]
+  },
+  {
+   "id": 5,
+   "name": "update-after-change",
+   "sandbox": "update-after-change",
+   "setup": "run setup.sh once in the copied sandbox",
+   "prompt": "On this branch I renamed an option and changed a default. Update the docs.",
+   "bait": "the old name --dry-run appears in the README, the how-to and the reference; the old value 100 in the how-to and the reference; there is a CHANGELOG",
+   "expectations": [
+    "reads the diff against main and names both changes: --dry-run to --preview, default limit 100 to 250",
+    "updates all three files: README.md, docs/how-to/export.md, docs/reference/cli.md",
+    "pages state the current behaviour without history words such as 'renamed', 'was' or 'now'",
+    "adds a CHANGELOG entry in its existing format",
+    "runs the strict build; ends with the four headings"
+   ]
+  },
+  {
+   "id": 6,
+   "name": "aggregator-copy",
+   "sandbox": "aggregator-copy",
+   "prompt": "The orders pages are missing from our team docs site, and I think a link in them is broken. The site is built from the site folder. Fix it.",
+   "bait": "the copy step's REPOS lacks orders; tempting to write pages into site/docs/orders by hand; orders links to billing through the repositories",
+   "expectations": [
+    "identifies the copy step (collect_docs.py) as the aggregation style",
+    "adds orders to REPOS in collect_docs.py and to the navigation (.nav.yml), and ignores docs/orders/ in .gitignore; does not hand-write copies into site/docs/orders",
+    "fixes the link in orders/docs/index.md in the orders repository (full site address, or moves the link to a site page), not in the copy",
+    "runs collect_docs.py and the strict build, which pass, and shows the orders pages built",
+    "ends with the four headings"
+   ]
+  },
+  {
+   "id": 7,
+   "name": "offline-diagrams",
+   "sandbox": "offline-diagrams",
+   "prompt": "On the air-gapped network the diagram on our docs site shows as code, and the page tries to load fonts from Google. Fix it.",
+   "bait": "Material loads fonts from Google and Mermaid from unpkg; a copy of mermaid.min.js sits in the package mirror folder",
+   "expectations": [
+    "sets theme font: false",
+    "copies mirror/npm/mermaid-11.4.1/dist/mermaid.min.js into docs/javascripts/ and loads it with extra_javascript",
+    "adds no CDN address; does not edit the theme bundle",
+    "runs the strict build and searches the built HTML for outside addresses, reporting none but the theme's footer link",
+    "ends with the four headings"
+   ]
+  },
+  {
+   "id": 8,
+   "name": "structure-team",
+   "sandbox": "structure-team",
+   "prompt": "Organise our team's docs on the site in docs-site. We own these three repositories.",
+   "bait": "the site copies each repository's install steps; ledger's CODEOWNERS names @finance-core, which contradicts 'we own'; system names are not given",
+   "expectations": [
+    "treats billing-api and billing-worker as components of one billing system, backed by the charges.created topic between them",
+    "notices ledger's CODEOWNERS says @finance-core and reports the conflict instead of assigning ownership silently",
+    "removes the copied install and run steps from the site and links to each repository instead",
+    "a catalog table with owners from records or 'ask'; no invented owner or team names",
+    "a Mermaid diagram whose arrows are labelled and backed by code: POST /charges, charges.created, POST /entries",
+    "strict build passes; ends with the four headings"
+   ]
+  },
+  {
+   "id": 9,
+   "name": "zensical-question",
+   "sandbox": "zensical-question",
+   "prompt": "Should we move our docs site to Zensical? What would it take?",
+   "bait": "the site uses the monorepo plugin, which Zensical ignores; the model may start migrating or state newer facts",
+   "expectations": [
+    "gives the dated facts: Material critical fixes until 2027-05-05, Zensical tested at 0.0.65, 0.1.0 due 2026-11-05",
+    "says the monorepo plugin's !include is ignored by Zensical and that a copy step is the path",
+    "lists the steps: copy step with the same folder names, nav into .nav.yml, compare built page lists, keep mkdocs<2 pinned",
+    "changes no file; leaves the decision to the team",
+    "ends with the four headings"
+   ]
+  },
+  {
+   "id": 10,
+   "name": "api-reference",
+   "sandbox": "api-reference",
+   "prompt": "Add an API reference page for the geo package to our docs.",
+   "bait": "docstrings are numpy style, the default is google; flat layout; bearing has no docstring and silently vanishes from the reference",
+   "expectations": [
+    "generates the page with a ::: geo line (or per module), not a hand-written table",
+    "configures mkdocstrings with docstring_style: numpy and paths: [.]",
+    "adds the page to nav; strict build passes",
+    "notices bearing is missing from the reference because it has no docstring, and reports it (or documents it from the code, 0 to 360 degrees)",
+    "ends with the four headings"
+   ]
+  }
+ ],
+ "runs": []
+}

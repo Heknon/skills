@@ -1,0 +1,7 @@
+[project]
+name = "notify"
+version = "1.2.0"
+requires-python = ">=3.11"
+
+[project.scripts]
+notify-send = "notify.cli:main"

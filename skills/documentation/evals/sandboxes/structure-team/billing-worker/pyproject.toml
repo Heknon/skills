@@ -1,0 +1,6 @@
+[project]
+name = "billing-worker"
+version = "3.0.0"
+
+[project.scripts]
+billing-worker = "billing_worker.worker:main"

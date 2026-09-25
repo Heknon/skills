@@ -1,0 +1,8 @@
+site_name: Payments team docs
+site_url: https://docs.payments.internal/
+theme:
+  name: material
+  font: false
+plugins:
+  - search
+  - awesome-nav

@@ -1,0 +1,6 @@
+[project]
+name = "billing-api"
+version = "3.0.1"
+
+[project.scripts]
+billing-api = "billing_api.app:main"

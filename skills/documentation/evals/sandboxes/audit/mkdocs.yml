@@ -1,0 +1,8 @@
+site_name: Ingest
+theme:
+  name: material
+  font: false
+nav:
+  - Home: index.md
+  - Run an ingest: how-to/run.md
+  - Command line: reference/cli.md

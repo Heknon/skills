@@ -1,0 +1,6 @@
+site_name: Payments team
+theme:
+  name: material
+  font: false
+nav:
+  - Home: index.md
