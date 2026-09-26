@@ -131,13 +131,26 @@ def mypy_codes(root: Path, cache: Path) -> Counter[str]:
             str(cache),
             "--no-error-summary",
             "--show-error-codes",
+            # a multi-file shape otherwise stops at "Source file found twice",
+            # an error with no code, and is never type-checked
+            "--explicit-package-bases",
         ],
         root,
     )
-    return Counter(
+    codes = Counter(
         m.group(1)
         for m in re.finditer(r"error: .*\[([\w-]+)\]$", proc.stdout, re.MULTILINE)
     )
+    # an error without a code, or a crash, means mypy did not check the tree:
+    # count it, so a blocked run can never read as clean
+    codes["uncoded"] += sum(
+        1
+        for line in proc.stdout.splitlines()
+        if ": error:" in line and not re.search(r"\[[\w-]+\]$", line)
+    )
+    if proc.returncode not in (0, 1):
+        codes["mypy-crash"] += 1
+    return +codes
 
 
 def modules(root: Path) -> list[str]:
