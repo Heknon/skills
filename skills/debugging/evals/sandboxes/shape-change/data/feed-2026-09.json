@@ -1,0 +1,8 @@
+{
+  "version": 2,
+  "items": [
+    {"sku": "A1", "quantity": 4, "pricing": {"unit": 4.5, "currency": "EUR"}},
+    {"sku": "B7", "quantity": 8, "pricing": {"unit": 1.25, "currency": "EUR"}},
+    {"sku": "C3", "quantity": 1, "pricing": {"unit": 22.0, "currency": "EUR"}}
+  ]
+}
