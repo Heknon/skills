@@ -5,7 +5,7 @@ PyMongo 4.18.2, MongoDB 8.0.32, *lab*. Why batches: `core/writes.md`.
 ## Batched insert that survives duplicates
 
 The shape that loaded 200,000 CSV rows in 2.19 s (a loop of
-`insert_one` managed about 780 rows a second):
+`insert_one` managed about 770 rows a second):
 
 ```python
 from pymongo.errors import BulkWriteError

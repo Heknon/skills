@@ -1,6 +1,9 @@
 # Plan: the mongodb skill
 
-Status: draft for decision. Nothing is built yet.
+Status: built in `skills/mongodb/`. The recommended answers in section 9
+were taken as defaults so the skill could be built (section 10); each can
+be changed. Sections 11 and 12 record how it was verified and what the
+lab changed.
 
 ## 1. What it is
 
@@ -66,6 +69,12 @@ the version they ran on, recipes that ran, evals written first.
 | **Driver from memory** | Motor's `AsyncIOMotorClient` in a Beanie 2 project; an `init_beanie` argument or PyMongo option that the pinned version does not have |
 
 ## 5. Layout
+
+As built: the layout below, plus `core/pagination.md` (the keyset query
+and index, split from `queries`), `pymongo/mongomock.md` (decision M6),
+a `server/` folder (8.0 limits and defaults; what 7.0 does differently),
+and the recipes `orient.py` and `keyset.py`. 101 files, about 2,900
+lines of markdown.
 
 ```
 skills/mongodb/
@@ -237,3 +246,112 @@ never proof of index use, plans, speed or transactions.
 *Recommended:* field expressions (`Order.status == "paid"`) for finds, as
 a misspelt field raises an error instead of matching nothing; raw dicts
 for pipelines, which Beanie does not type (to verify in the lab).
+
+## 10. Decisions taken as defaults
+
+- **M1.** Written on MongoDB 8.0 (8.0.32, the newest 8.0 on
+  fastdl.mongodb.org on 2026-09-26); 7.0.43 run for the differences in
+  `server/versions.md`. Which version and edition the team runs is still
+  to confirm; Orient reads it every time.
+- **M2.** Beanie 2.x on PyMongo's `AsyncMongoClient`; sync `MongoClient`
+  for scripts and diagnosis; `beanie/versions.md` recognises 1.x on
+  Motor. Motor is not taught.
+- **M3.** The three server cases (none, development, production) in
+  `core/orient.md` and the SKILL.md table; production read only.
+- **M4.** Models declare indexes; services start with
+  `skip_indexes=True`; builds run as their own step
+  (`recipes/beanie_app/build_indexes.py`, `core/index-live.md`).
+- **M5.** Nested models dotted, lists and dicts whole, `None` as `$set:
+  null`, filtered on a revision (`recipes/patch_to_set/`). The lab added
+  two rules (section 12).
+- **M6.** mongomock kept for logic tests, never proof
+  (`pymongo/mongomock.md`).
+- **M7.** Field expressions for finds, raw dicts for pipelines: a
+  misspelt field expression raised `AttributeError`, a misspelt raw dict
+  returned 0 silently.
+
+## 11. How it was verified
+
+- **Servers.** MongoDB 8.0.32 Community from the Ubuntu 24.04 tarball,
+  run as a single-node replica set (transactions, majority writes), a
+  three-member set on one machine (`$indexStats` per member, commit
+  quorum, a restarted member), and a standalone (transaction and
+  `getDefaultRWConcern` errors). MongoDB 7.0.43 as a single-node set for
+  the comparison. mongosh 2.12.0 from its tarball.
+- **Data.** `recipes/seed/seed.py`, deterministic: 200,000 customers,
+  1,000,000 orders, 500,000 events (34 s); a Beanie-shaped copy of the
+  orders with DBRef links; each Beanie sandbox's own seed.
+- **Every explain** in the skill was produced on those servers and
+  quoted from the output, with the document count and version. Mongosh
+  output is quoted as printed.
+- **Drivers.** Python 3.12 with PyMongo 4.18.2, Beanie 2.2.0, pydantic
+  2.13.5, pydantic-partial 0.11.1, mongomock 4.3.0; Beanie 1.30.0 with
+  Motor 3.7.1; Beanie 2.2.0 with Motor 3.7.1 for the failure. PyMongo
+  4.10.1, 4.12.1 and 4.13.0 wheels read for the async API's status.
+  Every Beanie claim of "what it sends" was recorded with PyMongo command
+  monitoring; method bodies read in the installed source.
+- **Recipes.** `patch_to_set` 15 tests and `beanie_app` 10 tests passed
+  against 8.0.32 through `uv run pytest` in a fresh copy, and failed when
+  the rule each guards was broken. `keyset.py --check 2000` matched skip
+  page for page. `patch_to_set` also ran on the pydantic skill's own
+  `apply_patch` output.
+- **Evals.** Each of the 15 baits was reproduced and each intended fix
+  checked on the lab (numbers in `evals/evals.json`).
+- **Not run.** Windows and PowerShell (commands are written in the
+  PowerShell form and marked); sharded clusters; Enterprise; MongoDB
+  6.0 or older; Beanie, bulk writes and transactions on 7.0; time series
+  collections beyond creating one and querying it.
+
+## 12. What the lab changed
+
+Findings that corrected the plan or a common belief, each now in the
+skill:
+
+- **`$match` after `$lookup` is not the problem it looks like.** 8.0.32
+  and 7.0.43 both moved a `$match` on local fields ahead of the join.
+  The report in the `lookup-then-match` eval took 45 s because the
+  foreign field had no index (`NestedLoopJoin`, 198,200,000 documents);
+  with it, 108 ms. The eval's pass condition changed from "`$match`
+  first" to "index the foreign field".
+- **Beanie's `fetch_links=True` can be slower than the N+1 it replaces.**
+  Its pipeline puts `$lookup` before `$sort` and `$limit`, and the server
+  does not move a `$sort` past a `$lookup`: 50 newest orders joined
+  50,178 (0.83 s) against 51 queries (0.11 s) and two queries with `$in`
+  (0.05 s). The eval now expects the two-query form.
+- **Hiding an index breaks a Beanie app that declares it**:
+  `init_beanie` fails with `IndexOptionsConflict` (85). Hiding and
+  unhiding also reset `$indexStats`. `allow_index_dropping=True` drops
+  indexes made by hand.
+- **Two rules for M5.** A dotted `$set` into a `null` parent fails
+  (`Cannot create field 'city' in element {billing: null}`), so a nested
+  model stored as null is written whole. For a `dict`-typed field,
+  pydantic's merge is key by key but `Patched.changes` holds only the
+  sent keys, so the dict is written from the validated model.
+- **ESR is a default, not a law.** With a very selective range, ERS read
+  274 keys against ESR's 81 but sorted in memory; with a broad one, ERS
+  read 188,536 keys against 20. The skill says to measure.
+- **A collation index is used only by queries with that collation**
+  (COLLSCAN otherwise), and `$regex` ignores collation (the server
+  parameter `internalQueryPlannerIgnoreIndexWithCollationForRegex: 1`).
+- **`background: true` does nothing on 8.0** but is stored in the spec;
+  a second `createIndexes` for the same index waits for the first; a
+  drop aborts a running build.
+- **PyMongo's `Cursor.explain()` sends no verbosity** and gets
+  `allPlansExecution`; the async API lost its beta warning in 4.13.0;
+  Motor's own metadata dates its deprecation (May 14th, 2026) and end of
+  critical fixes (May 14th, 2027).
+- **Beanie 1.30.0 ran on `AsyncMongoClient`** for an insert and a find,
+  although its signature names Motor; Beanie 2.2.0 on Motor failed with
+  a `TypeError` from `append_metadata`.
+- **Concurrent upserts without a unique index made duplicates** (91 of
+  300 keys); with one, none and no error reached the client.
+- **mongomock hides server errors**: it ignored a collation, accepted a
+  hint on a missing index, and accepted a dotted `$set` into null.
+- **The profiler**: `slowms` is server-wide while the level is per
+  database; `profile` returns the state before the change; the slow
+  query log works at level 0.
+- **`insert_one` in a loop** was about 120 times slower than batches of
+  1,000 under the default majority write concern.
+
+The plan's proposed roadmap changes (section 6) were already in the
+reconciled roadmap when the build started; none is outstanding.

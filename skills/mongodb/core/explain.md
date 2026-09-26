@@ -112,10 +112,13 @@ to stages that cut them to 20 is the finding (`core/aggregation.md`).
 
 `allPlansExecution` adds each candidate's trial run
 (`executionStats.allPlansExecution`). PyMongo's `Cursor.explain()` uses
-it by default (`pymongo/explain.md`). The planner races candidates for a
-short trial and caches the winner per query shape; a plan that was good
-for one value can be cached for another. `$planCacheStats` shows the
-cache (`mongosh/commands.md`).
+it by default (`pymongo/explain.md`). The winner is cached per query
+shape: `$planCacheStats` lists the entries (`mongosh/commands.md`).
+*lab*: after three runs of one shape with two candidate indexes, one
+entry (`isActive: true`, `works: 38`, `createdFromQuery` holding the
+filter); creating or dropping any index on the collection emptied the
+list. An explain shows the plan for the values you give it; check a
+query shape with its common and its rare values.
 
 ## Never
 

@@ -28,7 +28,7 @@ One sentence per term. Use these words and no synonyms.
 | hidden index | An index the planner ignores but the server keeps up to date; unhiding is instant. |
 | index build | Creating an index on existing data; on a replica set every voting member builds it and the **commit quorum** decides when it commits. |
 | working set | The documents and index pages a workload touches; performance falls when it no longer fits the WiredTiger cache. |
-| plan cache | The server's memory of the winning plan per query shape; cleared by restarts, index changes, or `planCacheClear`. |
+| plan cache | The server's memory of the winning plan per query shape; emptied for a collection when an index on it is created or dropped, or by `planCacheClear`. |
 | slot-based engine (SBE) | The newer execution engine; its explain has `explainVersion: '2'` and lowercase stage names in `executionStages`. |
 | pipeline | An aggregation's list of stages; the optimiser may move and merge stages before it runs. |
 | keyset pagination | Paging by "rows after this sort key", with a filter on the last row's key, instead of `skip`. |
