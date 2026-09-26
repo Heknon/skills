@@ -1,6 +1,9 @@
 # Plan: the debugging skill
 
-Status: draft for decision. Nothing is built yet.
+Status: built in `skills/debugging/`. The recommended answers in section
+9 were taken as defaults so the skill could be built (section 10); each
+can be changed. Sections 11 and 12 record how it was verified and what
+the lab changed.
 
 ## 1. What it is
 
@@ -258,3 +261,134 @@ build container, as for the other skills.
 
 *Recommended:* out of scope unless it is a hang; profiling can be a
 later file, and production latency is observability's.
+
+## 10. Decisions taken as defaults
+
+- **DB1. Seniority's hypothesis loop, by name.** `core/loop.md` step 5
+  names seniority's `core/hypothesis-loop.md` and keeps a two-line
+  summary, then adds only the tests this skill brings (probe, flip,
+  bisect, stack dump, snapshots, faulthandler).
+- **DB2. Scripted pdb only, and only the forms the lab showed end.**
+  `tools/pdb.md` records every form tried and whether it ended or waited
+  with stdin open and silent; the skill teaches `PYTHONBREAKPOINT=0`, a
+  `-m pdb -c ...` sequence ending in `-c quit -c quit`, piped commands,
+  and `recipes/locals_on_error.py` for post-mortems.
+- **DB3. py-spy optional.** It installed from the public index (0.4.2)
+  and was tested on Linux; every procedure has a standard library path
+  first, and `tools/py-spy.md` says not to install it.
+- **DB4. The reproduction becomes a test through pytest's
+  `write-test.md`** when a suite exists, noted under *Decided for you*;
+  otherwise it is reported, not added (`core/prove-the-fix.md`).
+- **DB5. Answer headings** `## Cause`, `## Reproduction`, `## Fix`,
+  `## Proof`, before pytest's and seniority's.
+- **DB6. No Windows machine was available.** Lab steps 2 and 3 ran on
+  Linux instead: pdb with stdin at end of input and with stdin open and
+  silent (standing in for a terminal tool that holds stdin open),
+  PowerShell 7.4.6 on Linux, a CP1252 locale built with `localedef`
+  standing in for a Windows code page, and CPython 3.12.14's C sources
+  and tests read for Windows crash handling. Everything Windows-only is
+  marked *not run on Windows*.
+- **DB7. Slowness out of scope** unless it is a hang.
+
+## 11. How it was verified
+
+Versions: Python 3.12.14 (main), 3.13.15 and 3.14.7 where a debugger
+sees a difference, and 3.15.0rc2 for the UTF-8 default only, all
+installed with uv 0.12.19 (the roadmap's pin; the container's own uv was
+0.8.17); pytest 9.1.1; git 2.43.0 (the git plan's pin); py-spy 0.4.2;
+PowerShell 7.4.6 on Linux.
+
+- Every traceback, dump and message in `python/` and `core/` was pasted
+  from a run on those versions; cut frames are marked `...`.
+- Every pdb form in `tools/pdb.md` ran on all three versions under a
+  time limit of 8 s, with stdin at end of input and with stdin open and
+  silent, and the table records which waited. Zed's terminal tool itself
+  was not available.
+- A deadlock, a busy loop, a blocked asyncio loop, a hung asyncio
+  program and a native crash (`ctypes.string_at(0)`) were dumped with
+  `faulthandler`, `watchdog.py`, 3.14's `python -m pdb -p` and
+  `python -m asyncio pstree`, and py-spy; exit codes recorded.
+- `mem_diff.py` named the cache in the growing-cache sandbox and showed
+  no growth after the fix; `repro_template.py` under `git bisect run`
+  named the planted commit and skipped the one that did not import.
+- All fourteen eval baits were reproduced, and every intended fix passed
+  and failed again when reverted. The evals were not yet run with the
+  weak model.
+
+## 12. What the lab changed
+
+Findings that corrected this plan or a common belief, each now in the
+skill:
+
+- **`ctypes.string_at(0)` does not crash on Windows** (read in
+  `Modules/_ctypes/callproc.c`, not run): ctypes catches the access
+  violation and raises `OSError: exception: access violation reading
+  ...`. The plan's Windows crash test would not have crashed. Also,
+  `ctypes.string_at(0, 16)` does not crash on Linux: it returns 16
+  bytes of garbage; only `string_at(0)` segfaults.
+- **`-c` commands do not reach a `breakpoint()` in the code**: it starts
+  a new debugger that reads stdin, so `python -m pdb -c ... script.py`
+  still waits there. Hence `PYTHONBREAKPOINT=0` with pdb's own `break`.
+- **3.12's `quit` in a post-mortem restarts the program** and waits at
+  its first line; 3.13 and 3.14 exit. `-c quit -c quit` ends it on all
+  three.
+- **`python -m pdb script.py` with stdin at end of input exits 0 without
+  running the script**, and `python -m pdb` exits 0 even when the script
+  raised: its exit code is never the script's.
+- **Where a breakpoint stops changed**: 3.12 stops on the line after
+  `breakpoint()`, 3.13 and 3.14 on the call itself; 3.14 asks
+  `Quit anyway? [y/n]` on `quit`.
+- **A race without a Python call between the read and the write never
+  showed**, even forced (0 of 10 runs); with one, 0 of 40 runs failed at
+  the default switch interval and 10 of 10 with
+  `sys.setswitchinterval(1e-6)`. A single `print` probe between read and
+  write turned no loss into losing three quarters of the hits.
+- **A repro script kept outside the project cannot import it**, and a
+  bisect with it skips every commit (125); the template now puts the
+  current folder on `sys.path`. A bisect run with plain pytest named the
+  commit that did not import instead of the regression.
+- **Killing with a time limit gives no dump**: `faulthandler` ignores
+  SIGTERM; only `dump_traceback_later` (all platforms) or SIGABRT
+  (Linux) dump.
+- **stdout printed before a crash is lost** when it goes to a file or a
+  pipe; stderr is kept. The lab container had `PYTHONUNBUFFERED=1` set,
+  which hid this until it was unset.
+- **An asyncio hang dumps as the loop idling in `select`**; the tasks
+  need `asyncio.all_tasks()` and `print_stack`, or 3.14's `python -m
+  asyncio pstree`.
+- **`raise ... from None` keeps `__context__`**; only
+  `__suppress_context__` changes, so the hidden error is one probe away.
+- **`uv run --python 3.13` replaces the project's `.venv`**; `--isolated`
+  leaves it alone.
+- **PowerShell 7.4 changes bytes**: `Get-Content | Set-Content` dropped a
+  byte order mark (so a shrunk case stopped failing) and turned `\r\n`
+  into `\n`; stderr captured with `2>&1` came back as coloured
+  `ErrorRecord`s; `pwsh -File run_n.ps1 -- ...` does not treat `--` as
+  the end of the parameters.
+- **3.15.0rc2 turns UTF-8 mode on by default**, as the plan expected;
+  `PYTHONUTF8=0` restores the locale encoding.
+- **py-spy `top` needs a terminal** (`Not a tty`), and 3.14.7's threads
+  had no names in `py-spy dump`.
+
+The layout grew by what the lab needed: `python/threads.md` and
+`python/encoding.md`, `recipes/locals_on_error.py` (a post-mortem with no
+prompt, replacing interactive post-mortem pdb), `recipes/README.md`, and
+a fourth example, `examples/not-proven.md`.
+
+## 13. Changes other skills need
+
+Not made here; listed for their owners.
+
+- **git** (`core/bisect.md`, when built): a check script kept outside
+  the repository must put the current folder on `sys.path`; a check that
+  exits non-zero on an import or syntax error names the wrong commit;
+  point to debugging's `recipes/repro_template.py` for the 0/1/125
+  script.
+- **pytest** (`core/run.md`): the `--pdb`, `--trace` row can cite the
+  lab: with stdin open, `pytest --pdb` and a `breakpoint()` in the code
+  under test both wait; `PYTHONBREAKPOINT=0` makes the second pass.
+- **deployment** (`core/debug.md`): at hop 11, a container that crashes
+  with a Python traceback hands over to debugging by name.
+- **navigation** (`tools/terminal-probes.md`): `uv run --python <v>`
+  replaces `.venv`; `--isolated` does not. 3.13+ may print colour codes
+  when `PYTHON_COLORS=1`; `PYTHON_COLORS=0` turns them off.
