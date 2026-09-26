@@ -1,6 +1,8 @@
 # Plan: the offline-docs skill
 
-Status: draft for decision. Nothing is built yet.
+Status: built on branch `claude/skill-offline-docs`, in
+`skills/offline-docs/`. Sections 10 to 12 record the decisions taken, how
+it was verified and what the lab changed.
 
 ## 1. What it is
 
@@ -220,3 +222,109 @@ ranks below the installed source unless it names the installed version.
 `uv run --isolated --with pkg==X` downloads into uv's cache and leaves
 the project alone. *Recommended:* allowed for Changed questions and
 said in the answer; never `uv add` or `uv sync`.
+
+## 10. Decisions taken as defaults
+
+Each decision took its *Recommended* answer.
+
+- **R1. Its own skill.** It starts from navigation's Environment answer
+  and does not repeat it: `core/pin-version.md` runs one probe in a uv
+  project and sends poetry, conda or a stray `python` to navigation's
+  `core/environment.md`. Nothing moved out of navigation; navigation
+  still needs its one pointer line (below).
+- **OD1. Scope.** Python packages, the standard library, and asking any
+  CLI about itself. No copy of Python's manuals was named, so the
+  standard library source and `python -m pydoc <topic>` are the
+  reference.
+- **OD2. Internal pages.** Read only, from hosts the person names or the
+  index the project already uses; a page ranks below the installed code
+  unless it names the installed version (`core/docs.md`,
+  `core/evidence.md`).
+- **OD3. A throwaway environment.** `uv run --isolated --no-project
+  --with <dist>==<v>` for Changed questions, said in the answer; never
+  `uv add` or `uv sync` (`core/changed.md`).
+
+The layout gained `recipes/lookup.py` (pin, where, grep, lines, def,
+wheel, diff), a fourth example (`what-changed.md`), `evals/libs/` with the
+made-up libraries' sources and `build.sh`, and a tenth eval,
+`import-side-effect`, for the "stuck or side effects" failure.
+
+Changes other skills need, not made here: navigation's
+`tools/terminal-probes.md` gets one line pointing third-party lookups
+(wrappers, compiled modules, stubs, `**kwargs`, dist-info, versions
+compared) to offline-docs; the roadmap rows proposed in section 6 still
+stand.
+
+## 11. How it was verified
+
+On Linux (no Windows machine): uv 0.12.19 (the roadmap's pin), a
+uv-managed CPython 3.12.14, pydantic 1.10.26 (the last 1.10 on the public
+index), orjson 3.12.0, requests 2.34.2 with types-requests
+2.33.0.20260906, PyYAML 6.0.3, ruff 0.16.9 and 0.6.9, mypy 2.3.1,
+pyright 1.1.414, ty 0.0.84, git 2.43.0, devpi-server 6.20.3 with
+devpi-web 5.1.1, Sphinx 9.1.0. The made-up libraries (fetchkit 1.4.0,
+1.5.0, 2.0.0, types-fetchkit, callagain, quickcfg, reportjob) were built
+with uv_build into wheels that rebuild byte for byte.
+
+Every command, API, message and line number in the skill was run or read
+in installed source in that lab, and its output copied into the file
+that states it. Every eval bait was reproduced and every intended answer
+checked in a fresh copy of its sandbox; the four examples are those runs.
+Terminal behaviour (pagers, `pydoc -p`) was run under `script`, a
+pseudo-terminal. The recipe was run in every sandbox.
+
+Not verified: anything on Windows or in Zed's agent terminal (marked
+`not run on Windows` where stated); PowerShell's `Get-Help`; Nexus or any
+doc server but devpi; the baits on MiniMax 2.7 without the skill; the
+internal mirror's versions (the public index stood in for it).
+
+## 12. What the lab changed
+
+Findings that corrected this plan or a common belief, each now in the
+skill:
+
+- `help()` and `python -m pydoc x` wait in a pager only when both input
+  and output are a terminal; `TERM=dumb` or a pipe avoids it
+  (`pydoc.py:1652-1673`). `uv help run` pages too; `uv help --no-pager
+  run` and `uv run --help` do not.
+- `pydoc -p` is unusable from an agent: in a terminal it waits at a
+  `server>` prompt, and with no input it stops at once. `pydoc -w` writes
+  `<name>.html` into the current folder.
+- `pydoc -k` and `pydoc modules` import every package on the path
+  (`pkgutil.walk_packages`), so they run top-level code; the plan listed
+  `-k` among the discovery steps. Only `find_spec` of a top-level name
+  avoids the import.
+- `inspect.signature` works on many C functions (`len`, `sorted`,
+  `orjson.dumps`) and fails on others (`max`, `getattr`, `dict`,
+  `socket.socket.settimeout`); `getsource` fails on all. On a Cython
+  method (pydantic 1.10.26) the signature works and `__code__` still names
+  the `.py` file and line.
+- `inspect.getsource(collections.OrderedDict)` returns a pure-Python class
+  that does not run: the module replaces it with the C one at line 340.
+- pydantic 1.10.26 ships each module twice, compiled and `.py`; the
+  compiled one is what imports. The `.py` is still the source to cite.
+- `importlib.metadata.packages_distributions()` has no entry for an
+  editable install, and an editable install's version goes stale under
+  `uv run --no-sync` after `pyproject.toml` changes.
+- uv writes `REQUESTED` for every package, dependencies included, so it
+  says nothing about what was asked for.
+- No changelog file in any of 59 popular wheels; 37 of their sdists have
+  one; a few carry release notes in `METADATA` (pydantic 1.10.26: every
+  1.10 release).
+- A `types-*` package wins over a library's own inline types for mypy
+  (types-requests 2.33 over requests 2.34.2), and its `METADATA` says
+  which version it targets. All three checkers accepted a parameter from
+  a stub that the runtime rejects.
+- `uv run --isolated --no-project --with x==v` left `.venv` byte for byte
+  unchanged; `--with` needs the version on an index uv uses.
+- ruff 0.16.9 enables RUF059 by default (413 default rules), so the
+  question "turn it on" had the answer "it already is", from
+  `ruff check --show-settings`.
+- An explicit `timeout=None` passed to `urlopen` disables the timeout even
+  after `socket.setdefaulttimeout(1)` (a run waited past 4 s).
+- A script run as `python lookup.py` does not see the project's own
+  packages (its folder, not the current one, is first on `sys.path`); the
+  recipe puts the current folder first, as `python -c` does.
+- A uv-managed CPython 3.12.14 has no `test/` package, 96 modules built
+  into the interpreter with no file at all, and an `EXTERNALLY-MANAGED`
+  marker.
