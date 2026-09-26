@@ -1,0 +1,18 @@
+rs3 [direct: primary] shop> db.orders.aggregate([{$indexStats: {}}, {$project: {name: 1, host: 1, accesses: 1}}])
+[
+  {
+    name: 'status_1',
+    host: 'vm:27021',
+    accesses: { ops: Long('5'), since: ISODate('2026-09-26T05:50:41.370Z') }
+  },
+  {
+    name: '_id_',
+    host: 'vm:27021',
+    accesses: { ops: Long('0'), since: ISODate('2026-09-26T05:50:32.630Z') }
+  },
+  {
+    name: 'country_1',
+    host: 'vm:27021',
+    accesses: { ops: Long('0'), since: ISODate('2026-09-26T05:51:25.254Z') }
+  }
+]
