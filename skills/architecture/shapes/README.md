@@ -21,7 +21,7 @@ shapes add an after-only test that shows what the after makes possible
 
 This skill states the end state, never the steps. The steps from a
 before to an after, each checked, are the refactoring skill's recipes,
-named by the same IDs.
+named by the same IDs; each shape's last line gives its recipe's path.
 
 ## Before is correct, only badly placed
 
@@ -43,6 +43,16 @@ uv run python check_shapes.py L5 L8      # some
 `check_shapes.py` writes each side's files from the fenced blocks
 (`python file=before/...`, `python file=after/...`, a shared
 `python file=test_shape.py`) into a temporary folder and runs pytest
-there. *lab,* Python 3.12.14 with the pins in `pyproject.toml`: all 22
-runs passed (11 shapes, before and after). The PowerShell form above is
-*not run on Windows*.
+there, and ends with `check_shapes: <n> of <n> sides passed`. *lab,*
+Python 3.12.14 with the pins in `pyproject.toml`: `check_shapes: 22 of
+22 sides passed`. The PowerShell form above is *not run on Windows*.
+
+## An after is clean under the linting checks
+
+An after adds no ruff or mypy finding: ruff 0.16.9 (`E4,E7,E9,F,B,
+PLC0415,TRY002`) and mypy 2.3.1 on `app`, as refactoring's
+`run_recipes.py` runs them. Where typing shows a bug the before already
+had, the after keeps the behaviour, makes it explicit and says so beside
+the code (L3: the missing user, a 500 on both sides); it never silences
+the checker. Where a finding is only an untyped value, the after types
+it (L6: `TypedDict`s for the raw rows).

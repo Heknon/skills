@@ -45,7 +45,7 @@ def run_side(files: dict[str, str], root: Path) -> tuple[int, str]:
 
 
 def main(ids: list[str]) -> int:
-    failed = 0
+    failed = runs = 0
     for md in sorted(HERE.glob("L*-*.md"), key=lambda p: int(p.name[1:].split("-")[0])):
         shape_id = md.name.split("-")[0]
         if ids and shape_id not in ids:
@@ -54,7 +54,9 @@ def main(ids: list[str]) -> int:
             for side, files in split(md).items():
                 code, summary = run_side(files, Path(tmp) / side)
                 failed += code != 0
+                runs += 1
                 print(f"{shape_id:4} {side:6} {summary}")
+    print(f"check_shapes: {runs - failed} of {runs} sides passed")
     return 1 if failed else 0
 
 

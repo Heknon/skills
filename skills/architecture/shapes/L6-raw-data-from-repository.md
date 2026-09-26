@@ -43,11 +43,26 @@ def open_totals() -> list[dict]:
 ## After
 
 ```python file=after/app/main.py
+from typing import TypedDict
+
 from fastapi import FastAPI
 from pydantic import BaseModel
 
 app = FastAPI()
-INVOICES = [
+
+
+class InvoiceDoc(TypedDict):                 # a stored document's keys
+    customer_id: str
+    amount_cents: int
+    paid: bool
+
+
+class OpenTotalRow(TypedDict):               # one row of the aggregation
+    _id: str
+    open_cents: int
+
+
+INVOICES: list[InvoiceDoc] = [
     {"customer_id": "c1", "amount_cents": 500, "paid": False},
     {"customer_id": "c1", "amount_cents": 200, "paid": False},
     {"customer_id": "c2", "amount_cents": 900, "paid": True},
@@ -65,7 +80,7 @@ class InvoiceRepository:
         for inv in INVOICES:
             if not inv["paid"]:
                 totals[inv["customer_id"]] = totals.get(inv["customer_id"], 0) + inv["amount_cents"]
-        rows = [{"_id": c, "open_cents": t} for c, t in totals.items()]
+        rows: list[OpenTotalRow] = [{"_id": c, "open_cents": t} for c, t in totals.items()]
         return [CustomerTotal(customer_id=r["_id"], open_cents=r["open_cents"]) for r in rows]
 
 
@@ -83,6 +98,16 @@ The list here stands in for `Invoice.aggregate([...]).to_list()`, which
 returns `dict`s keyed by `_id` (`skills/mongodb/core/aggregation.md`); the
 mapping line is the same.
 
+**The raw data is typed where it is read.** The before's untyped list is
+`list[dict[str, object]]` to mypy 2.3.1, which reports `index` and
+`call-overload` on the totals line; mapping those rows to the model adds
+`arg-type` (`incompatible type "object"; expected "str"`). None of them
+is a bug: the values are right at run time. The two `TypedDict`s state
+the document's and the row's keys, inside the repository, and the after
+is clean. *lab:* a mistyped key, `r["id"]`, is then a mypy error
+(`TypedDict "OpenTotalRow" has no key "id"  [typeddict-item]`); the
+same typo in the before gave no new finding.
+
 ## The test both pass
 
 ```python file=test_shape.py
@@ -95,5 +120,9 @@ def test_open_totals():
     assert TestClient(app).get("/open-totals").json() == [{"customer_id": "c1", "open_cents": 700}]
 ```
 
-Checked with `uv run python check_shapes.py L6`. Steps: refactoring's
-recipe `L6`.
+*lab,* Python 3.12.14: `uv run python check_shapes.py L6`, both sides 1
+passed; the after is clean under ruff 0.16.9 (`E4,E7,E9,F,B,PLC0415,
+TRY002`) and mypy 2.3.1; typing changed neither the body nor the
+OpenAPI document.
+
+Steps from before to after: `skills/refactoring/recipes/L6-raw-data-from-repository.md`.

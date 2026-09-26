@@ -164,5 +164,6 @@ def test_duplicate_email_is_409():
 ```
 
 Checked with `uv run python check_shapes.py L8`. Driver error classes
-for each database: `beanie/errors.md`, `sqlalchemy/errors.md`. Steps:
-refactoring's recipe `L8`.
+for each database: `beanie/errors.md`, `sqlalchemy/errors.md`.
+
+Steps from before to after: `skills/refactoring/recipes/L8-untranslated-db-error.md`.

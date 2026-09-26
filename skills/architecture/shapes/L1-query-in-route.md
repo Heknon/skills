@@ -111,5 +111,6 @@ def test_published_filters_drafts():
 ```
 
 Checked with `uv run python check_shapes.py L1`: before 1 passed,
-after 2 passed. The steps from before to after are refactoring's recipe
-`L1`.
+after 2 passed.
+
+Steps from before to after: `skills/refactoring/recipes/L1-query-in-route.md`.

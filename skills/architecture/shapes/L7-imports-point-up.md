@@ -129,5 +129,6 @@ def test_models_import_no_schemas():
 ```
 
 Checked with `uv run python check_shapes.py L7`; the after-only test
-fails on the before (it finds the function-level import). Steps:
-refactoring's recipe `L7`.
+fails on the before (it finds the function-level import).
+
+Steps from before to after: `skills/refactoring/recipes/L7-imports-point-up.md`.
