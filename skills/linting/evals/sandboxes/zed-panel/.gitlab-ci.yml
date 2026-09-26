@@ -1,0 +1,6 @@
+checks:
+  image: python:3.12
+  script:
+    - uv sync --locked
+    - uv run --no-sync ruff check .
+    - uv run --no-sync mypy

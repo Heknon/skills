@@ -1,0 +1,43 @@
+# Offline pre-commit hooks for a uv workspace (services/*, packages/*).
+# One config, at the repository root; nested configs are not used by
+# commits. Tools come from the workspace lock; --all-packages installs
+# every member so imports between members resolve. Change the member
+# paths and add one mypy hook per member that has its own settings.
+default_install_hook_types: [pre-commit]
+default_stages: [pre-commit]
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run --frozen --all-packages ruff check --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+      - id: ruff-format
+        name: ruff format
+        entry: uv run --frozen --all-packages ruff format --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+      - id: mypy-api
+        name: mypy (services/api, strict)
+        entry: uv run --frozen --all-packages mypy --config-file services/api/pyproject.toml services/api/src
+        language: system
+        files: ^services/api/
+        types_or: [python, pyi]
+        pass_filenames: false
+      - id: mypy-worker
+        name: mypy (services/worker)
+        entry: uv run --frozen --all-packages mypy services/worker/src
+        language: system
+        files: ^services/worker/
+        types_or: [python, pyi]
+        pass_filenames: false
+      - id: mypy-common
+        name: mypy (packages/common)
+        entry: uv run --frozen --all-packages mypy packages/common/src
+        language: system
+        files: ^packages/common/
+        types_or: [python, pyi]
+        pass_filenames: false

@@ -1,0 +1,55 @@
+PS C:\work\billing> ruff check .
+F401 [*] `os` imported but unused
+ --> src/billing/charges.py:2:8
+  |
+1 | import logging
+2 | import os
+  |        ^^
+3 | from typing import Optional
+  |
+help: Remove unused import: `os`
+  |
+1 | import logging
+  - import os
+2 | from typing import Optional
+  |
+
+UP045 [*] Use `X | None` for type annotations
+  --> src/billing/charges.py:8:31
+   |
+ 8 | def charge(amount: str, note: Optional[str] = None, tags=[]) -> dict:
+   |                               ^^^^^^^^^^^^^
+ 9 |     try:
+10 |         cents = int(amount)
+   |
+help: Convert to `X | None`
+  |
+7 |
+  - def charge(amount: str, note: Optional[str] = None, tags=[]) -> dict:
+8 + def charge(amount: str, note: str | None = None, tags=[]) -> dict:
+9 |     try:
+  |
+
+B006 Do not use mutable data structures for argument defaults
+  --> src/billing/charges.py:8:58
+   |
+ 8 | def charge(amount: str, note: Optional[str] = None, tags=[]) -> dict:
+   |                                                          ^^
+ 9 |     try:
+10 |         cents = int(amount)
+   |
+help: Replace with `None`; initialize within function
+
+BLE001 Do not catch blind exception: `Exception`
+  --> src/billing/charges.py:11:12
+   |
+ 9 |     try:
+10 |         cents = int(amount)
+11 |     except Exception:
+   |            ^^^^^^^^^
+12 |         log.warning("bad amount %r", amount)
+13 |         cents = 0
+   |
+
+Found 4 errors.
+[*] 2 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).

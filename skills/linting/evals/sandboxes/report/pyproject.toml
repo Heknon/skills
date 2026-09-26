@@ -1,0 +1,19 @@
+[project]
+name = "app"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = ["ruff==0.16.9"]
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "UP"]
+# Long SQL and log lines are kept on one line so they can be searched for.
+ignore = ["E501"]

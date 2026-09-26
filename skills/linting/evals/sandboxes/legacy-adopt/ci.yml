@@ -1,0 +1,5 @@
+# The project's current CI job (GitLab). mypy is not run yet.
+lint:
+  script:
+    - uv sync --locked
+    - uv run --no-sync ruff check .
