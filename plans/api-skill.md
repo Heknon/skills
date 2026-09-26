@@ -1,6 +1,9 @@
 # Plan: the api skill
 
-Status: draft for decision. Nothing is built yet.
+Status: built on branch `claude/skill-api` (`skills/api/`, 113 files,
+2,680 lines of markdown). Decisions A1 to A8 were taken with their
+recommended answers (section 10); sections 11 to 13 record how it was
+verified, what the lab changed and what was not verified.
 
 ## 1. What it is
 
@@ -249,3 +252,131 @@ stays framework agnostic so a `flask/` folder can be added later.
 
 *Recommended:* out of this skill, except which requests are safe to retry
 (`core/idempotency.md`). Client timeouts and backoff need an owner.
+
+## 10. Decisions taken as defaults
+
+- **A1. Versions.** FastAPI 0.141.1 with Starlette 1.7.0, and 0.118.0
+  with Starlette 0.48.0 (FastAPI 0.118 caps Starlette below 0.49). Both
+  with pydantic 2.13.5, uvicorn 0.54.0, Python 3.12; httpx2 2.13.1 on the
+  new line, httpx 0.28.1 on the old. FastAPI 0.117.1 was added for one
+  row (when teardown runs), and releases between were bisected where a
+  behaviour changed. `fastapi/versions.md` holds the differences.
+- **A2.** RFC 9457 problem details, validation errors in an `errors`
+  member (`core/errors.md`, the recipe's `problems.py`).
+- **A3.** Keyset cursors, opaque, sort key plus id; a maximum page size;
+  no total by default (`core/pagination.md`).
+- **A4.** Additive first; `/v2` only for an unavoidable break
+  (`core/compatibility.md`).
+- **A5.** Merge-patch meaning over `application/json`, and
+  `application/merge-patch+json` accepted; JSON Patch for reading only.
+- **A6.** `Annotated[...]` everywhere; `with TestClient(app)`; an async
+  client inside `lifespan_context` only when a test must await.
+- **A7.** Structure stays with architecture and mongodb; the recipe is
+  flat and says so. FastAPI only.
+- **A8.** Calling other APIs stays out, except which requests are safe
+  to retry (`core/idempotency.md`).
+
+Changes from the layout in section 5: two more kinds in the router,
+**Update** (PUT and PATCH) and **Review**; `recipes/tools/` with
+`openapi_dump.py` (writes the OpenAPI document itself, since a
+PowerShell redirect can change the encoding) and `stall_check.py`;
+examples named `patch-that-reset.md`, `breaking-rename.md`,
+`stall-found.md`; a fifteenth eval, `lost-update`, for If-Match and the
+revision race of R4.
+
+## 11. How it was verified
+
+- Every FastAPI and Starlette fact was run in a scratch lab on both
+  lines of A1 (parameter matrix against `/openapi.json`, response
+  filtering, the dependency cache, teardown order and scope, overrides,
+  lifespan with and without `with`, handlers against the router's 404
+  and 405, middleware order and CORS placement, background tasks,
+  redirects, security status codes, content types). Timings ran under
+  uvicorn with real concurrent requests. Version boundaries were read in
+  every published wheel between the two lines and bisected by running
+  the releases around each change.
+- Contract rules quote RFC 9110, 9457, 5789, 7396, 8288 and 6585,
+  fetched as text in the lab; the Idempotency-Key draft (-07) and its
+  datatracker status were read the same way.
+- Every eval bait was reproduced on a fresh copy of its sandbox, and
+  every intended fix was made and passed (section 8 table; all 15).
+- `recipes/service/`: 22 tests pass on FastAPI 0.141.1 (also with
+  `-W error`) and on 0.118.0 with httpx; each behaviour was broken in
+  turn and a named test failed (the table in its README). It answered a
+  real `curl --json` under uvicorn with `201` and `Location`.
+- `Invoke-RestMethod`, `curl` quoting and a body file ran in PowerShell
+  7.5.3 on Linux against a running app.
+- The three examples are fresh runs of the patch-resets, rename-field
+  and stall sandboxes; their outputs are pasted, not written.
+- The recipe's code passes ruff 0.16.9 (`E,F,W,I,B,UP,FAST`), apart from
+  `patching.py`, which is the pydantic skill's file copied unchanged.
+
+## 12. What the lab changed
+
+Findings that corrected the plan or a common belief, each now in the
+skill:
+
+- **The four marked facts, confirmed and made exact.** `/docs` loads
+  Swagger UI from `cdn.jsdelivr.net` and its favicon from
+  `fastapi.tiangolo.com`; `/openapi.json` still works. Strict content
+  type arrived in FastAPI 0.132.0 and only concerns a body with no
+  `Content-Type`: `curl -d` (form encoded) and `Invoke-RestMethod`
+  without `-ContentType` get 422 on every version. The 422 name
+  `HTTP_422_UNPROCESSABLE_CONTENT` exists from Starlette 0.48.0; from
+  1.3.1 the old name warns `StarletteDeprecationWarning`, a
+  `UserWarning`, so pytest shows it and `-W error` fails. TestClient
+  tries `httpx2` first from Starlette 1.2.0; with only `httpx` it warns,
+  with neither it raises a `RuntimeError` naming only `httpx2`, and
+  `fastapi[standard]` still installs `httpx`.
+- **Teardown after `yield` runs after the response by default** (from
+  0.118.0; 0.117.1 ran it before). A commit that fails after `yield`
+  reaches the client as 200. `Depends(scope="function")` (0.121.0)
+  restores the old order and gives 500. Background tasks run while a
+  default-scope session is still open.
+- **A partial model cannot be the FastAPI body parameter** when the full
+  model has model validators: FastAPI validates without the
+  `context={"partial": True}` the pydantic skill relies on, and rejected
+  a valid PATCH. And a `ValidationError` from `apply_patch` inside the
+  endpoint is a 500. The PATCH endpoint takes a `dict` body, calls
+  `apply_patch`, and re-raises as `RequestValidationError`.
+- **A returned instance of the response model's own class is not
+  validated again**: a `model_copy` PATCH returned `display_name: null`
+  with 200 despite `min_length=1`.
+- **`list[str] = []` without `Query()` is read from the body, even on a
+  GET**; the query values are silently ignored.
+- **`on_event` handlers are silently skipped when `lifespan=` is set.**
+- **Security classes answer a missing credential with 401 and
+  `WWW-Authenticate` from 0.122.0**, 403 before.
+- **The 405 `Allow` header names only the first matching route's
+  methods** when GET and PATCH are separate routes.
+- **A route added to a router after `include_router`** is served from
+  0.137.0, a 404 before.
+- **More workers divide a stall, they do not end it**: four workers
+  still held `/health` for 1.7 s.
+- **Python 3.12's `HTTPStatus(422).phrase` is still "Unprocessable
+  Entity"**; problem titles use RFC 9110's names from a small table.
+- Items the plan left open: anyio's threadpool is 40; ruff 0.16.9 has
+  `FAST001` to `FAST003`; `Idempotency-Key` is draft -07, a working
+  group document that expired on 18 April 2026; navigation's file is
+  `python/entry-points.md`, not `languages/python/entry-points.md`.
+- In the recipe, removing the fixture that clears
+  `dependency_overrides` failed no test (the leaks were harmless in that
+  order); the guard stays autouse and the override-leak eval shows the
+  failure it prevents.
+- pydantic's `Field(deprecated=...)` warns when your own code reads the
+  field, so the additive rename marks the old field with
+  `json_schema_extra={"deprecated": True}` instead.
+
+## 13. Not verified
+
+- Nothing ran on Windows. PowerShell facts ran in PowerShell 7.5.3 on
+  Linux; Windows PowerShell 5.1 quoting for native programs, the `curl`
+  alias and redirect encodings are marked "not run on Windows". The
+  recipe's tests did not run in PowerShell on Windows.
+- Which of `httpx` and `httpx2` the internal mirror carries.
+- The pairing of FastAPI 0.141 with Beanie (roadmap R2, open) was not
+  tried; it is architecture's and mongodb's question.
+- Serving Swagger UI from internally hosted assets: the code ran with
+  placeholder URLs; no real assets were served.
+- The evals have not been run against the target model; `runs` is
+  empty.
