@@ -1,0 +1,10 @@
+[
+  {"customer": "acme", "balance": 12.0,
+   "items": [{"sku": "A1", "qty": 2, "price": 10.0}]},
+  {"customer": "birch",
+   "items": [{"sku": "B7", "qty": 1, "price": 25.5}]},
+  {"customer": "cobalt", "balance": 5.0,
+   "items": [{"sku": "A1", "qty": 1, "price": 10.0}]},
+  {"customer": "dune",
+   "items": [{"sku": "C3", "qty": 3, "price": 4.0}]}
+]
