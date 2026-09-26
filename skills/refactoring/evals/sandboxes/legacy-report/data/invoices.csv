@@ -1,0 +1,7 @@
+number,customer,status,due,amount,currency,rate
+1001,Acme,open,2026-01-10,1200.00,EUR,
+1002,Acme,paid,2026-01-15,300.00,EUR,
+1003,Globex,open,2026-02-20,500.00,USD,0.92
+1004,Initech,open,2099-01-01,80.00,EUR,
+1005,Globex,open,2026-03-01,250.00,EUR,
+1006,Umbrella,open,2026-02-27,99.99,GBP,
