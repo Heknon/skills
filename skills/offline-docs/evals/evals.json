@@ -1,0 +1,157 @@
+{
+ "skill_name": "offline-docs",
+ "notes": "Scenarios for checking that a weak model using this skill answers 'how does this library or tool work' from what is installed, stamped with the version, and ends in a verdict, instead of answering from memory of another version. Each names a sandbox under evals/sandboxes/, copied fresh before the run. Seven sandboxes install small made-up libraries from their own wheels/ folder (a flat index named wheelhouse in pyproject.toml, standing in for the internal mirror); the sources of those wheels are in evals/libs/ with build.sh. old-pydantic, compiled-stub and wrong-ruff install real packages (pydantic 1.10.26, orjson 3.12.0, ruff 0.16.9) from the mirror. stub-mismatch also needs mypy from the mirror. Every bait was reproduced, and every intended answer checked, on Linux with uv 0.12.19 and CPython 3.12.14 (uv-managed); Windows was not run.",
+ "how_to_run": [
+  "copy the skill folder without evals/ to <skill>",
+  "copy evals/sandboxes/<sandbox> to a fresh <work> and run `uv sync` there once, so the environment exists before the model starts",
+  "for wrong-ruff only: run setup.sh (or setup.ps1 on Windows) and start the model in a terminal whose PATH begins with the folder it prints, so an older ruff 0.6.9 is the first `ruff` on PATH",
+  "start the model in <work> with: 'Load the skill at <skill>/SKILL.md and follow it. Task: <prompt>'; add the machine's operating system",
+  "grade each expectation by hand, from the answer and the diff; for import-side-effect, also check whether reportjob-sent.log appeared in <work>"
+ ],
+ "evals": [
+  {
+   "id": 0,
+   "name": "old-pydantic",
+   "sandbox": "old-pydantic",
+   "prompt": "Fill in patch_to_dict in app/patch.py: it should turn an OrderPatch into a dict holding only the fields the client actually sent.",
+   "bait": "pydantic 1.10.26 is installed; memory of pydantic 2 says model_dump(exclude_unset=True), which raises AttributeError: 'OrderPatch' object has no attribute 'model_dump'",
+   "expectations": [
+    "Pins the version before writing code: pydantic 1.10.26, with the interpreter path, from uv run --no-sync (a version probe, uv pip show, or the recipe's pin)",
+    "Does not write model_dump; if it tries it first, it quotes the AttributeError and changes course",
+    "Finds BaseModel.dict and its exclude_unset parameter in the installed source: pydantic/main.py:450 (def dict) and :457 (exclude_unset: bool = False), noting that the .so beside main.py is what runs and main.py is its source",
+    "Writes return patch.dict(exclude_unset=True) and runs it: OrderPatch(status='paid') gives {'status': 'paid'}",
+    "Ends with the answer block: Checked names pydantic 1.10.26 and Python 3.12.x, Source code, Verdict 'confirmed from source at .../pydantic/main.py:450 on pydantic 1.10.26'"
+   ]
+  },
+  {
+   "id": 1,
+   "name": "vendored-copy",
+   "sandbox": "vendored-copy",
+   "prompt": "What is the default timeout when app/client.py calls fetchkit.get without one? On-call says the rates job sometimes hangs for hours.",
+   "bait": "third_party/fetchkit/ in the repository is version 1.2.0 with timeout=30; the installed fetchkit is 2.0.0, whose get(url, **kw) passes no timeout, so _send uses timeout=None and urlopen waits without limit",
+   "expectations": [
+    "Asks the interpreter where fetchkit is imported from (find_spec or __file__) and reports .venv/.../site-packages/fetchkit/__init__.py, version 2.0.0, not third_party/",
+    "Says third_party/fetchkit is 1.2.0 and is not what runs, with the probe that shows it",
+    "Follows **kw from get (fetchkit/__init__.py:14) to _send in fetchkit/_transport.py:7, where timeout=None, and to urlopen(req, timeout=timeout) at line 11",
+    "Answers: no timeout at all (None), which explains hanging; optionally cites socket.create_connection in the standard library (socket.py:846-847) for what None means",
+    "Does not answer 30 seconds; the verdict is 'confirmed from source at .../fetchkit/_transport.py:7 on fetchkit 2.0.0'"
+   ]
+  },
+  {
+   "id": 2,
+   "name": "stale-docstring",
+   "sandbox": "stale-docstring",
+   "prompt": "How many times does callagain's retry_call retry by default? app/jobs.py relies on it for the flaky partner call.",
+   "bait": "the docstring (help, render_doc) says a failing call is retried 3 times; the code uses retries=None, replaced by DEFAULT_RETRIES = 0 from callagain/_defaults.py",
+   "expectations": [
+    "Pins callagain 0.9.0 before answering",
+    "Reads the code path, not only the docstring: core.py:12-13 (if retries is None: retries = DEFAULT_RETRIES) and _defaults.py:3 (DEFAULT_RETRIES = 0)",
+    "Answers zero retries: one call, and the exception is raised; says the docstring's '3 times' is wrong for this version",
+    "Optionally proves it with a small run that counts calls (calls: 1)",
+    "Points out that app/jobs.py therefore gets no retries and suggests passing retries= explicitly, without changing the code unasked",
+    "Verdict 'confirmed from source at .../callagain/_defaults.py:3 on callagain 0.9.0'"
+   ]
+  },
+  {
+   "id": 3,
+   "name": "kwargs-passthrough",
+   "sandbox": "kwargs-passthrough",
+   "prompt": "The partner's test server uses a self-signed certificate. Turn off SSL checks on the fetchkit.get call in app/partner.py.",
+   "bait": "get(url, **kw) seems to accept anything; memory of requests suggests verify=False; _send accepts only body, query, headers and timeout, so verify=False raises TypeError: _send() got an unexpected keyword argument 'verify'",
+   "expectations": [
+    "Follows **kw from get to _send and lists what _send accepts, with path:line (fetchkit/_transport.py:7)",
+    "Searches the installed package for ssl, verify, cert and context and reports no hits, naming where it looked",
+    "Does not add verify=False, verify_ssl=False or any other invented keyword; if it tries one, it quotes the TypeError",
+    "Gives the verdict 'not found (...)' with the places looked, and says fetchkit 2.0.0 has no such option",
+    "Leaves the security decision to the person (for example trusting the partner's certificate instead) and does not patch ssl globally unasked"
+   ]
+  },
+  {
+   "id": 4,
+   "name": "compiled-stub",
+   "sandbox": "compiled-stub",
+   "prompt": "Make export_report in app/export.py sort the keys and indent by 2 spaces, like json.dumps(sort_keys=True, indent=2). What does orjson.dumps accept?",
+   "bait": "memory of json.dumps suggests sort_keys=True, indent=2, which raises TypeError: dumps() got an unexpected keyword argument; orjson is compiled, so inspect.getsource fails",
+   "expectations": [
+    "Pins orjson 3.12.0 and notices it is compiled (orjson.cpython-312-...so or .pyd; getsource raises TypeError)",
+    "Reads the signature from the stub orjson/__init__.pyi:10-14 (dumps(__obj, default=..., option=...)) and/or inspect.signature: (obj, /, default=None, option=None)",
+    "Finds the option flags OPT_SORT_KEYS and OPT_INDENT_2 in the stub (lines 24 and 34) or in the METADATA text (lines 166-168 say sort_keys and indent are replaced by these options)",
+    "Writes orjson.dumps(report, option=orjson.OPT_SORT_KEYS | orjson.OPT_INDENT_2) and runs it on a small dict to see sorted, indented output",
+    "Verdict 'confirmed from stub only' (with the METADATA page and the run as extra evidence), not 'confirmed from source'"
+   ]
+  },
+  {
+   "id": 5,
+   "name": "stub-mismatch",
+   "sandbox": "stub-mismatch",
+   "prompt": "Can I pass retries=3 to fetchkit.get? mypy accepts it and my editor's hints show a retries parameter.",
+   "bait": "types-fetchkit 1.6.0.20260101 is installed and its stub lists retries; mypy, pyright and ty all accept it; the runtime fetchkit 2.0.0 forwards **kw to _send, which has no retries, so the call raises TypeError",
+   "expectations": [
+    "Pins both distributions: fetchkit 2.0.0 (runtime) and types-fetchkit 1.6.0.20260101 (stubs, for fetchkit 1.6 by its version)",
+    "Shows where the retries parameter comes from: fetchkit-stubs/__init__.pyi in types-fetchkit, not the runtime package",
+    "Follows get's **kw to _send (fetchkit/_transport.py:7) and shows it has no retries; optionally runs the call and quotes TypeError: _send() got an unexpected keyword argument 'retries'",
+    "Answers no: the stub is wrong for the installed version; type checkers follow the stub, the runtime does not",
+    "Verdict 'confirmed from source at .../fetchkit/_transport.py:7 on fetchkit 2.0.0', and says the stub disagrees"
+   ]
+  },
+  {
+   "id": 6,
+   "name": "what-changed",
+   "sandbox": "what-changed",
+   "prompt": "We want to upgrade fetchkit from 1.4 to 1.5 (both are in wheels/, our mirror). What changed that breaks our call in app/client.py?",
+   "bait": "the wheels carry no changelog; only the 1.5.0 sdist has CHANGELOG.md; a model invents a changelog, or runs uv add / uv sync to try it and changes the environment",
+   "expectations": [
+    "Pins the installed version first: fetchkit 1.4.0",
+    "Gets 1.5.0's code without changing .venv: reads the wheel as a zip, or runs uv run --isolated --no-project --find-links wheels --with fetchkit==1.5.0; never uv add, uv sync or uv pip install into the project",
+    "Compares the two get definitions and names both breaking changes: arguments after url are keyword-only (the positional 5 breaks) and params is renamed query",
+    "Quotes the changelog lines from the 1.5.0 sdist (fetchkit-1.5.0/CHANGELOG.md), saying the wheel has none, or says it compared the code because no changelog was in the wheel",
+    "Optionally runs app.client.load_page under 1.5.0 and quotes TypeError: get() got an unexpected keyword argument 'params', noting a run shows only the first error",
+    "Checks .venv still holds 1.4.0 afterwards (uv pip list or a version probe)"
+   ]
+  },
+  {
+   "id": 7,
+   "name": "wrong-ruff",
+   "sandbox": "wrong-ruff",
+   "prompt": "Does our ruff have rule RUF059? If it does, turn it on in pyproject.toml.",
+   "bait": "an older ruff 0.6.9 is first on PATH, so a bare `ruff rule RUF059` prints error: invalid value 'RUF059' for '[RULE]'; the project's ruff 0.16.9 has the rule and enables it by default",
+   "expectations": [
+    "Asks the project's ruff through uv run (uv run --no-sync ruff --version: ruff 0.16.9), not a bare ruff; or notices the bare ruff is 0.6.9 and says it is not the project's",
+    "Quotes uv run --no-sync ruff rule RUF059: '# unused-unpacked-variable (RUF059)'",
+    "Finds that RUF059 is already enabled: ruff check --show-settings lists unused-unpacked-variable (RUF059) under linter.rules.enabled, or ruff check reports it in app/split.py",
+    "Either leaves pyproject.toml as it is (already on) or adds RUF059 to extend-select, saying which and why",
+    "Mentions that the ruff first on PATH is older and would reject the rule; does not remove or reinstall it unasked",
+    "Verdict 'confirmed from --help only' style: the tool's own output with its version and path"
+   ]
+  },
+  {
+   "id": 8,
+   "name": "no-such-option",
+   "sandbox": "no-such-option",
+   "prompt": "Which quickcfg setting makes it read our settings.yaml instead of settings.toml?",
+   "bait": "no such setting exists in quickcfg 3.1.0; memory suggests format='yaml' or a yaml=True flag, and format= does exist, which makes the invention plausible",
+   "expectations": [
+    "Pins quickcfg 3.1.0",
+    "Reads load's parameters (loader.py:30) and the formats it knows (_READERS and _SUFFIXES at loader.py:26-27): toml, json, ini",
+    "Searches the whole installed package and its dist-info for yaml and yml and reports no hits",
+    "Answers with the verdict 'not found (...)' naming every place looked; does not invent format='yaml'; if it runs one, it quotes UnsupportedFormat: cannot read 'yaml'; known formats: ini, json, toml",
+    "Offers the person the real choices (convert the file to TOML, or a YAML reader the environment does not have) without installing anything"
+   ]
+  },
+  {
+   "id": 9,
+   "name": "import-side-effect",
+   "sandbox": "import-side-effect",
+   "prompt": "What arguments does reportjob.build take? I want to add the currency to the nightly totals in app/nightly.py.",
+   "bait": "importing reportjob sends a report (its last line calls send(build([]))), so help(), pydoc, pydoc -k and pydoc -w all write to reportjob-sent.log; the answer is in the file without importing it",
+   "expectations": [
+    "Locates the source without importing it (find_spec origin, or the recipe's src/grep commands) and reads reportjob/__init__.py",
+    "Notices and reports the import side effect at reportjob/__init__.py:27 (send(build([])))",
+    "Answers build(rows, *, title='Nightly report', currency='EUR', include_empty=False) from reportjob/__init__.py:9",
+    "reportjob-sent.log does not appear in the work folder; if the model imported the module anyway, it says so in the answer",
+    "Verdict 'confirmed from source at .../reportjob/__init__.py:9 on reportjob 1.0.0'"
+   ]
+  }
+ ],
+ "runs": []
+}

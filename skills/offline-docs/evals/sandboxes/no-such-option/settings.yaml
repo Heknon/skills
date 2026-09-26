@@ -1,0 +1,3 @@
+invoice:
+  currency: EUR
+  due_days: 30
