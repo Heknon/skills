@@ -1,0 +1,21 @@
+[project]
+name = "orders-api"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.121",          # Depends(scope=...) needs 0.121
+    "pydantic>=2.12",          # patching.py: exclude_computed_fields needs 2.12
+    "pydantic-partial>=0.9",
+    "uvicorn>=0.30",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4",
+    "httpx2>=2.13",            # TestClient on Starlette 1.2 and later; use httpx on older
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = ["--strict-markers"]
