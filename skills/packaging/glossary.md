@@ -31,6 +31,10 @@ One sentence per term. Use these words and no synonyms.
 | explicit index | An index with `explicit = true`: used only for packages pinned to it in `[tool.uv.sources]`. |
 | source | A `[tool.uv.sources]` entry that tells uv where one package comes from: `{ workspace = true }`, `{ path = ... }`, `{ index = ... }`. |
 | dependency confusion | A public package with an internal package's name, chosen because an index strategy or a missing source let it win. |
+| unit | Anything in a repository that builds, runs or deploys on its own (a project, a program with its own Dockerfile, CI job or entry point, a package with its own script inside a larger project), or shared code that other units import. |
+| tie | What makes one unit depend on another: an import, a path hack, `PYTHONPATH`, a path or workspace source, a copied module, a shared requirements file or config. |
+| path hack | A `sys.path.insert` or `sys.path.append` line, or a `PYTHONPATH` setting, that makes code importable only from the checkout. |
+| monorepo | A repository that holds more than one unit; not a kind but a place on a spectrum from unpackaged units tied by paths to one workspace (`core/monorepo.md`). |
 | workspace | A uv workspace: a root `pyproject.toml` with `[tool.uv.workspace] members`, one `uv.lock`, one `.venv`. |
 | member | A project inside a workspace, with its own `pyproject.toml` and version. |
 | sibling | Another member of the same workspace that a member depends on. |

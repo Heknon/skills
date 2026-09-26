@@ -1,6 +1,6 @@
 ---
 name: packaging
-description: Turn Python code into something another machine can install, and install other people's packages safely, with uv. Write and fix pyproject.toml (metadata, requires-python, dependencies, extras, dependency groups), tell which build backend a project uses (hatchling, setuptools, uv_build; recognise poetry-core, pdm-backend, flit-core), src and flat layouts, package data and missing files, editable installs, console scripts and entry points, build a wheel or sdist and say what is in it, versions (static, uv version --bump, or from git tags with hatch-vcs or setuptools-scm), resolve dependency conflicts and read uv.lock, monorepos and uv workspaces (members, workspace sources, one lock or several, bounds on siblings, uv sync --package, releasing one member), internal indexes and the mirror ([[tool.uv.index]], explicit, sources, credentials, internal CA, dependency confusion), wheelhouses across the air gap, and publishing to an internal index. Load it for: pyproject, wheel, sdist, build, backend, package data, entry point, console script, version bump, tag, lock, conflict, uv add, workspace, monorepo, member, index, mirror, wheelhouse, offline install, publish, release. Verified on uv 0.12.19, hatchling 1.32.4, setuptools 84.0.0, Python 3.12.
+description: Turn Python code into something another machine can install, and install other people's packages safely, with uv. Write and fix pyproject.toml (metadata, requires-python, dependencies, extras, dependency groups), tell which build backend a project uses (hatchling, setuptools, uv_build; recognise poetry-core, pdm-backend, flit-core), src and flat layouts, package data and missing files, editable installs, console scripts and entry points, build a wheel or sdist and say what is in it, versions (static, uv version --bump, or from git tags with hatch-vcs or setuptools-scm), resolve dependency conflicts and read uv.lock, repositories that hold several units, whether or not anyone calls them a monorepo (find the units and their ties: imports, sys.path hacks, PYTHONPATH, copied modules, a shared requirements.txt; move them one checked step at a time to a uv workspace), uv workspaces (members, workspace sources, one lock or several, bounds on siblings, uv sync --package, releasing one member), internal indexes and the mirror ([[tool.uv.index]], explicit, sources, credentials, internal CA, dependency confusion), wheelhouses across the air gap, and publishing to an internal index. Load it for: pyproject, wheel, sdist, build, backend, package data, entry point, console script, version bump, tag, lock, conflict, uv add, workspace, monorepo, several projects in one repo, sys.path, PYTHONPATH, untangle, member, index, mirror, wheelhouse, offline install, publish, release. Verified on uv 0.12.19, hatchling 1.32.4, setuptools 84.0.0, Python 3.12.
 ---
 
 # Packaging
@@ -40,7 +40,8 @@ version ... does not match the running version`.
 | **Build** | build a wheel or sdist and say what is in it | `core/build-and-inspect.md` |
 | **Version** | bump, or derive from git tags | `core/versioning.md` |
 | **Dependencies** | add, pin, upgrade, or resolve a conflict | `core/dependencies.md`, `uv/lockfile.md` |
-| **Monorepo** | say how a repository of many packages is organised, or choose how it should be | `core/monorepo.md` |
+| **Monorepo** | say what units a repository holds, how they are tied and where it sits, whether or not it is called a monorepo | `core/monorepo.md`, `core/units-and-ties.md` |
+| **Untangle** | "this is a monorepo, make it better": move units tied by paths, copies or one shared project to a workspace | `core/monorepo.md`, then `core/monorepo-better.md`, `recipes/untangle/` |
 | **Workspace** | set up or fix a uv workspace: add, move or split a member | `core/workspaces.md` |
 | **Member release** | build, version or publish one member | `core/member-release.md`, then `core/publish.md` |
 | **Index** | configure the mirror and internal indexes, credentials, the CA | `core/indexes.md`, `uv/config.md` |
@@ -57,12 +58,14 @@ Before you say any change is done, load `core/verify.md`.
 | `core/` | the procedures above, each ending in a verdict |
 | `backends/` | hatchling, setuptools and uv_build: file selection, data, versions, the errors they print; `others.md` recognises poetry-core, pdm-backend and flit-core |
 | `uv/` | `commands.md` (the commands and flags used here), `config.md` (indexes, variables, credentials, the CA), `lockfile.md` (reading `uv.lock`), `versions.md` (uv 0.8 and 0.12) |
-| `recipes/` | complete projects that were built, installed and run: `src-hatchling/`, `flat-setuptools/`, `uv-build/`, `workspace/`, `independent-projects/`, `internal-index/`, `wheelhouse/`; and `tools/inspect_dist.py` |
-| `examples/` | three finished tasks: a data file lost in the wheel (`lost-data-file.md`), a resolver conflict (`conflict.md`), a workspace member released (`member-release.md`) |
+| `recipes/` | complete projects that were built, installed and run: `src-hatchling/`, `flat-setuptools/`, `uv-build/`, `workspace/`, `independent-projects/`, `untangle/` (before and after), `internal-index/`, `wheelhouse/`; and `tools/inspect_dist.py`, `tools/map_units.py` |
+| `examples/` | four finished tasks: a data file lost in the wheel (`lost-data-file.md`), a resolver conflict (`conflict.md`), a workspace member released (`member-release.md`), a tangled repository walked to a workspace (`untangle-monorepo.md`) |
 
 `glossary.md` fixes the words. `recipes/README.md` says what each recipe
 shows and how it was checked. Run the inspector with
 `uv run --no-project python <skill>\recipes\tools\inspect_dist.py "dist\*"`.
+Map a repository's units and ties with `uv run --no-project python
+<skill>\recipes\tools\map_units.py .` from its root.
 
 ## Invariants
 
@@ -95,6 +98,9 @@ shows and how it was checked. Run the inspector with
     that need different versions are independent projects.
 11. **Resolve against the mirror.** A lock that names `pypi.org` was made
     in another world; a build fetches its backend from the mirror too.
+12. **Units come from the files, not from the word "monorepo".** Map
+    them first; ask only the questions in `core/monorepo.md`, once, each
+    with its evidence and default. Change one unit per step, and check.
 
 ## What you say when you finish
 
