@@ -217,6 +217,13 @@ names as part of a module's public API, and let a split name the module
 that replaced it; a separate change to the harness, reviewed against its
 fixtures, before refactoring's evals run.
 
+*Done:* `check_change.py` now follows a `from x import name` re-export to
+the module that defines the name and compares its signature there, and
+compares a module that became a package with its `__init__.py`. The
+`fixtures/move/` pair (a correct move and split, and a move that changed
+a default and dropped a method) is in `run_fixtures.sh`; the harness
+passes.
+
 ## 7. What the plans changed in this roadmap
 
 - Dependencies found that the first draft missed: navigation is touched

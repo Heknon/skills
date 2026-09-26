@@ -6,6 +6,10 @@ Usage: check_change.py --before DIR --after DIR [--json]
 --before is the snapshot folder (.ledger/before), holding a copy of every
 file as it was before its first edit, at the same relative path. --after
 is the working directory. Only files present in the snapshot are compared.
+A public name that moved and stays importable from its old module (a
+`from x import name` at module level) is compared where it now lives, and
+a module that became a package (`util.py` to `util/__init__.py`) is
+compared as the same module, so a correct move or split is not a removal.
 
 Every rule prints PASS, FAIL, WARN, SKIP or INFO, a count, up to five
 offenders and a note. Exit 0 when no rule is FAIL, 1 when any is, 2 on an
@@ -121,6 +125,60 @@ def public_api(source: str) -> Optional[Dict[str, Signature]]:
     return api
 
 
+def reexports(source: str) -> Dict[str, Tuple[str, int, str]]:
+    """Names a module imports at top level with `from X import name`: {local name: (module, level, original name)}."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return {}
+    names: Dict[str, Tuple[str, int, str]] = {}
+    for node in tree.body:
+        if isinstance(node, ast.ImportFrom):
+            for alias in node.names:
+                if alias.name != "*":
+                    names[alias.asname or alias.name] = (node.module or "", node.level, alias.name)
+    return names
+
+
+def resolve_module(after: str, path: str, module: str, level: int) -> Optional[str]:
+    """The file inside the working directory that an import from `path` names, or None."""
+    parts: List[str] = []
+    if level:
+        base = os.path.dirname(path)
+        for _ in range(level - 1):
+            base = os.path.dirname(base)
+        if base:
+            parts.append(base)
+    parts.extend(part for part in module.split(".") if part)
+    stem = os.path.join(*parts) if parts else ""
+    candidates = [stem + ".py", os.path.join(stem, "__init__.py")] if stem else ["__init__.py"]
+    for root in ([""] if level else ["", "src"]):
+        for candidate in candidates:
+            full = os.path.join(after, root, candidate)
+            if os.path.isfile(full):
+                return full
+    return None
+
+
+def find_signature(after: str, path: str, source: str, name: str, depth: int = 0) -> Tuple[Optional[Signature], bool]:
+    """Look a public name up in a module, following re-exports. Returns (signature, resolved);
+    resolved is False when the name comes from a module outside the working directory."""
+    api = public_api(source) or {}
+    if name in api:
+        return api[name], True
+    head, _, rest = name.partition(".")
+    imports = reexports(source)
+    if head not in imports or depth > 3:
+        return None, True
+    module, level, original = imports[head]
+    target = resolve_module(after, path, module, level)
+    text = read(target) if target else None
+    if text is None:
+        return None, False
+    target_path = os.path.relpath(target, after).replace(os.sep, "/")
+    return find_signature(after, target_path, text, original + ("." + rest if rest else ""), depth + 1)
+
+
 def module_constants(source: str) -> Dict[str, str]:
     try:
         tree = ast.parse(source)
@@ -157,7 +215,8 @@ def is_public(name: str) -> bool:
     return not any(part.startswith("_") and not (part.startswith("__") and part.endswith("__")) for part in name.split("."))
 
 
-def compare_python(path: str, old: str, new: str, api: List[str], errors: List[str], constants: List[str]) -> None:
+def compare_python(path: str, old: str, new: str, api: List[str], errors: List[str], constants: List[str],
+                   after_root: Optional[str] = None) -> None:
     old_api, new_api = public_api(old), public_api(new)
     if old_api is None or new_api is None:
         return
@@ -165,6 +224,10 @@ def compare_python(path: str, old: str, new: str, api: List[str], errors: List[s
         if not is_public(name):
             continue
         after = new_api.get(name)
+        if after is None and after_root is not None:
+            after, resolved = find_signature(after_root, path, new, name)
+            if after is None and not resolved:
+                continue  # re-exported from outside the working directory; its signature cannot be read
         if after is None:
             api.append(f"{path}: {name} was removed or renamed")
             continue
@@ -227,16 +290,22 @@ def evaluate(before: str, after: str):
     for path in files:
         old = read(os.path.join(before, path))
         new = read(os.path.join(after, path))
+        compared_as = path
+        if new is None and path.endswith(".py"):
+            package_init = path[:-3] + "/__init__.py"
+            new = read(os.path.join(after, package_init))
+            if new is not None:
+                compared_as = package_init
         if new is None:
             missing.append(f"{path} is in the snapshot but gone from the working directory")
             continue
         if old is None or old == new:
             continue
-        changed.append(path)
+        changed.append(path if compared_as == path else f"{path} became the package {compared_as}")
         if TEST_PATH_RE.search(path):
             compare_tests(path, old, new, tests, tests_added)
         elif path.endswith(".py"):
-            compare_python(path, old, new, api, errors, constants)
+            compare_python(compared_as, old, new, api, errors, constants, after_root=after)
 
     results.append(Result("files-changed", INFO, len(changed), changed, "files that differ from the snapshot") if files else Result("files-changed", SKIP, 0, [], "no snapshot"))
     results.append(verdict("files-deleted", missing, note="deleting a file is a behaviour change; it needs the ask"))

@@ -35,6 +35,10 @@ done
 expect 0 check_change.py --before fixtures/change/before --after fixtures/change/after_good
 expect 1 check_change.py --before fixtures/change/before --after fixtures/change/after_bad
 expect 1 check_change.py --before fixtures/change/missing --after fixtures/change/after_good
+# a move kept importable from the old module, and a module split into a package, are not removals;
+# a move that changes a default or drops a method still fails
+expect 0 check_change.py --before fixtures/move/before --after fixtures/move/after_good
+expect 1 check_change.py --before fixtures/move/before --after fixtures/move/after_bad
 
 expect 0 check_finish.py --dir fixtures/finish/good
 expect 1 check_finish.py --dir fixtures/finish/bad_behaviour
