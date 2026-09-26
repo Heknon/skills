@@ -46,7 +46,11 @@ def main() -> int:
     work.mkdir(parents=True, exist_ok=True)
     for src in sandbox.rglob("*"):
         rel = src.relative_to(sandbox)
-        if SKIP_NAMES & set(rel.parts) or is_change_file(src) or rel.name == "generate.py":
+        if (
+            SKIP_NAMES & set(rel.parts)
+            or is_change_file(src)
+            or rel.name == "generate.py"
+        ):
             continue
         dst = work / rel
         if src.is_dir():
@@ -62,7 +66,9 @@ def main() -> int:
     git(work, "config", "core.autocrlf", "false")
     exclude = work / ".git" / "info" / "exclude"
     exclude.parent.mkdir(parents=True, exist_ok=True)
-    exclude.write_text("notes/\nincoming/\nuv.lock\n.venv/\n__pycache__/\n*_cache/\n", encoding="utf-8")
+    exclude.write_text(
+        "notes/\nincoming/\nuv.lock\n.venv/\n__pycache__/\n*_cache/\n", encoding="utf-8"
+    )
     if generator.exists():
         subprocess.run([sys.executable, str(generator), "base", str(work)], check=True)
     git(work, "add", "-A")
@@ -74,7 +80,9 @@ def main() -> int:
         git(work, "apply", "--index", str(patch))
         git(work, "add", "-A")
         git(work, "commit", "-q", "-m", message(patch))
-    subprocess.run(["git", "log", "--oneline", "--all", "--graph"], cwd=work, check=True)
+    subprocess.run(
+        ["git", "log", "--oneline", "--all", "--graph"], cwd=work, check=True
+    )
     return 0
 
 

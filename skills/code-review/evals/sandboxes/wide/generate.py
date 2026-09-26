@@ -1,8 +1,8 @@
 """Writes the 38 job modules of this sandbox (called by make_repo.py).
 
-    python generate.py base <work>       jobs log through `log`
-    python generate.py change-1 <work>   the same jobs, renamed to `logger`
-                                         (used only to write change-1.patch)
+python generate.py base <work>       jobs log through `log`
+python generate.py change-1 <work>   the same jobs, renamed to `logger`
+                                     (used only to write change-1.patch)
 """
 
 import sys
