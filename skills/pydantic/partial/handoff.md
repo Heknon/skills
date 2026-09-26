@@ -61,10 +61,30 @@ def apply_patch(stored: M, patch_model: type[BaseModel], body: Any) -> Patched[M
 `Patched.changes`, a nested dict with only the paths the body set, for
 the store. Turning `{"address": {"city": "Lyon"}}` into
 `{"$set": {"address.city": "Lyon"}}` guarded by the revision is the
-mongodb skill's ground; what the endpoint returns and which status it
-uses is the api skill's. Where those skills are not installed yet,
-follow the table above and say that step 4 and the status codes were
-not checked against them.
+mongodb skill's ground (`skills/mongodb/core/patch-to-set.md`); what
+the endpoint returns and which status it uses is the api skill's
+(`skills/api/core/put-and-patch.md`).
+
+**A `dict`-typed field.** `deep_merge` merges a dict key by key, but
+`changes` holds only the keys the body sent. *lab* (pydantic 2.13.5,
+pydantic-partial 0.11.1): stored `prefs={"lang": "fr", "theme":
+"dark"}`, body `{"prefs": {"theme": "light"}}` gave `model.prefs ==
+{"lang": "fr", "theme": "light"}` but `changes == {"prefs": {"theme":
+"light"}}`. Writing `changes["prefs"]` as the new value drops `lang`.
+The store writes a dict field whole, from the validated `model`, as
+mongodb's `recipes/patch_to_set/` does (it produced `{"prefs": {"lang":
+"fr", "theme": "light"}}` for this body).
+
+## The partial model is not the endpoint's body parameter
+
+FastAPI validates a body parameter with no validation context. *lab*
+(FastAPI 0.141.1): a model validator on the body model saw
+`info.context` as `None`. So the early return on `context={"partial":
+True}` (`partial/validators.md`) never happens, and an inherited model
+validator runs on the partial's defaults. Declare the body as a `dict`,
+call `apply_patch` inside the endpoint, and turn its `ValidationError`
+into a 422: the api skill's procedure, in
+`skills/api/core/put-and-patch.md`.
 
 ## PUT
 

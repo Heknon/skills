@@ -135,6 +135,15 @@ lookup happens at every level (*lab:* overriding `leaf`, used by `mid`,
 gave `mid(fake-leaf)`). The replacement's own parameters are
 resolved as a dependency's are.
 
+So give the override a callable with no parameters of its own. A class
+whose `__init__` takes fields, such as a `@dataclass` fake, is read as
+a dependency: its fields become request parameters. *lab* (0.141.1):
+`app.dependency_overrides[get_store] = FakeStore`, a dataclass with
+`items: dict[str, str]`, answered `GET /items/a` with 422 `{"type":
+"missing", "loc": ["body"], "msg": "Field required"}`. Build the fake
+first and pass a lambda: `fake = FakeStore({"a": "fake"})`, then
+`app.dependency_overrides[get_store] = lambda: fake` gave 200.
+
 ## Security dependencies
 
 `HTTPBearer`, `APIKeyHeader` and the other `fastapi.security` classes

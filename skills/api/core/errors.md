@@ -71,7 +71,8 @@ test received it:
 ## Errors from other layers
 
 Custom exception classes (when to define one, where it lives, its
-fields) are the architecture skill's ground; so is translating errors
+fields) are the architecture skill's ground
+(`skills/architecture/placement/custom-errors.md`); so is translating errors
 layer by layer. This skill owns the last step: the handler that turns
 an exception into a status and a problem body. A `ValidationError`
 raised by your own code, not by FastAPI, is a 500 until you convert it

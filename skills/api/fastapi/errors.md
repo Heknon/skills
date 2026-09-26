@@ -66,7 +66,8 @@ def install(app: FastAPI) -> None:
   encode (a `ValueError` in `ctx`).
 - A handler for your own exception class works the same way
   (`@app.exception_handler(OutOfStock)`; *lab:* 409 problem). The class
-  itself is the architecture skill's.
+  itself (when to define one, its base, its fields, where it lives) is
+  the architecture skill's: `skills/architecture/placement/custom-errors.md`.
 
 ## The Exception handler and TestClient
 

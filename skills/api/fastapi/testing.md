@@ -68,6 +68,9 @@ def frozen_clock() -> datetime:
 
 Key the override on the same function object the route's `Depends`
 names, imported from where it is defined (`fastapi/dependencies.md`).
+Give it a lambda that returns the fake, never the fake's class: a
+dataclass's fields are read as request parameters and the route
+answers 422 (*lab*, `fastapi/dependencies.md`).
 What to replace (a repository, a client) is the architecture skill's
 decision.
 
