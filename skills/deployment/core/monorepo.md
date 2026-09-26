@@ -13,7 +13,12 @@ changes compared with: <per event, from the table below>
 ## Find the units
 
 1. List the folders with their own build file (`pyproject.toml`,
-   `Dockerfile`, `Chart.yaml`). Each is a candidate unit.
+   `Dockerfile`, `Chart.yaml`). Each is a candidate unit. Units can also
+   exist without a build file (a folder reached by `sys.path` or
+   `PYTHONPATH`, a program with only a `requirements.txt`): the
+   packaging skill's `recipes/tools/map_units.py` lists every unit and
+   tie with `file:line`, and `core/monorepo.md` there says what to do
+   about them.
 2. For Python, read the root `pyproject.toml`: `[tool.uv.workspace]
    members` lists the workspace members, and each member's
    `[tool.uv.sources]` with `workspace = true` names the members it

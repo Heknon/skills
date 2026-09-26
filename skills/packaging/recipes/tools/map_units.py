@@ -14,7 +14,8 @@ path and workspace sources, requirement files and who reads them, copied
 modules), the Dockerfiles' install and run lines, then the folders the
 evidence cannot place. Each line carries file:line so it can be checked
 by hand. Virtual environments (any folder with pyvenv.cfg), .git and
-caches are skipped. Exit code: 0.
+caches are skipped. Exit code: 0, or 2 when the argument is not a
+folder.
 """
 
 from __future__ import annotations
@@ -24,9 +25,10 @@ import hashlib
 import os
 import re
 import sys
-import tomllib
 from collections import defaultdict
 from pathlib import Path
+
+import tomllib
 
 SKIP = {".git", ".venv", "venv", "node_modules", "__pycache__",
         "dist", "build", ".tox", ".nox", ".mypy_cache", ".pytest_cache",
@@ -38,7 +40,7 @@ TEXT_SUFFIXES = {".yml", ".yaml", ".toml", ".ini", ".cfg", ".sh", ".ps1",
 BUILD_SIGNS = ("pyproject.toml", "setup.py", "setup.cfg")
 GENERIC_NAMES = {"__init__.py", "__main__.py", "conftest.py", "main.py",
                  "setup.py", "app.py", "config.py", "settings.py"}
-MAIN_GUARD = re.compile(r"""^if\s+__name__\s*==\s*['"]__main__['"]""", re.M)
+MAIN_GUARD = re.compile(r"""^if\s+__name__\s*==\s*['"]__main__['"]""", re.MULTILINE)
 SYSPATH = re.compile(r"sys\.path\.(insert|append|extend)\s*\(|site\.addsitedir\s*\(")
 PYTHONPATH = re.compile(r"PYTHONPATH")
 REQ_PATH = re.compile(r"^\s*(-e\s+)?(\.{1,2}[/\\]|file:)")
@@ -72,7 +74,13 @@ def is_docker(rel: Path) -> bool:
 
 
 def main(argv: list[str]) -> int:
+    if len(argv) > 1 and argv[1] in ("-h", "--help"):
+        print(__doc__)
+        return 0
     root = Path(argv[1] if len(argv) > 1 else ".").resolve()
+    if not root.is_dir():
+        print(f"map_units: not a folder: {root}", file=sys.stderr)
+        return 2
     all_files = files(root)
     py = [f for f in all_files if f.suffix == ".py"]
     texts = {f: read(root, f) for f in all_files
@@ -83,11 +91,7 @@ def main(argv: list[str]) -> int:
     signs: dict[Path, list[str]] = defaultdict(list)
     for f in all_files:
         d = f.parent
-        if f.name in BUILD_SIGNS:
-            signs[d].append(f.name)
-        elif f.name.startswith("requirements") and f.suffix in {".txt", ".in"}:
-            signs[d].append(f.name)
-        elif is_docker(f) and any(p.parent == d or d in p.parents for p in py):
+        if f.name in BUILD_SIGNS or f.name.startswith("requirements") and f.suffix in {".txt", ".in"} or is_docker(f) and any(p.parent == d or d in p.parents for p in py):
             signs[d].append(f.name)
         elif f.name == "__main__.py" and not (root / d.parent / "__init__.py").exists():
             signs[d].append("__main__.py")
@@ -154,9 +158,8 @@ def main(argv: list[str]) -> int:
     def unit_of(rel: Path) -> Path:
         best = Path(".")
         for u in units:
-            if rel == u or u in rel.parents:
-                if len(u.parts) > len(best.parts):
-                    best = u
+            if (rel == u or u in rel.parents) and len(u.parts) > len(best.parts):
+                best = u
         return best
 
     for where in sorted(code.values()):
