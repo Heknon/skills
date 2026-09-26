@@ -1,0 +1,7 @@
+jobs:
+  audit_user:
+    call: app.users.get_user
+    schedule: "0 2 * * *"
+  list_active:
+    call: app.users.list_users
+    schedule: "0 3 * * *"

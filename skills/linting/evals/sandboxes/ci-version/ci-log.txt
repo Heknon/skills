@@ -1,0 +1,21 @@
+$ uv sync --locked
+Using CPython 3.12.14
+Creating virtual environment at: .venv
+Resolved 2 packages in 1ms
+Installed 2 packages in 2ms
+ + billing==0.1.0 (from file:///builds/team/billing)
+ + ruff==0.15.8
+$ uv run --no-sync ruff check .
+F401 [*] `os` imported but unused
+ --> src/billing/charges.py:2:8
+  |
+1 | import logging
+2 | import os
+  |        ^^
+3 | from typing import Optional
+  |
+help: Remove unused import: `os`
+
+Found 1 error.
+[*] 1 fixable with the `--fix` option.
+ERROR: Job failed: exit code 1

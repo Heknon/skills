@@ -33,7 +33,9 @@ folders: <folder> - <what is in it>, one line each for the top level
 6. **Name the top folders.** One line each, from the folder's
    `__init__.py` docstring, README, or the names of the files in it. Mark
    the package folder (the one the imports start from), and whether the
-   layout is `src/<package>/` or `<package>/` at the root.
+   layout is `src/<package>/` or `<package>/` at the root. How a
+   service's layers fit together is the architecture skill's
+   `core/recognise.md`.
 
 ## Never
 

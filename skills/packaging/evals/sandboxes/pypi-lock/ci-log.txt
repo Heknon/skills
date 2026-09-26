@@ -1,0 +1,8 @@
+$ uv sync --locked
+Using CPython 3.12.3 interpreter at: /usr/bin/python3.12
+Creating virtual environment at: .venv
+Resolved 15 packages in 1.03s
+error: The lockfile at `uv.lock` needs to be updated, but `--locked` was provided.
+
+hint: To update the lockfile, run `uv lock`.
+ERROR: Job failed: exit code 1

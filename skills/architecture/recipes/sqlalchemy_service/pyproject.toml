@@ -1,0 +1,39 @@
+[project]
+name = "accounts-sql"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi==0.141.1",
+  "pydantic==2.13.5",
+  "sqlalchemy[asyncio]==2.1.1",
+  "aiosqlite",          # tests and local runs
+  "asyncpg",            # PostgreSQL in production
+]
+
+[dependency-groups]
+dev = ["pytest==9.1.1", "httpx2"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+# Optional: only for a project that already uses import-linter
+# (the linting skill runs it: `uv run lint-imports`).
+[tool.importlinter]
+root_package = "app"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Layers inside a feature point one way"
+type = "layers"
+containers = ["app.accounts"]
+layers = ["router", "schemas | dependencies", "service", "repository", "models", "domain", "errors"]
+
+[[tool.importlinter.contracts]]
+name = "The service knows no HTTP and no database"
+type = "forbidden"
+source_modules = ["app.accounts.service", "app.accounts.domain"]
+forbidden_modules = ["fastapi", "starlette", "sqlalchemy"]

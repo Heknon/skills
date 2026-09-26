@@ -40,6 +40,9 @@ P9   publish\(|subscribe\(|send_message\(|topic=
 P10  @shared_task|@\w+\.task\b|crontab
 ```
 
+For a settings class, take each variable's name from the pydantic
+skill's `settings/env.md`: a prefix is added to a field, not to an alias.
+
 ## For each surface, record
 
 - its exact name, as the code spells it;

@@ -48,6 +48,15 @@ mock the project's own classes to test the code that uses them; then the
 test checks the mock. Prefer a real small object (an in-memory store, a
 `tmp_path` file) over a mock when it is cheap.
 
+Some boundaries have their own skill:
+
+- a FastAPI app (client, lifespan, dependency overrides): the api
+  skill's `fastapi/testing.md`
+- settings read from the environment: the pydantic skill's
+  `settings/testing.md`
+- MongoDB through mongomock, and what it cannot show: the mongodb
+  skill's `pymongo/mongomock.md`
+
 ## Never
 
 - Never assert only that a mock was called with arguments you told it to

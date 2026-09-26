@@ -6,6 +6,10 @@ Usage: check_change.py --before DIR --after DIR [--json]
 --before is the snapshot folder (.ledger/before), holding a copy of every
 file as it was before its first edit, at the same relative path. --after
 is the working directory. Only files present in the snapshot are compared.
+A public name that moved and stays importable from its old module (a
+`from x import name` at module level) is compared where it now lives, and
+a module that became a package (`util.py` to `util/__init__.py`) is
+compared as the same module, so a correct move or split is not a removal.
 
 Every rule prints PASS, FAIL, WARN, SKIP or INFO, a count, up to five
 offenders and a note. Exit 0 when no rule is FAIL, 1 when any is, 2 on an
@@ -18,6 +22,7 @@ from __future__ import annotations
 import argparse
 import ast
 import difflib
+import glob
 import json
 import os
 import re
@@ -73,6 +78,7 @@ class Signature:
     params: List[Tuple[str, str]]  # (kind, name)
     defaults: Dict[str, str]
     handlers_without_raise: int
+    variable: bool = False  # a module-level value, not a callable: only its presence is compared
 
 
 def default_text(node: ast.AST) -> str:
@@ -111,6 +117,15 @@ def public_api(source: str) -> Optional[Dict[str, Signature]]:
         return None
     api: Dict[str, Signature] = {}
     for node in tree.body:
+        targets = []
+        if isinstance(node, ast.Assign) and not isinstance(node.value, (ast.Name, ast.Attribute)):
+            targets = [target.id for target in node.targets if isinstance(target, ast.Name)]
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.value is not None \
+                and not isinstance(node.value, (ast.Name, ast.Attribute)):
+            targets = [node.target.id]
+        for target in targets:  # aliases (`old = new`) are resolved by find_signature instead
+            if target != "__all__":
+                api[target] = Signature([], {}, 0, variable=True)
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             api[node.name] = signature_of(node)
         elif isinstance(node, ast.ClassDef):
@@ -119,6 +134,188 @@ def public_api(source: str) -> Optional[Dict[str, Signature]]:
                 if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     api[f"{node.name}.{item.name}"] = signature_of(item)
     return api
+
+
+def module_tree(source: str) -> Optional[ast.Module]:
+    try:
+        return ast.parse(source)
+    except SyntaxError:
+        return None
+
+
+def reexports(source: str) -> Dict[str, Tuple[str, int, str]]:
+    """Names a module imports at top level with `from X import name`: {local name: (module, level, original name)}."""
+    tree = module_tree(source)
+    names: Dict[str, Tuple[str, int, str]] = {}
+    for node in tree.body if tree else []:
+        if isinstance(node, ast.ImportFrom):
+            for alias in node.names:
+                if alias.name != "*":
+                    names[alias.asname or alias.name] = (node.module or "", node.level, alias.name)
+    return names
+
+
+def module_imports(source: str) -> Dict[str, Tuple[str, int]]:
+    """Modules bound to a name at top level (`import a.b as m`, `import a`, `from pkg import mod`): {name: (module, level)}.
+    A `from pkg import name` is listed too, since `name` may be a module; resolution decides."""
+    tree = module_tree(source)
+    bound: Dict[str, Tuple[str, int]] = {}
+    for node in tree.body if tree else []:
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.asname:
+                    bound[alias.asname] = (alias.name, 0)
+                else:
+                    bound[alias.name.split(".")[0]] = (alias.name.split(".")[0], 0)
+        elif isinstance(node, ast.ImportFrom):
+            for alias in node.names:
+                if alias.name != "*":
+                    module = ".".join(part for part in (node.module or "", alias.name) if part)
+                    bound[alias.asname or alias.name] = (module, node.level)
+    return bound
+
+
+def star_imports(source: str) -> List[Tuple[str, int]]:
+    tree = module_tree(source)
+    return [(node.module or "", node.level) for node in (tree.body if tree else [])
+            if isinstance(node, ast.ImportFrom) and any(alias.name == "*" for alias in node.names)]
+
+
+def aliases(source: str) -> Dict[str, str]:
+    """Names bound to another name: module level `old = new` or `old = mod.new`, and class level
+    `old_method = new_method`. {alias: target}, targets dotted as written."""
+    tree = module_tree(source)
+    found: Dict[str, str] = {}
+
+    def dotted(node: ast.AST) -> Optional[str]:
+        if isinstance(node, ast.Name):
+            return node.id
+        if isinstance(node, ast.Attribute):
+            base = dotted(node.value)
+            return f"{base}.{node.attr}" if base else None
+        return None
+
+    for node in tree.body if tree else []:
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            target = dotted(node.value)
+            if target:
+                found[node.targets[0].id] = target
+        elif isinstance(node, ast.ClassDef):
+            for item in node.body:
+                if isinstance(item, ast.Assign) and len(item.targets) == 1 and isinstance(item.targets[0], ast.Name) \
+                        and isinstance(item.value, ast.Name):
+                    found[f"{node.name}.{item.targets[0].id}"] = f"{node.name}.{item.value.id}"
+    return found
+
+
+def dunder_all(source: str) -> Optional[List[str]]:
+    """A module's literal `__all__`, or None when it has none (or builds it dynamically)."""
+    tree = module_tree(source)
+    for node in tree.body if tree else []:
+        if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "__all__" for t in node.targets) \
+                and isinstance(node.value, (ast.List, ast.Tuple)):
+            return [element.value for element in node.value.elts
+                    if isinstance(element, ast.Constant) and isinstance(element.value, str)]
+    return None
+
+
+def has_module_getattr(source: str) -> bool:
+    tree = module_tree(source)
+    return any(isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "__getattr__"
+               for node in (tree.body if tree else []))
+
+
+_ROOTS: Dict[str, List[str]] = {}
+
+
+def import_roots(after: str) -> List[str]:
+    """Folders an absolute import may be rooted at: the working directory, and every `src` folder
+    up to three levels down (`src`, `packages/core/src`)."""
+    if after not in _ROOTS:
+        roots = [""]
+        for depth in ("src", "*/src", "*/*/src", "*/*/*/src"):
+            for found in sorted(glob.glob(os.path.join(after, depth))):
+                if os.path.isdir(found):
+                    roots.append(os.path.relpath(found, after))
+        _ROOTS[after] = roots
+    return _ROOTS[after]
+
+
+def resolve_module(after: str, path: str, module: str, level: int) -> Tuple[Optional[str], bool]:
+    """The file inside the working directory that an import from `path` names.
+    Returns (file, local): local is True when the module belongs to this project (a relative import,
+    or a top-level package that exists here), so a missing file is a real break, not a third-party module."""
+    parts: List[str] = []
+    if level:
+        base = os.path.dirname(path)
+        for _ in range(level - 1):
+            base = os.path.dirname(base)
+        if base:
+            parts.append(base)
+    parts.extend(part for part in module.split(".") if part)
+    stem = os.path.join(*parts) if parts else ""
+    candidates = [stem + ".py", os.path.join(stem, "__init__.py")] if stem else ["__init__.py"]
+    roots = [""] if level else import_roots(after)
+    for root in roots:
+        for candidate in candidates:
+            full = os.path.join(after, root, candidate)
+            if os.path.isfile(full):
+                return full, True
+    if level:
+        return None, True
+    top = module.split(".")[0]
+    local = any(os.path.isdir(os.path.join(after, root, top)) or os.path.isfile(os.path.join(after, root, top + ".py"))
+                for root in roots)
+    return None, local
+
+
+def find_signature(after: str, path: str, source: str, name: str, depth: int = 0) -> Tuple[Optional[Signature], bool]:
+    """Look a public name up in a module, following aliases, re-exports, module attributes and star
+    imports. Returns (signature, resolved); resolved is False when the name comes from somewhere that
+    cannot be read (a module outside the project, a module-level __getattr__)."""
+    if depth > 5:
+        return None, False
+    api = public_api(source) or {}
+    if name in api:
+        return api[name], True
+    head, _, rest = name.partition(".")
+    suffix = "." + rest if rest else ""
+
+    def follow(module: str, level: int, inner: str) -> Tuple[Optional[Signature], bool]:
+        target, local = resolve_module(after, path, module, level)
+        text = read(target) if target else None
+        if text is None:
+            return None, local  # a missing module of this project is a break; a third-party one cannot be read
+        target_path = os.path.relpath(target, after).replace(os.sep, "/")
+        return find_signature(after, target_path, text, inner, depth + 1)
+
+    known = aliases(source)
+    if name in known:  # a class-level method alias, Class.old = Class.new
+        return find_signature(after, path, source, known[name], depth + 1)
+    if head in known:
+        return find_signature(after, path, source, known[head] + suffix, depth + 1)
+    imports = reexports(source)
+    if head in imports:
+        module, level, original = imports[head]
+        signature, resolved = follow(module, level, original + suffix)
+        if signature is not None or not rest:
+            return signature, resolved
+    bound = module_imports(source)
+    if head in bound and rest:  # `import money` then `total = money.total`, reached through an alias
+        module, level = bound[head]
+        return follow(module, level, rest)
+    for module, level in star_imports(source):
+        target, _ = resolve_module(after, path, module, level)
+        text = read(target) if target else None
+        exported = dunder_all(text) if text is not None else None
+        if exported is not None and head not in exported:
+            continue  # `import *` only brings names listed in the target's __all__
+        signature, resolved = follow(module, level, name)
+        if signature is not None:
+            return signature, True
+    if has_module_getattr(source):
+        return None, False
+    return None, True
 
 
 def module_constants(source: str) -> Dict[str, str]:
@@ -157,7 +354,8 @@ def is_public(name: str) -> bool:
     return not any(part.startswith("_") and not (part.startswith("__") and part.endswith("__")) for part in name.split("."))
 
 
-def compare_python(path: str, old: str, new: str, api: List[str], errors: List[str], constants: List[str]) -> None:
+def compare_python(path: str, old: str, new: str, api: List[str], errors: List[str], constants: List[str],
+                   after_root: Optional[str] = None, moved_from: Optional[Dict[str, int]] = None) -> None:
     old_api, new_api = public_api(old), public_api(new)
     if old_api is None or new_api is None:
         return
@@ -165,9 +363,15 @@ def compare_python(path: str, old: str, new: str, api: List[str], errors: List[s
         if not is_public(name):
             continue
         after = new_api.get(name)
+        if after is None and after_root is not None:
+            after, resolved = find_signature(after_root, path, new, name)
+            if after is None and not resolved:
+                continue  # re-exported from outside the working directory; its signature cannot be read
         if after is None:
             api.append(f"{path}: {name} was removed or renamed")
             continue
+        if before.variable or after.variable:
+            continue  # a value that still exists; module-constants reports a changed constant
         old_names = [param for param in before.params]
         new_names = [param for param in after.params]
         common = min(len(old_names), len(new_names))
@@ -188,7 +392,11 @@ def compare_python(path: str, old: str, new: str, api: List[str], errors: List[s
                 api.append(f"{path}: {name} parameter {param!r} lost its default; callers that omit it break")
     for name, after in new_api.items():
         before = old_api.get(name)
-        added = after.handlers_without_raise - (before.handlers_without_raise if before else 0)
+        if before is not None:
+            baseline = before.handlers_without_raise
+        else:  # new here: a function moved from another snapshot file keeps its old count
+            baseline = (moved_from or {}).get(name, 0)
+        added = after.handlers_without_raise - baseline
         if added > 0:
             errors.append(f"{path}: {name} has {added} new except block(s) that do not re-raise; an error that used to stop the program is now hidden")
     old_options, new_options = cli_options(old), cli_options(new)
@@ -224,19 +432,30 @@ def evaluate(before: str, after: str):
         results.append(Result("snapshot-present", PASS, 0, [], f"{len(files)} file(s) in the snapshot"))
 
     changed, missing, api, errors, constants, tests, tests_added = [], [], [], [], [], [], []
+    moved_from: Dict[str, int] = {}
+    for path in files:
+        if path.endswith(".py") and not TEST_PATH_RE.search(path):
+            for name, signature in (public_api(read(os.path.join(before, path)) or "") or {}).items():
+                moved_from[name] = max(moved_from.get(name, 0), signature.handlers_without_raise)
     for path in files:
         old = read(os.path.join(before, path))
         new = read(os.path.join(after, path))
+        compared_as = path
+        if new is None and path.endswith(".py"):
+            package_init = path[:-3] + "/__init__.py"
+            new = read(os.path.join(after, package_init))
+            if new is not None:
+                compared_as = package_init
         if new is None:
             missing.append(f"{path} is in the snapshot but gone from the working directory")
             continue
         if old is None or old == new:
             continue
-        changed.append(path)
+        changed.append(path if compared_as == path else f"{path} became the package {compared_as}")
         if TEST_PATH_RE.search(path):
             compare_tests(path, old, new, tests, tests_added)
         elif path.endswith(".py"):
-            compare_python(path, old, new, api, errors, constants)
+            compare_python(compared_as, old, new, api, errors, constants, after_root=after, moved_from=moved_from)
 
     results.append(Result("files-changed", INFO, len(changed), changed, "files that differ from the snapshot") if files else Result("files-changed", SKIP, 0, [], "no snapshot"))
     results.append(verdict("files-deleted", missing, note="deleting a file is a behaviour change; it needs the ask"))

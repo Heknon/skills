@@ -1,0 +1,66 @@
+Accept the mobile app's clientId and apiKey
+
+The mobile app sends camelCase keys and cannot be updated before the
+release. The route now reads either spelling from the JSON body.
+---
+diff --git a/src/shop/api.py b/src/shop/api.py
+index 294c875..ecf6992 100644
+--- a/src/shop/api.py
++++ b/src/shop/api.py
+@@ -1,7 +1,7 @@
+ """HTTP routes for API clients."""
+ 
+ import os
+-from typing import Annotated
++from typing import Annotated, Any
+ 
+ from fastapi import Depends, FastAPI, HTTPException
+ from pydantic import BaseModel
+@@ -21,11 +21,6 @@ def get_clients() -> Collection[ClientDoc]:
+     return _mongo["shop"]["clients"]
+ 
+ 
+-class Credentials(BaseModel):
+-    client_id: str
+-    api_key: str
+-
+-
+ class ScopesOut(BaseModel):
+     client_id: str
+     scopes: list[str]
+@@ -33,10 +28,15 @@ class ScopesOut(BaseModel):
+ 
+ @app.post("/auth/scopes")
+ def client_scopes(
+-    body: Credentials,
++    body: dict[str, Any],
+     clients: Annotated[Collection[ClientDoc], Depends(get_clients)],
+ ) -> ScopesOut:
+-    found = find_client(clients, body.client_id, body.api_key)
++    # the mobile app still sends clientId and apiKey
++    client_id = body.get("client_id") or body.get("clientId")
++    api_key = body.get("api_key") or body.get("apiKey")
++    if client_id is None or api_key is None:
++        raise HTTPException(status_code=422, detail="client_id and api_key needed")
++    found = find_client(clients, client_id, api_key)
+     if found is None:
+         raise HTTPException(status_code=401, detail="unknown client or key")
+     return ScopesOut(client_id=found["client_id"], scopes=found["scopes"])
+diff --git a/tests/test_api.py b/tests/test_api.py
+index 3346f8a..713759a 100644
+--- a/tests/test_api.py
++++ b/tests/test_api.py
+@@ -43,3 +43,13 @@ def test_wrong_key_is_401(client: TestClient) -> None:
+     body = {"client_id": "acme", "api_key": "nope"}
+     response = client.post("/auth/scopes", json=body)
+     assert response.status_code == 401
++
++
++def test_mobile_app_spelling_is_accepted(client: TestClient) -> None:
++    body = {"clientId": "acme", "apiKey": "s3cret"}
++    response = client.post("/auth/scopes", json=body)
++    assert response.status_code == 200
++
++
++def test_missing_key_is_422(client: TestClient) -> None:
++    assert client.post("/auth/scopes", json={"clientId": "acme"}).status_code == 422

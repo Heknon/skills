@@ -1,0 +1,9 @@
+[project]
+name = "quickcfg"
+version = "3.1.0"
+description = "Load settings from a file and the environment."
+requires-python = ">=3.10"
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"

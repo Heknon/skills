@@ -18,6 +18,9 @@ each with the file and line that defines it.
 | CI workflows, `Makefile`, `justfile`, `tasks.py`, `noxfile.py`, `tox.ini` | the commands they run | how tests and tools are started |
 | `manage.py`, `wsgi.py`, `asgi.py` | exist or not | a Django project; `manage.py` is its command entry |
 
+This file finds entry points. Declaring a console script, or fixing one
+that fails once installed, is the packaging skill's `core/entry-points.md`.
+
 ## Web applications
 
 - **The app object**: grep `=\s*(FastAPI|Flask|Starlette|Sanic|Quart)\(`

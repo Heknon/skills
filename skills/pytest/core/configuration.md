@@ -36,6 +36,22 @@ directory) upwards; the first match wins, and **files are never merged**:
 The configfile's directory becomes the rootdir. `--rootdir` forces it
 (not from `addopts`); `-c file` picks the file.
 
+**A test file outside the project runs without the project's config.**
+The search starts from the path given, not from the current folder.
+*lab, 9.1.1:* from the project root, `uv run pytest ..\test_outside.py`
+printed `rootdir:` as the parent folder and no `configfile:` line, so
+`pythonpath = ["src"]` did not apply: `ModuleNotFoundError: No module
+named 'shop'`. With the file picked by hand it ran with the project's
+settings (`configfile: pyproject.toml`, `1 passed`):
+
+```
+uv run pytest -c pyproject.toml --rootdir=. ..\test_outside.py
+```
+
+(`-c pyproject.toml` alone gave the same rootdir there; `--rootdir=.`
+says it outright.) Read the header's `configfile:` line whenever a test
+file lives outside the project, such as a scratch test.
+
 **Versions matter.** pytest 8 does not read `[tool.pytest]` at all:
 *lab:* with markers registered only in `[tool.pytest]`, 8.4.2 ran
 without them and warned `PytestUnknownMarkWarning: Unknown
@@ -85,7 +101,9 @@ passed. Fix it so both work:
    `[build-system]`, `uv sync` installs it editable, and `uv run pytest`
    imports it from anywhere. Preferred.
 2. Or `pythonpath = ["src"]` (or `["."]`) in the configuration. *lab:* a
-   src layout passed with `pythonpath = ["src"]`.
+   src layout passed with `pythonpath = ["src"]`, even when the built
+   wheel held no module at all. Whether the package imports once
+   installed is the packaging skill's `core/verify.md`.
 3. Or a `tests/__init__.py` in a flat layout, which makes the project
    root the base directory (*lab:* passed). Not for src layouts.
 
@@ -96,6 +114,9 @@ passed. Fix it so both work:
   at startup ("initial conftests"): only those can add command-line
   options (`pytest_addoption`).
 - `pytest_plugins = [...]` is allowed only in the root `conftest.py`.
+- `pytest.skip(..., allow_module_level=True)` in an initial conftest
+  ends the run (*lab, 9.1.1:* a `Skipped:` traceback, exit 1); in a
+  conftest below them it skips that folder's tests.
 - Hooks in a conftest: the runtest, report and fixture hooks apply only
   to tests under its folder, but `pytest_collection_modifyitems`,
   `pytest_terminal_summary` and the session hooks see the whole session

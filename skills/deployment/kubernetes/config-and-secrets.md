@@ -9,6 +9,9 @@
 | a secret the app reads | a Secret in the namespace, created outside the chart, referenced by name | `envFromSecrets` |
 | a secret file (certificate, key) | a Secret mounted as a volume; add the option to the chart if missing | |
 
+How the application reads these, and which layer wins over another, is
+the pydantic skill's `settings/layering.md`.
+
 ## Secrets are created outside the chart
 
 The chart references Secrets by name and never holds their values: Helm

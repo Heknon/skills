@@ -1,0 +1,63 @@
+# Offline pre-commit hooks for one uv project.
+# Every tool runs from the project's environment at the version in
+# uv.lock (dev group: ruff, mypy, pre-commit, pre-commit-hooks), so no
+# hook repository is fetched. Change only the mypy path (src) and drop
+# hooks the project does not want.
+default_install_hook_types: [pre-commit]
+default_stages: [pre-commit]
+repos:
+  - repo: local
+    hooks:
+      - id: trailing-whitespace
+        name: trim trailing whitespace
+        entry: uv run --frozen trailing-whitespace-fixer
+        language: system
+        types: [text]
+      - id: end-of-file-fixer
+        name: fix end of files
+        entry: uv run --frozen end-of-file-fixer
+        language: system
+        types: [text]
+      - id: check-added-large-files
+        name: check for added large files
+        entry: uv run --frozen check-added-large-files
+        language: system
+      - id: detect-private-key
+        name: detect private key
+        entry: uv run --frozen detect-private-key
+        language: system
+        types: [text]
+      - id: check-merge-conflict
+        name: check for merge conflicts
+        entry: uv run --frozen check-merge-conflict
+        language: system
+        types: [text]
+      - id: check-toml
+        name: check toml
+        entry: uv run --frozen check-toml
+        language: system
+        types: [toml]
+      - id: uv-lock
+        name: uv.lock matches pyproject.toml
+        entry: uv lock --locked --offline
+        language: system
+        files: ^(pyproject\.toml|uv\.lock)$
+        pass_filenames: false
+      - id: ruff-check
+        name: ruff check
+        entry: uv run --frozen ruff check --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+      - id: ruff-format
+        name: ruff format
+        entry: uv run --frozen ruff format --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+      - id: mypy
+        name: mypy
+        entry: uv run --frozen mypy src
+        language: system
+        types_or: [python, pyi]
+        pass_filenames: false

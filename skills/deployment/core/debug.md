@@ -42,6 +42,9 @@ because a later hop looks likelier.
   logs <pod> -n <ns> --previous` for the crash before the restart.
 - **Helm**: `helm status`, `helm history`; the description column holds
   the failure reason.
+- **A Python traceback** in a job log or `kubectl logs`: this ladder
+  names the hop; reading the traceback is the debugging skill's
+  `core/read-traceback.md`.
 
 ## Hypotheses
 

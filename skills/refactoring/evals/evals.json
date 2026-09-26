@@ -1,0 +1,193 @@
+{
+ "skill_name": "refactoring",
+ "notes": "Scenarios for checking that a weak model using this skill changes structure without changing behaviour, in small checked and committed steps, and proves a rename or move complete by search and checks rather than by an IDE. Scenarios 0 to 10 cover the core, the steps and legacy code; service-from-router covers the recipes, which walk code towards the architecture skill's shapes. Each names a sandbox under evals/sandboxes/, copied fresh before the run. The sandboxes are uv projects with a .python-version of 3.12, needing pytest, ruff and mypy from the package index or a mirror (rename-everywhere and dead-handlers also PyYAML and types-PyYAML; schema-rename pydantic; move-util hatchling to install the project; service-from-router FastAPI and httpx2). Every bait was reproduced, and every intended fix passed, on Python 3.12.14, pytest 9.1.1, ruff 0.16.9, mypy 2.3.1, pydantic 2.13.5, FastAPI 0.141.1 (Starlette 1.7.0) and git 2.43.0.",
+ "how_to_run": [
+  "copy the skill folder without evals/ to <skill>; for service-from-router also copy the architecture skill to a sibling folder named architecture, since the recipes point to its shapes",
+  "copy evals/sandboxes/<sandbox> to a fresh <work>; for mixed-diff run setup.sh inside it once; for every other sandbox run: git init, then git add -A and git commit -m base",
+  "run uv sync in <work>",
+  "start the model in <work> with: 'Load the skill at <skill>/SKILL.md and follow it. Task: <prompt>'; add the machine's operating system",
+  "grade each expectation by hand, from the answer, git log and the diff"
+ ],
+ "evals": [
+  {
+   "id": 0,
+   "name": "tidy-keeps-behaviour",
+   "sandbox": "tidy-pricing",
+   "prompt": "Tidy up shop/pricing.py, it's messy.",
+   "bait": "round() on floats gives 1.27 for a gross of 1.275, which looks like a rounding bug to 'fix' with Decimal; add_item has a shared mutable default that ruff flags (B006); replacing the discount if/elif chain with a dict lookup raises TypeError for an unhashable code where the chain returned the total",
+   "expectations": [
+    "Reads 'tidy' as behaviour unchanged and says so; writes a behaviour probe before the first edit that calls every public function on edge inputs, including price_with_vat(1.0625) (1.27) and add_item called twice (the same list comes back)",
+    "Leaves round() as it is and lists the 1.275 -> 1.27 rounding as a finding, not an edit",
+    "Leaves the mutable default's behaviour as it is (no basket=None rewrite) and lists it as a finding with ruff's B006",
+    "Each tidy step is checked: tests (4 passed), ruff on the file, and the probe output identical to the one taken before (compared by a command, not by eye)",
+    "If it replaces the elif chain or the index loop, it either keeps behaviour for odd inputs (unhashable code, tuples of three) or names the difference as a finding; it does not claim no behaviour change without inputs that would show one",
+    "One commit per step (or the steps listed, if it was told not to commit); never a push",
+    "Ends with the refactoring headings, then seniority's"
+   ]
+  },
+  {
+   "id": 1,
+   "name": "split-a-long-module",
+   "sandbox": "big-module",
+   "prompt": "app/reports.py is too long. Turn it into a package with one module per part (money, orders, clock, CSV, text). Other teams import from app.reports, so that must keep working.",
+   "bait": "one sweeping edit is tempting; CENT is public but not in __all__; tests patch \"app.reports.now\", which stops reaching stamp_header once it lives in a submodule; a submodule that imports from app.reports makes a circular import that depends on import order",
+   "expectations": [
+    "Before the first edit, records the baseline: tests (5 passed), ruff, mypy, import-all of app with scripts/, and the public names of app.reports (CENT among them)",
+    "First step turns the module into a package with git mv (app/reports.py -> app/reports/__init__.py), checked and committed on its own",
+    "Moves one part per step, each followed by tests, ruff, import-all and a public-names comparison, and a commit; at no commit are the tests red",
+    "Keeps every old import working, CENT included: `from app.reports import CENT, format_money, render_text, write_csv` runs at the end; re-exports use `import X as X` or __all__ so ruff does not flag or remove them",
+    "Moves the mock.patch target to where now() is used (app.reports.<clock module>.now) in the same step that moves it, or, if the step went red, undoes the step and redoes it with the patch target, rather than patching forward",
+    "Submodules import from sibling modules, not from app.reports; no circular import (import-all passes)",
+    "Test expectations are unchanged; only patch targets moved",
+    "Says that other teams' tests that patch app.reports.now would stop working, since that cannot be seen from this repository"
+   ]
+  },
+  {
+   "id": 2,
+   "name": "plan-only",
+   "sandbox": "big-module",
+   "prompt": "How would you split app/reports.py into smaller modules? Don't change anything yet, I want to review the plan first.",
+   "bait": "the ask is a plan; doing the split, or a plan with no checks, is tempting",
+   "expectations": [
+    "Changes no file (git status clean at the end)",
+    "Gives numbered steps, each named from the catalogue (module to package, split module / move function) with the check that closes it and a commit",
+    "Says what is pinned first: the tests, the public names of app.reports including CENT (not in __all__), the importers found by search (app/api.py, app/cli.py, scripts/nightly.py, tests) and the other teams named in README",
+    "Names the patch-target trap (tests patch app.reports.now) and the circular import risk, and how each step avoids them",
+    "Says old imports stay working through re-exports in app/reports/__init__.py"
+   ]
+  },
+  {
+   "id": 3,
+   "name": "rename-everywhere",
+   "sandbox": "rename-everywhere",
+   "prompt": "Rename get_user to fetch_user in app/users.py, everywhere it's used.",
+   "bait": "a rename of the def and direct calls leaves __all__ (ruff F822 only), the mock.patch string in tests (AttributeError), the getattr(source, \"get_user\", None) in app/lookup.py (resolve() silently returns unknown, no test covers it), the dotted path in config/jobs.yaml (fails only when the job runs) and docs/users.md; AdminClient.get_user is a different method that a blind replace would rename",
+   "expectations": [
+    "Lists every hit of get_user before editing (14 lines in 8 files with a search over all files, not only *.py), each marked 'edit' or 'leave, because'",
+    "Edits __all__, the test import and calls, the mock.patch string, the getattr string in app/lookup.py, config/jobs.yaml and the first line of docs/users.md",
+    "Leaves AdminClient.get_user, its test and its doc line alone, and says they are a different method",
+    "Names the silent miss: with the getattr string unchanged, resolve(1) would return {'id': 1, 'name': 'unknown'} and no test would fail",
+    "Proves completeness: a final search for get_user shows only the AdminClient lines; tests (6 passed), ruff, mypy, and import_all.py with --config config/jobs.yaml all run clean",
+    "Says whether it kept an alias for callers outside the repository, and why; if it kept one, says that patching the old name no longer reaches the code",
+    "One commit, or a commit per step; no push"
+   ]
+  },
+  {
+   "id": 4,
+   "name": "move-with-outside-importers",
+   "sandbox": "move-util",
+   "prompt": "Move parse_date from app/helpers.py into app/dates.py, where it belongs.",
+   "bait": "tools/backfill.py and the app.parsers entry point in pyproject.toml import the old path and no test covers either; a shim written as a plain import is flagged F401 and removed by ruff --fix; leaving DATE_FORMATS behind and importing it from helpers makes a circular import with the shim",
+   "expectations": [
+    "Finds every importer by search, including tools/backfill.py and the entry point app.helpers:parse_date in pyproject.toml, and says no test covers them",
+    "Keeps a shim in app/helpers.py in the explicit re-export form (`from app.dates import parse_date as parse_date`, or __all__), or changes every importer including the entry point; says which and why (RF2: the package may be imported outside the repository)",
+    "Moves DATE_FORMATS with parse_date (or otherwise avoids helpers and dates importing each other); import of app.helpers and app.dates both work",
+    "Runs import_all.py app --config pyproject.toml --scripts tools and quotes all OK; runs the tests (7 passed), ruff and mypy",
+    "If the entry point in pyproject.toml was edited, reinstalls (uv sync) before checking it, since uv run --no-sync keeps the old entry point",
+    "Does not run ruff check --fix in a way that removes the shim"
+   ]
+  },
+  {
+   "id": 5,
+   "name": "extract-keeps-the-bug",
+   "sandbox": "extract-with-bug",
+   "prompt": "Extract the discount logic in order_total into its own function, apply_discounts.",
+   "bait": "the extracted lines hold an off-by-one: the price list says '10 items or more' and the code checks items > 10; fixing it inside the extraction mixes a behaviour change into a refactoring, and the fix also makes 10 items cost more (52.40 instead of 50.00) because shipping then applies",
+   "expectations": [
+    "Pins the boundary before the edit: a characterization test or probe including exactly 10 items (50.00 today)",
+    "The extraction commit keeps `items > BULK_THRESHOLD`; tests pass and the probe is identical",
+    "Reports the off-by-one as a finding with the evidence (the comment, and the totals for 10 items now and after a fix) and asks, or fixes it only in a separate commit whose test fails before the fix",
+    "Does not describe the extraction as fixing anything"
+   ]
+  },
+  {
+   "id": 6,
+   "name": "pin-before-restructuring",
+   "sandbox": "legacy-report",
+   "prompt": "build_report in billing/report.py is one long function. Restructure it into smaller functions.",
+   "bait": "there are no tests; the output depends on date.today() and a file; 'tests pass' proves nothing because nothing runs the code; a characterization test copied from reading the code, or asserting only that the text starts with 'Overdue on', cannot fail",
+   "expectations": [
+    "Notices there are no tests (pytest exit 5, no tests collected) before changing structure",
+    "Adds the smallest seam for the clock first (a module function such as _today() patched with monkeypatch, or a today parameter with a default), and shows the output of billing.mail is unchanged by it; does not try to patch datetime.date.today (TypeError: cannot set 'today' attribute of immutable type)",
+    "Writes characterization tests whose expected lines were copied from the code's output for fixed dates, covering the flag (over 60 days) and 'nothing overdue', with the GBP-at-1:1 oddity pinned and commented as a finding",
+    "Shows the tests fail with the code broken (at least one deliberate change), then restores it",
+    "Then extracts functions one at a time, tests green after each, one commit each",
+    "Lists the GBP conversion as a finding, not fixed"
+   ]
+  },
+  {
+   "id": 7,
+   "name": "dead-or-alive",
+   "sandbox": "dead-handlers",
+   "prompt": "Remove the unused handlers from events/handlers.py.",
+   "bait": "no line calls on_refund or on_invoice by name: on_refund is registered by @handler(\"refund\") and dispatched from a queue message; on_invoice is named in config/routes.yaml and loaded by a dotted path; removing on_invoice leaves every test green",
+   "expectations": [
+    "Keeps on_refund, citing the @handler(\"refund\") registration and HANDLERS[kind] in events/consumer.py",
+    "Keeps on_invoice, citing config/routes.yaml and routes.routed_handler",
+    "Removes _format_legacy and _on_shipment after searches that show no other use (name in all files, as a string, in config)",
+    "For on_ping (public, not registered, not routed) says what search cannot see (other repositories, the queue's messages) and either keeps it and asks, or removes it with that caveat",
+    "After removing, runs the tests and import_all.py events --config config/routes.yaml, all OK",
+    "Commits removals separately from anything else"
+   ]
+  },
+  {
+   "id": 8,
+   "name": "contract-not-structure",
+   "sandbox": "schema-rename",
+   "prompt": "Rename the field user_name to username in UserOut, it's inconsistent with the rest of the code.",
+   "bait": "UserOut is a response body served as JSON to the mobile app and partners; renaming the field changes the JSON, and the test that checks the body would be 'updated' to match",
+   "expectations": [
+    "Says renaming a field of a response schema changes the JSON contract, so it is not a refactoring; names the api and pydantic skills as the owners",
+    "Does not change the expected body in test_user_response_body",
+    "Either stops and asks (with options: keep the name, or rename in Python with an alias that keeps 'user_name' on the wire, or version the API), or does the aliased rename and shows the JSON unchanged: the body test passes unmodified",
+    "If it used an alias, checks that model_dump_json() still writes user_name (serialization_alias alone does not, on pydantic 2.13) and that construction with the Python name works or is changed"
+   ]
+  },
+  {
+   "id": 9,
+   "name": "red-means-undo",
+   "sandbox": "red-step",
+   "prompt": "Extract an Inventory class from stock/inventory.py so we can run more than one warehouse set; the module functions must keep working.",
+   "bait": "the second step (module functions delegate to a default Inventory with its own dicts) turns 4 tests red because the tests and the nightly import use the module's _levels; editing conftest.py or the tests to point at the instance is patching forward",
+   "expectations": [
+    "Works in steps: the class first (unused, tests green, commit), then the delegation",
+    "When a step turns tests red, undoes it (git restore, or stash) and says so, instead of editing tests or conftest.py",
+    "Redoes the step smaller or differently so the module-level _levels and _reserved stay the tables in use (for example Inventory(_levels, _reserved), with `is not None` rather than `or {}`), 5 passed",
+    "tests/conftest.py and tests/test_inventory.py are unchanged at the end",
+    "One commit per green step"
+   ]
+  },
+  {
+   "id": 10,
+   "name": "untangle-mixed-change",
+   "sandbox": "mixed-diff",
+   "prompt": "I refactored billing/fees.py (renamed the helper). Please commit it as a refactoring.",
+   "bait": "the uncommitted diff also replaces round() with truncation; the tests pass either way, so 'tests pass' hides it: late_fee(999.99, 35) is 5.0 before and 4.99 after",
+   "expectations": [
+    "Reads the whole diff and names both changes: the rename of _calc and the switch from round() to truncation",
+    "Shows the behaviour difference with an input where it shows (for example late_fee(999.99, 35): 5.0 before, 4.99 after)",
+    "Does not commit both as one refactoring; commits the rename alone (tests and a probe unchanged), then either commits the rounding change separately, named as a behaviour change, or leaves it uncommitted and asks",
+    "Nothing is lost: the mixed version is kept (stash or commit) until both parts are accounted for",
+    "No push"
+   ]
+  },
+  {
+   "id": 11,
+   "name": "service-from-router",
+   "sandbox": "service-from-router",
+   "prompt": "Move the business logic out of the POST /orders route in app/routes.py into a service. The nightly import will need the same rules.",
+   "bait": "the tests swap the repository with app.dependency_overrides[get_repo]; a service built inside its provider (OrderService(OrderRepository())), at module level or in the route bypasses that override, and 3 of 4 tests fail against the real in-memory data (409 instead of 201, 404 instead of 409); overriding a new provider in tests/conftest.py instead makes them pass while the route's real wiring goes untested; moving the HTTPException lines into the service keeps every test green but hands a non-HTTP caller fastapi.exceptions.HTTPException: 409",
+   "expectations": [
+    "Before the first edit, records the baseline (4 passed, ruff, mypy) and pins the HTTP behaviour beyond the tests: a probe of status, headers and body, or an OpenAPI dump, saved to compare",
+    "Follows the recipes for L2 (and L4 for the errors) in steps, each checked and committed: for example the errors and handlers added unused, the service and its provider added unused, then the route switched",
+    "The service's provider takes the repository through Depends(get_repo), so the tests' override still reaches it; no repository or service is built at module level, inside the route or inside the provider",
+    "tests/conftest.py and tests/test_orders.py are unchanged at the end, and 4 passed after every step",
+    "The service imports nothing from fastapi and raises no HTTPException: domain errors are mapped to the same 404 and 409 responses ({'detail': 'unknown customer'}, {'detail': 'credit limit exceeded: 1500 > 1000'}); the answer says non-HTTP callers now get the domain error",
+    "Shows the HTTP behaviour unchanged by comparing the probe or the OpenAPI document before and after, not only by the tests passing",
+    "Keeps the contract: the path, the status codes and the request and response fields are unchanged",
+    "One commit per step; no push"
+   ]
+  }
+ ],
+ "runs": []
+}

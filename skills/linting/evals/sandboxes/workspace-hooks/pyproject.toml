@@ -1,0 +1,13 @@
+[project]
+name = "shop"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[tool.uv.workspace]
+members = ["services/*", "packages/*"]
+
+[dependency-groups]
+dev = ["ruff==0.16.9", "mypy==2.3.1", "pre-commit==4.6.2"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]

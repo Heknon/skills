@@ -1,0 +1,42 @@
+Add transfer of loyalty points between accounts
+
+Customers can give points to family members.
+---
+diff --git a/src/shop/points.py b/src/shop/points.py
+index 1597e0e..07e3cd9 100644
+--- a/src/shop/points.py
++++ b/src/shop/points.py
+@@ -22,3 +22,15 @@ AUDIT: list[str] = []
+ 
+ def audit(line: str) -> None:
+     AUDIT.append(line)
++
++
++def transfer_points(src: Account, dst: Account, points: int) -> None:
++    """Move points from src to dst. The whole balance may be moved."""
++    if src.balance < points:
++        raise InsufficientPoints(src.id)
++    src.balance -= points
++    dst.balance += points
++    try:
++        audit(f"{src.id}->{dst.id}:{points}")
++    except Exception:
++        pass
+diff --git a/tests/test_points.py b/tests/test_points.py
+index 55105bc..dae68db 100644
+--- a/tests/test_points.py
++++ b/tests/test_points.py
+@@ -1,6 +1,12 @@
+-from shop.points import AUDIT, audit
++from shop.points import AUDIT, Account, audit, transfer_points
+ 
+ 
+ def test_audit_keeps_lines() -> None:
+     audit("hello")
+     assert AUDIT[-1] == "hello"
++
++
++def test_transfer_moves_points() -> None:
++    ann, bob = Account("ann", 50), Account("bob", 0)
++    transfer_points(ann, bob, 20)
++    assert (ann.balance, bob.balance) == (30, 20)

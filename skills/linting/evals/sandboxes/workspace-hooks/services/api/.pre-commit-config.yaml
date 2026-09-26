@@ -1,0 +1,9 @@
+# api hooks (2024)
+repos:
+  - repo: local
+    hooks:
+      - id: api-mypy
+        name: mypy for the api
+        entry: mypy --ignore-missing-imports
+        language: system
+        types: [python]

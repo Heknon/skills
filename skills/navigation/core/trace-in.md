@@ -20,6 +20,16 @@ safe to change: <yes | no, because <use> | unknown, because <what could not be s
    `core/search-patterns.md`: calls, attribute access, and imports of `X`.
    For each file that imports `X` under another name (`import X as Y`),
    search that file for `Y` too.
+   On a branch that will merge into another, search that branch too:
+   callers it gained after your branch point are not in your files.
+   ```
+   git fetch
+   git grep -n -w X origin/main
+   ```
+   Each hit is `origin/main:path:line:text`. *lab* (git 2.43.0): on
+   the feature branch, `git grep -n -w get_user` missed `report.py`,
+   which main had added since; the command above found
+   `origin/main:report.py:4:    return get_user(2)`.
 4. **Go through `core/what-search-misses.md`**, all eleven items. Each
    one that applies is either searched and ruled out, or listed under *Not
    covered*.

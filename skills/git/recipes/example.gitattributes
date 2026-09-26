@@ -1,0 +1,17 @@
+# Line endings for a Python repository worked on from Windows and Linux.
+# With this file, git stores text with LF and core.autocrlf no longer
+# decides. Adding it to an existing repository is its own commit, with
+# `git add --renormalize .` (see core/clean-up.md), and only when asked.
+* text=auto
+*.py text eol=lf
+*.toml text eol=lf
+*.md text
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.sh text eol=lf
+*.png binary
+*.jpg binary
+*.pdf binary
+*.zip binary
+*.whl binary

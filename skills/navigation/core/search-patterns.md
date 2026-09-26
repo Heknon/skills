@@ -24,12 +24,15 @@ syntax: no lookbehind, no backreferences. `\b` is a word boundary.
 | a re-export in an `__all__` | `__all__.*["']Client["']` |
 | a decorator named `route` | `^\s*@[\w.]*\broute\b` |
 
-An import of module `billing`, in either form (a pipe inside a table
-cannot be shown safely, so it is here):
+An import of module `billing`, in any form, `from app import billing`
+included (a pipe inside a table cannot be shown safely, so it is here):
 
 ```
-^\s*(from|import)\s+[\w.]*\bbilling\b
+^\s*(from|import)\s+[\w.]*\bbilling\b|^\s*from\s+[\w.]+\s+import\s+.*\bbilling\b
 ```
+
+An import in parentheses over several lines is missed; widen to the bare
+name (rule 3).
 
 ## Uses in Python
 

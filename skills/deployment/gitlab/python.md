@@ -54,6 +54,9 @@ test:
   lab monorepo).
 - After a sync, `uv run --no-sync <tool>` runs without checking the
   environment again.
+- A pre-commit job that runs `pre-commit run --from-ref` needs both
+  commits in the clone; a shallow clone failed in the linting skill's
+  lab (`pre-commit/ci.md`).
 
 ## The package index, air gapped
 
@@ -77,6 +80,10 @@ new index instead of installing the locked set.
 An index behind the internal CA needs the CA: `SSL_CERT_FILE` pointing at
 it (a File variable), or the CA installed in the job image. Without it:
 `invalid peer certificate: UnknownIssuer` (lab).
+
+What the index settings mean (`explicit`, `[tool.uv.sources]`, the
+credential variables) and how to prevent dependency confusion is the
+packaging skill's `core/indexes.md`.
 
 ## GitLab's PyPI registry
 

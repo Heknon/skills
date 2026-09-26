@@ -27,7 +27,10 @@ run:        <summary line of the final run>
    wrong value, remove the check, flip a condition), run the test, see it
    fail with a message that says what broke, then undo the change and see
    it pass again. A test that still passes with the code broken tests
-   nothing. Write the change you made under `fails when`.
+   nothing. Write the change you made under `fails when`. Undo the break
+   in a later second, or delete the module's `__pycache__` first: *lab,
+   3.12:* an undo of the same size in the same second kept the broken
+   bytecode, and the test still failed.
 6. Run the file, then the suite.
 
 ## Tools, all checked on pytest 9.1.1 (and 8.4.2 unless marked)

@@ -1,0 +1,45 @@
+Address review: refuse non-positive transfers, test the balance check
+
+Findings 1 and 3 of the first review.
+---
+diff --git a/src/shop/points.py b/src/shop/points.py
+index 07e3cd9..f3ce6e9 100644
+--- a/src/shop/points.py
++++ b/src/shop/points.py
+@@ -26,7 +26,9 @@ def audit(line: str) -> None:
+ 
+ def transfer_points(src: Account, dst: Account, points: int) -> None:
+     """Move points from src to dst. The whole balance may be moved."""
+-    if src.balance < points:
++    if points <= 0:
++        raise ValueError(f"points must be positive, got {points}")
++    if src.balance <= points:
+         raise InsufficientPoints(src.id)
+     src.balance -= points
+     dst.balance += points
+diff --git a/tests/test_points.py b/tests/test_points.py
+index dae68db..e43eb15 100644
+--- a/tests/test_points.py
++++ b/tests/test_points.py
+@@ -1,4 +1,6 @@
+-from shop.points import AUDIT, Account, audit, transfer_points
++import pytest
++
++from shop.points import AUDIT, Account, InsufficientPoints, audit, transfer_points
+ 
+ 
+ def test_audit_keeps_lines() -> None:
+@@ -10,3 +12,13 @@ def test_transfer_moves_points() -> None:
+     ann, bob = Account("ann", 50), Account("bob", 0)
+     transfer_points(ann, bob, 20)
+     assert (ann.balance, bob.balance) == (30, 20)
++
++
++def test_transfer_more_than_balance_is_refused() -> None:
++    with pytest.raises(InsufficientPoints):
++        transfer_points(Account("ann", 5), Account("bob", 0), 10)
++
++
++def test_transfer_of_zero_or_less_is_refused() -> None:
++    with pytest.raises(ValueError):
++        transfer_points(Account("ann", 5), Account("bob", 0), -3)

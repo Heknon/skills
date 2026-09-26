@@ -1,0 +1,20 @@
+[project]
+name = "acme-api"
+version = "1.0.0"
+description = "Quotes service."
+requires-python = ">=3.12"
+dependencies = [
+    "acme-common>=1.0,<2",
+    "click>=8.5.0",
+    "pydantic>=2",
+]
+
+[project.scripts]
+acme-api = "acme_api.main:cli"
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+acme-common = { workspace = true }

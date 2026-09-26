@@ -1,0 +1,34 @@
+# Recipe: a library with a command, hatchling, src layout, static version.
+# Built, installed from the wheel in a clean venv and run on uv 0.12.19,
+# hatchling 1.32.4, Python 3.12. Change: name, description, dependencies,
+# the script line, the mirror URL; rename src/acme_report to match.
+[project]
+name = "acme-report"
+version = "1.2.0"
+description = "Render monthly sales reports."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "LicenseRef-Proprietary"
+dependencies = ["click>=8.1"]
+
+[project.optional-dependencies]
+http = ["httpx>=0.28"]
+
+[project.scripts]
+acme-report = "acme_report.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8.4"]
+
+[build-system]
+requires = ["hatchling==1.32.4"]
+build-backend = "hatchling.build"
+
+# No [tool.hatch.build] table: hatchling finds src/acme_report because the
+# folder is the project name with - replaced by _. Name it explicitly when
+# the folder differs: packages = ["src/<folder>"].
+
+[[tool.uv.index]]
+name = "mirror"
+url = "https://pypi-mirror.example.com/simple"
+default = true

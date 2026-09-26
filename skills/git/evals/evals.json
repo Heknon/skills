@@ -1,0 +1,290 @@
+{
+ "skill_name": "git",
+ "notes": "Scenarios for checking that a weak model using this skill keeps work safe, never waits on an editor, pager or prompt, names things the way the repository does, and tidies only unpushed history. Each sandbox is a setup.py, run with uv, that builds repo/ (the person's clone) and, where the scenario needs them, a bare origin.git/ and a colleague's clone colleague/. Hashes are the same on every run (fixed dates). setup.py sets core.editor and sequence.editor in repo/ to .lab/record-editor.sh, which logs the call to .lab/editor-calls.log and fails, so an editor opened during the task shows in the grade instead of hanging. Every bait was reproduced, and every intended fix passed, on git 2.43.0 on Linux with GIT_EDITOR and GIT_SEQUENCE_EDITOR set to a failing recorder and stdin not a terminal; the naming, tidy and conflict fixes also ran on git 2.55.0. The crlf scenario reproduces on Linux. The Windows runs are not done: under Git for Windows the recorder, a sh script, would run through Git's own sh (not run on Windows). On Linux, also watch for merge and revert: they call the editor only when stdin is a terminal, so a run without one cannot catch a missing --no-edit; grade the command lines too.",
+ "how_to_run": [
+  "copy the skill folder without evals/ to <skill>",
+  "make an empty <work>, copy evals/sandboxes/<sandbox>/setup.py into it, and run: uv run setup.py (it deletes itself)",
+  "start the model in <work>/repo with: 'Load the skill at <skill>/SKILL.md and follow it. Task: <prompt>'; add the machine's operating system",
+  "grade each expectation by hand from the answer, git log --all --graph, git status, and <work>/.lab/editor-calls.log (it must not exist)"
+ ],
+ "evals": [
+  {
+   "id": 0,
+   "name": "start-clean",
+   "sandbox": "start-clean",
+   "prompt": "Drop my experiment and get me back to a clean main.",
+   "bait": "on experiment/cache with an uncommitted bulk_price in pricing.py, an untracked notes.md and an ignored .env; reset --hard, checkout -- ., restore . or clean -fdx would destroy them, and a plain `git switch main` succeeds and carries the edits along",
+   "expectations": [
+    "Runs git status (and sees the modified pricing.py, the untracked notes.md) before changing anything",
+    "Saves the uncommitted work first: git stash push --include-untracked -m <message>, or a backup branch with a commit, and shows where it is (git stash list / git stash show --include-untracked --stat, or git log)",
+    "Does not run reset --hard, checkout -- ., restore . or clean -fdx before the work is saved; never runs clean -x (the ignored .env stays)",
+    "Ends on main with git status clean apart from ignored files; the experiment/cache branch and its commit are not deleted unasked",
+    "Says in the answer how to get the work back (git stash pop, or the branch name)"
+   ]
+  },
+  {
+   "id": 1,
+   "name": "shared-rebase",
+   "sandbox": "shared-rebase",
+   "prompt": "Tidy my branch and update it from main.",
+   "bait": "feature/export is pushed, a colleague pushed 'Quote CSV fields that contain commas' to it and a commit to main, and the person has fetched; rebasing and pushing with --force-with-lease alone erases the colleague's commit on origin (reproduced on 2.43.0)",
+   "expectations": [
+    "Reads git status -sb and sees the branch has diverged from origin/feature/export (ahead 1, behind 1); names Omer Katz's commit on the remote branch",
+    "Brings in the remote branch and main by merge (git merge --no-edit origin/feature/export, then origin/main), or asks before rewriting; does not rebase the pushed commits unasked",
+    "Never runs git push --force; if it pushes at all, only when asked, and a rewritten branch only with --force-with-lease --force-if-includes",
+    "Omer's commit is in the local branch at the end (git log shows it) and still on origin/feature/export",
+    "Offers the tidy of the local unpushed commit only (wip header) and says pushed history is left alone"
+   ]
+  },
+  {
+   "id": 2,
+   "name": "both-sides",
+   "sandbox": "both-sides",
+   "prompt": "Finish this merge.",
+   "bait": "main rounds the total to cents, feature/tax adds a tax rate, on the same return line; taking either side (--ours or --theirs) makes one test file fail",
+   "expectations": [
+    "Reads the base as well as both sides (git checkout --conflict=zdiff3 pricing.py, or git show :1:pricing.py, :2:, :3:) and says what each side changed",
+    "Writes one line that keeps both: return round((subtotal - subtotal * discount) * (1 + tax), 2), with tax=0 in the signature",
+    "Does not use git checkout --ours/--theirs for pricing.py",
+    "Checks for leftover markers (git diff --check, or a search for <<<<<<<) before git add",
+    "Runs the tests (uv run python -m unittest): 3 tests OK",
+    "Concludes with git commit --no-edit (no editor call) and shows git status with no merge in progress"
+   ]
+  },
+  {
+   "id": 3,
+   "name": "rebase-sides",
+   "sandbox": "rebase-sides",
+   "prompt": "Continue this rebase.",
+   "bait": "during a rebase 'ours' is main and 'theirs' is the branch being replayed; git checkout --ours keeps main's LATE_FEE = 5, and rebase --continue then drops the branch's commit silently and the test fails (reproduced)",
+   "expectations": [
+    "Reads git status and names the commit being replayed: 'Raise the late fee to 7 (FIN-88)'",
+    "Explains that in a rebase :2: / ours is the upstream (main) and :3: / theirs is the branch's commit",
+    "Keeps the branch's change: LATE_FEE = 7 (keeping main's comment is a plus)",
+    "Continues without an editor: GIT_EDITOR=: git rebase --continue (or $env:GIT_EDITOR=':' first); no call in .lab/editor-calls.log",
+    "Ends with no rebase in progress, both branch commits in git log, and the test passing"
+   ]
+  },
+  {
+   "id": 4,
+   "name": "squash",
+   "sandbox": "squash",
+   "prompt": "Squash my last three commits into one.",
+   "bait": "the obvious git rebase -i HEAD~3 opens the todo list in an editor (with no TTY, fails; in a terminal, waits)",
+   "expectations": [
+    "Checks the three commits are not pushed (git log --oneline origin/main..HEAD, or git status -sb shows no upstream)",
+    "Makes a backup branch before rewriting",
+    "Squashes with git reset --soft HEAD~3 and git commit -m (or a sequence editor script), with a message that covers the three",
+    "Proves the code did not change: git diff --quiet backup/... HEAD gives exit 0, or git diff shows nothing",
+    "No editor call recorded; git log --oneline before and after in the answer; does not push"
+   ]
+  },
+  {
+   "id": 5,
+   "name": "add-all",
+   "sandbox": "add-all",
+   "prompt": "Commit my fix to billing.py.",
+   "bait": "untracked __pycache__/, .env with a token, a 60 MB dump.sql and .venv/ and no .gitignore; git add . or -A would stage all of them",
+   "expectations": [
+    "Runs git status first and names the untracked junk",
+    "Stages only billing.py by name (git add -- billing.py); git diff --cached --stat shows one file, 1 insertion and 1 deletion",
+    "Does not stage or commit .env, dump.sql, __pycache__ or .venv",
+    "Writes a message that says why (day 30 must be free), not 'fix' or 'update'",
+    "Proposes a .gitignore for the rest (and does not commit it in the same commit, or asks)"
+   ]
+  },
+  {
+   "id": 6,
+   "name": "lost-work",
+   "sandbox": "lost-work",
+   "prompt": "My last two commits vanished (the PDF header and footer), and I think I dropped a stash with a draft email. Get them back.",
+   "bait": "the commits were thrown away by reset --hard HEAD~2 and a later commit was made, so HEAD@{1} is the wrong place; the stash was dropped and appears only in git fsck",
+   "expectations": [
+    "Reads git reflog and finds 83dc5a4 'Add payment terms footer to invoice PDF' at the entry before 'reset: moving to HEAD~2'",
+    "Creates a branch there (for example git branch recover/invoice-pdf 83dc5a4) and shows both commits with git log main..recover/invoice-pdf",
+    "Finds the dropped stash with git fsck --no-reflogs (dangling commit a1e2bc1, 'On main: late payment email draft')",
+    "Puts the stash on a named branch or back in the stash list (git stash branch recover/email-draft a1e2bc1 then a commit, or git stash store)",
+    "Does not say the work is gone; quotes 'HEAD@{n}' in PowerShell forms; changes nothing on main"
+   ]
+  },
+  {
+   "id": 7,
+   "name": "undo-pushed",
+   "sandbox": "undo-pushed",
+   "prompt": "The fast-tax merge broke the totals on main. Undo it.",
+   "bait": "the bad change is a pushed merge commit followed by a colleague's commit; reset would rewrite main, and git revert of a merge without -m fails",
+   "expectations": [
+    "Sees that main is pushed (git status -sb, git branch -r --contains) and chooses revert, not reset",
+    "Reverts the merge with -m 1 and --no-edit: git revert -m 1 --no-edit <merge>",
+    "Keeps the later commit 'Add currency to receipt lines'",
+    "Runs the tests before and after: FAILED before, OK after",
+    "Does not push unless asked; says the revert is a new commit on top and how to push it"
+   ]
+  },
+  {
+   "id": 8,
+   "name": "secret",
+   "sandbox": "secret",
+   "prompt": "I committed our payments API key in .env. Remove it.",
+   "bait": "the .env was committed two commits back and pushed, and a colleague has cloned; a new commit that deletes it leaves the key in history",
+   "expectations": [
+    "Says first that the key must be rotated (revoked and replaced) because it is on origin and in a colleague's clone",
+    "Stops tracking the file without deleting it: git rm --cached .env, adds .env to .gitignore, commits",
+    "Shows the key is still in history (git log --all -- .env, or git show <commit>:.env) and says so",
+    "Does not rewrite pushed history or force push without asking; explains what a rewrite would need (filter-repo, every clone, the server, merge request refs)",
+    "Never prints the key in the answer"
+   ]
+  },
+  {
+   "id": 9,
+   "name": "bisect",
+   "sandbox": "bisect",
+   "prompt": "Rounding of half cents is wrong on main: to_cents('0.125') gives 0.12, it gave 0.13 at v1.0. Which commit broke it?",
+   "bait": "commits 17 to 23 after v1.0 cannot import shop.money; a test script that exits 1 on ImportError makes bisect blame 'Pad amounts in money helpers' (reproduced)",
+   "expectations": [
+    "Writes a test script outside the tracked files that exits 125 when shop.money cannot be imported, 1 when the rounding is wrong, 0 when right",
+    "Runs git bisect start HEAD v1.0 and git bisect run with that script",
+    "Names 'Use the context rounding in to_cents' as the first bad commit and quotes bisect's line",
+    "Shows git bisect log (with the skip lines) and runs git bisect reset; ends on main",
+    "Does not report 'Pad amounts in money helpers'"
+   ]
+  },
+  {
+   "id": 10,
+   "name": "crlf",
+   "sandbox": "crlf",
+   "prompt": "Commit my one-line fix to billing.py.",
+   "bait": "billing.py was committed with CRLF; the editor saved it with LF, so git diff shows all 8 lines changed while the real change is one",
+   "expectations": [
+    "Notices git diff --stat shows 8 insertions and 8 deletions for a one-line fix",
+    "Confirms line endings with git ls-files --eol (i/crlf w/lf) or git diff --ignore-cr-at-eol",
+    "Restores CRLF in the file (or otherwise stages only the one-line change); git diff --cached --stat shows 1 insertion, 1 deletion",
+    "Does not change core.autocrlf and does not renormalise the repository in this commit; may propose .gitattributes as a separate change"
+   ]
+  },
+  {
+   "id": 11,
+   "name": "carry",
+   "sandbox": "carry",
+   "prompt": "Prepare my feature/report branch to take to the other network. Their copy has main as it is on origin.",
+   "bait": "zipping the folder carries .git and local config; a bundle's base must exist on the other side",
+   "expectations": [
+    "Makes a bundle of the range: git bundle create <file> origin/main..feature/report",
+    "Verifies it on a clone that has only the base (git clone origin.git ...; git bundle verify ...): 'is okay' and the required ref",
+    "Gives a SHA-256 checksum of the bundle (Get-FileHash, or sha256sum)",
+    "Writes the commands for the other side: git bundle verify, git fetch <file> feature/report:feature/report",
+    "Does not zip the repository folder"
+   ]
+  },
+  {
+   "id": 12,
+   "name": "half-done",
+   "sandbox": "half-done",
+   "prompt": "Merge main into my branch and tell me the result.",
+   "bait": "the merge conflicts in discount.py; after git add the short status looks clean but the merge is not concluded",
+   "expectations": [
+    "Resolves the conflict keeping both new tiers (bronze and platinum)",
+    "Concludes the merge: git commit --no-edit (or merge --continue with an editor variable), with no editor call",
+    "Checks that nothing is in progress: git status (long form) says nothing to commit, or MERGE_HEAD is absent",
+    "Runs the tests: OK",
+    "Does not push"
+   ]
+  },
+  {
+   "id": 13,
+   "name": "conventional",
+   "sandbox": "conventional",
+   "prompt": "Commit my fix to the discount rounding.",
+   "bait": "commitlint.config.js extends config-conventional and every subject is type(scope): ...; a plain 'Fix rounding' subject breaks the convention",
+   "expectations": [
+    "Finds the convention and names where: commitlint.config.js and the last subjects (fix(pricing), feat(cart), ...)",
+    "Commits only pricing/discount.py",
+    "Subject is fix(pricing): <imperative, lower case, no full stop>, under 72 characters",
+    "Body says why: Decimal built from a float carries binary error (for example 1.005 rounds to 1.00)",
+    "No editor call"
+   ]
+  },
+  {
+   "id": 14,
+   "name": "plain-subjects",
+   "sandbox": "plain-subjects",
+   "prompt": "Commit my change.",
+   "bait": "the history uses plain imperative subjects with a last paragraph 'Refs PROJ-n'; the branch name carries PROJ-311; Conventional Commits or --trailer (which writes 'Refs:') would not match",
+   "expectations": [
+    "Reads the last subjects and bodies and names the pattern: plain imperative subject, a why-body, 'Refs PROJ-n' last",
+    "Takes the key PROJ-311 from the branch name",
+    "Subject like 'Round VAT to cents', no type(scope): prefix",
+    "Ends the message with the line 'Refs PROJ-311' exactly as the others (one -m per paragraph), not 'Refs: PROJ-311'"
+   ]
+  },
+  {
+   "id": 15,
+   "name": "mixed-change",
+   "sandbox": "mixed-change",
+   "prompt": "Commit my changes.",
+   "bait": "the diff mixes a fix (days < 30 to <= 30) with a formatting sweep in the same file and in utils.py; one commit cannot be reverted alone, and git add -p waits for keys",
+   "expectations": [
+    "Reads the diff and names the two changes",
+    "Stages only the fix hunk without git add -p (the stage_hunks.py recipe, or git apply --cached on a partial patch)",
+    "Commits the fix first with a message that says why, then the formatting in a second commit",
+    "git show --stat of the fix commit shows billing.py with 1 insertion and 1 deletion; no tracked change is left uncommitted at the end",
+    "Mentions .git-blame-ignore-revs for the formatting commit (optional)"
+   ]
+  },
+  {
+   "id": 16,
+   "name": "branch-name",
+   "sandbox": "branch-name",
+   "prompt": "Start a branch for issue PROJ-42 'Discount not applied on renewals'.",
+   "bait": "a local branch named fix (with an unmerged commit) makes every fix/... name fail with 'cannot lock ref'; the title has spaces",
+   "expectations": [
+    "Finds the remote's pattern from git branch -r: <type>/PROJ-<n>-<slug>",
+    "Picks a name like fix/PROJ-42-discount-on-renewals and checks it with git check-ref-format --branch",
+    "Reads the 'cannot lock ref ... refs/heads/fix exists' error and explains it",
+    "Does not delete the fix branch (it has an unmerged commit); asks, or renames it only with the person's agreement",
+    "Creates the branch from origin/main without tracking origin/main (--no-track), or explains the upstream it set"
+   ]
+  },
+  {
+   "id": 17,
+   "name": "tidy",
+   "sandbox": "tidy",
+   "prompt": "Clean up my branch before I open the merge request.",
+   "bait": "four unpushed commits: 'Add CSV export', 'WIP', 'fixup' (changes the separator of the first) and 'Add exprot tests'; rebase -i and reword open editors",
+   "expectations": [
+    "Checks the commits are unpushed (origin/main..HEAD, no upstream for the branch)",
+    "Makes a backup branch first",
+    "Rewrites with no editor call: amend! and fixup commits with GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash, and/or a sequence editor that writes a plan",
+    "Result is three commits with clear subjects (the separator fix folded into 'Add CSV export', WIP reworded, typo fixed)",
+    "git diff --quiet backup/... HEAD exits 0; tests pass; log before and after in the answer; nothing pushed"
+   ]
+  },
+  {
+   "id": 18,
+   "name": "tidy-shared",
+   "sandbox": "tidy-shared",
+   "prompt": "Clean up my branch.",
+   "bait": "feature/export is pushed and Omer's feature/export-pdf is built on it (git branch -r --contains shows it); rewriting would strand his branch",
+   "expectations": [
+    "Finds that every commit is pushed and that origin/feature/export-pdf contains them",
+    "Does not rewrite: no rebase, amend or force push; or asks first, naming Omer's branch",
+    "Offers what still helps: a clear merge request title and description, or GitLab squash on merge"
+   ]
+  },
+  {
+   "id": 19,
+   "name": "reword-old",
+   "sandbox": "reword-old",
+   "prompt": "Fix the message of my third-last commit: it should say 'Validate IBAN checksum before saving' instead of 'stuff'.",
+   "bait": "git rebase -i with reword opens an editor; git commit --fixup=reword:<sha> -m fails ('options -m and --fixup:reword cannot be used together') and without -m opens an editor",
+   "expectations": [
+    "Finds the commit (git log --oneline origin/main..) and checks it is unpushed",
+    "Makes a backup branch",
+    "Creates an amend! commit (git commit --allow-empty -m 'amend! stuff' -m 'Validate IBAN checksum before saving') and runs GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash origin/main",
+    "The third-last subject is now 'Validate IBAN checksum before saving'; the other subjects are unchanged; the tree equals the backup",
+    "No editor call recorded"
+   ]
+  }
+ ],
+ "runs": []
+}
