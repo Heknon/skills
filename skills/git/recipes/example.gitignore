@@ -1,0 +1,25 @@
+# Local files that never belong in a commit. Propose it; commit it on
+# its own, not with a code change.
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.sql
+*.dump
+*.log
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
