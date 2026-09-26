@@ -475,3 +475,32 @@ failed with it reverted. The evals were not run with the weak model.
   `PermissionError`; opening a directory gives `[Errno 13]`, where Linux
   gives `IsADirectoryError`; a refused connection is `WSAECONNREFUSED`,
   10061, still `ConnectionRefusedError`.
+
+### Can seniority find it? (routing lab)
+
+Seniority loads on every task and names no skill by design, so the new
+files are only useful if a model starting from seniority reaches them.
+Measured with a weaker model standing in for MiniMax, given seniority
+and the other skills as a list of descriptions (as Zed lists them), on
+four read-only tasks from the new sandboxes: a `KeyError`, a log line
+with no traceback, a `decimal.InvalidOperation`, and "plan a better
+error message". The files each run opened were taken from its tool
+calls, not from its own report.
+
+| Round | Change before it | Reached the target file |
+| --- | --- | --- |
+| 1 | none | 0 of 4; no run opened the debugging skill |
+| 2 | seniority: `reading-errors.md` question 3 and the Investigate row point at a skill that names the error | 1 of 4; two stopped at debugging's router |
+| 3 | debugging: "an error in front of you" above the router; seniority's Start row names the match | 3 of 8; 4 never left seniority; both improve runs planned a `ValueError` |
+| 4 | seniority: "Find the skill" section, `scope.md` question 9 and a `skill:` notes line; debugging's description opens with explaining and improving errors | 6 of 8; both improve runs kept the caught type |
+| 5 | seniority: the section moved to the top of `SKILL.md`, invariant 12 | 6 of 8; every run reached debugging; improve 2 of 2 |
+| 6 | debugging's description names the three files | 5 of 6 on the three understand tasks |
+
+What it found: one pointer two files deep (`first-step.md` to
+`choosing-a-tool.md`) was never followed; rules in prose under a table
+were skipped, while a table row, a notes field and an invariant were
+used; a model that opened a router often answered from it, until the
+description itself named the file. Without the skill, the improve task
+planned exactly the type change that `core/improve-the-error.md`
+forbids, in 4 of 4 runs. Seniority evals 12 and 13 now test this route.
+Not measured: MiniMax itself, and Zed's own skill listing.
