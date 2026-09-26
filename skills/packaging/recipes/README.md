@@ -12,9 +12,11 @@ there.
 | `uv-build/` | a pure-Python library on uv's backend, data inside the package | uv_build 0.12.19 |
 | `workspace/` | a virtual root, a library and a service as namespace packages (`acme.core`, `acme.api`), a bounded sibling with a workspace source | hatchling 1.32.4 |
 | `independent-projects/` | two projects in one repository with their own locks, one using the other by path | hatchling 1.32.4 |
+| `untangle/` | `before/`: two services and a shared folder tied by `sys.path` lines, `PYTHONPATH`, a copy and one `requirements.txt`; `after/`: the same folders as one workspace (`core/monorepo-better.md`) | hatchling 1.32.4 |
 | `internal-index/` | the mirror as default, an explicit internal index with a publish URL, a source line per internal package | hatchling 1.32.4 |
 | `wheelhouse/` | `fetch-wheels.sh` for the connected side, the check and the offline install (`README.md`) | pip 26.2.1 |
 | `tools/inspect_dist.py` | lists a wheel's or sdist's metadata, backend, entry points and files; `--against` finds missing files | standard library |
+| `tools/map_units.py` | lists a repository's units with their signs, and every tie between them with file:line: imports across units, sys.path lines, `PYTHONPATH`, requirement files and who reads them, sources, workspaces, Dockerfile lines, copies; changes nothing (`core/units-and-ties.md`) | standard library |
 
 ## How each was checked
 
@@ -41,6 +43,7 @@ Results:
 | `uv-build/` | `1 passed`; `built by: uv 0.12.19`; `acme-tax DE 100` printed `DE 100.00 -> 119.00` |
 | `workspace/` | one lock (`Resolved 9 packages`); `uv sync --package acme-api` installed acme-api, acme-core, click and the member's dev tools; `Requires-Dist: acme-core<2,>=1.2`; both wheels in one venv: `acme-api 1.10 2.20` printed `total 3.30`, and `import acme.core, acme.api` worked |
 | `independent-projects/` | a `uv.lock` in each folder; billing's tests `1 passed`; both wheels installed together with pydantic 1.10.26 |
+| `untangle/` | see its `README.md` and `examples/untangle-monorepo.md`: each of five steps checked; `after/` replayed from a fresh copy |
 | `internal-index/` | acme-report locked from the internal index (credentials from `UV_INDEX_INTERNAL_*`), click from the mirror; `uv publish --index internal` uploaded to a local test index, and a second run printed `already exists, skipping` |
 | `wheelhouse/` | see its `README.md` |
 

@@ -1,0 +1,23 @@
+# Recipe: the end of the walk in examples/untangle-monorepo.md. Three
+# units that were reached by sys.path lines, PYTHONPATH and a copy are now
+# members of one workspace, in the folders they always had: acme-common
+# (a library), acme-api and acme-worker (services with console scripts).
+# Locked, tested, built, installed from the wheels in clean venvs and run
+# on uv 0.12.19, hatchling 1.32.4, Python 3.12. Change: names, members,
+# the mirror URL. This root is virtual: it has no [project].
+[tool.uv.workspace]
+members = [
+    "common",
+    "api",
+    "worker",
+]
+
+[[tool.uv.index]]
+name = "mirror"
+url = "https://pypi-mirror.example.com/simple"
+default = true
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

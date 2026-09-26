@@ -1,0 +1,20 @@
+[project]
+name = "acme-worker"
+version = "1.0.0"
+description = "Batch totals worker."
+requires-python = ">=3.12"
+dependencies = [
+    "acme-common>=1.0,<2",
+    "click>=8.5.0",
+    "httpx>=0.28.1",
+]
+
+[project.scripts]
+acme-worker = "acme_worker.batch:main"
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+acme-common = { workspace = true }

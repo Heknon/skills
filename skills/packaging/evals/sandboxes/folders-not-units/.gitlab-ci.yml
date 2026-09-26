@@ -1,0 +1,8 @@
+test:
+  script:
+    - uv sync --locked
+    - uv run pytest
+
+build:
+  script:
+    - buildah bud -t acme-reports .
