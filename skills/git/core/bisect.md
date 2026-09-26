@@ -35,6 +35,21 @@ script runs.
    | 125 | cannot test this commit: skip it |
    | 128 or more, or negative | bisect run stops with an error |
    A commit that does not import or build is **125**, never 1.
+
+   A Python script kept outside the repository cannot import the
+   project unless it puts the current folder on `sys.path`: `python
+   ../bisect_test.py` puts the script's own folder there, not the one
+   `bisect run` works in. `recipes/bisect_test.py` does it with
+   `sys.path.insert(0, os.getcwd())`, as does the debugging skill's
+   `skills/debugging/recipes/repro_template.py`; keep that line, and
+   run from the repository's top folder. The shell recipes need no such
+   line: `python -c` and `python -m pytest` start from the current
+   folder. *lab* (git 2.43.0, the bisect
+   sandbox): without the line the script printed `skip: cannot import
+   shop.money: ModuleNotFoundError("No module named 'shop'")` at every
+   commit, and bisect ended with `There are only 'skip'ped commits left
+   to test.`; with it, bisect named `2d373da`. A script that answers
+   125 at both ends is broken, not the code (step 2 catches it).
 4. Run it:
    ```
    git bisect start <bad> <good>

@@ -68,6 +68,16 @@ is `git config --get core.hooksPath`, or `.git/hooks`
 (`git rev-parse --git-path hooks` prints the one in use). Never pass
 `--no-verify` unless the person asks for it.
 
+With `core.hooksPath` set, `pre-commit install` refuses (``Cowardly
+refusing to install hooks with `core.hooksPath` set.``) and hints `git
+config --unset-all core.hooksPath`, which would switch off what the
+hooks path runs. Do not unset it unasked. Call pre-commit from the
+existing hook instead: the last line of that folder's `pre-commit`
+script becomes `exec uv run --frozen pre-commit run`. *lab* (git
+2.43.0, pre-commit 4.6.2): the existing hook printed its line, then the
+ruff hook failed the commit on an unused import. The details are the
+linting skill's: `skills/linting/pre-commit/install.md`.
+
 ## Never
 
 - Never `git add .`, `git add -A` or `git commit -a` without reading

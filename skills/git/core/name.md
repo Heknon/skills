@@ -78,5 +78,7 @@ Stop at the first that decides, and cite it.
 Annotated, with a message: `git tag -a v1.4.0 -m "Release 1.4.0"`
 (`git cat-file -t v1.4.0` prints `tag`; a tag without `-a` prints
 `commit`). `git tag -a v9` with no `-m` opens the editor. Which number
-is the packaging skill's decision. Pushing a tag leaves this machine
+is the packaging skill's decision. A monorepo that releases members one
+by one tags each as `<member>-v<version>`, such as `api-v0.5.0`
+(`reference/conventions.md`). Pushing a tag leaves this machine
 (`core/push.md`).

@@ -67,10 +67,21 @@ Default pattern: `<type>/<issue>-<slug>` with types `feat`, `fix`,
 `v<major>.<minor>.<patch>`, annotated. `git tag -l --sort=-v:refname`
 sorts by version: `v1.10.0` before `v1.9.1` before `v1.2.0` (lab).
 
+In a monorepo whose members are released one by one, a tag per member:
+`<member>-v<major>.<minor>.<patch>`, such as `api-v0.5.0` and
+`core-v1.2.0`, annotated, on the commit that carries the member's new
+version. `git tag -l "api-v*" --sort=-v:refname` lists one member's
+releases newest first: `api-v0.10.0`, `api-v0.5.0`, `api-v0.4.0` (lab,
+git 2.43.0). Which version the tag carries is the packaging skill's
+(`skills/packaging/core/member-release.md`); a CI rule that matches the
+prefix is the deployment skill's (`skills/deployment/core/monorepo.md`).
+
 ## A formatting commit
 
-A formatting sweep is its own commit (the linting skill decides when).
-Record it so blame skips it:
+A formatting sweep is its own commit. The linting skill decides when
+one is made and what goes in it (`skills/linting/core/in-scope.md`,
+and `skills/linting/ruff/format.md` for a switch of formatter). Record
+it so blame skips it:
 
 ```
 .git-blame-ignore-revs:
