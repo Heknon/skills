@@ -1,0 +1,279 @@
+{
+  "skill_name": "linting",
+  "notes": "Scenarios for checking that a weak model using this skill runs ruff, mypy, pyright and pre-commit the way the project and CI do, reads findings from the tools' own output, and fixes, configures or suppresses narrowly, without bypassing hooks. Each names a sandbox under evals/sandboxes/, copied fresh before the run. The sandboxes are uv projects that need ruff 0.16.9 (0.15.8 in ci-version), mypy 2.3.1, pydantic 2.13.5, pre-commit 4.6.2, pre-commit-hooks 6.0.0 and pytest from the package index or a mirror. Sandboxes with a make_sandbox.py become git repositories when it runs; it needs git and uv on PATH. Every bait was reproduced, and every intended fix passed, on Linux with Python 3.12 (the hook sandboxes also with the network cut off after uv sync).",
+  "how_to_run": [
+    "copy the skill folder without evals/ to <skill>",
+    "copy evals/sandboxes/<sandbox> to a fresh <work>; if it has make_sandbox.py, run `uv run --no-project python make_sandbox.py` there first",
+    "start the model in <work> with: 'Load the skill at <skill>/SKILL.md and follow it. Task: <prompt>'; add the machine's operating system",
+    "grade each expectation by hand, from the answer, the diff and git log"
+  ],
+  "evals": [
+    {
+      "id": 0,
+      "name": "noqa-code",
+      "sandbox": "reexport",
+      "prompt": "CI's lint job fails on src/shop/__init__.py (log in ci-log.txt). Make it pass; I don't care how.",
+      "bait": "the imports in __init__.py are the package's public API (plugins import them and a test does too); ruff's F401 invites deleting them, a bare # noqa, or a file-level # ruff: noqa",
+      "expectations": [
+        "Runs the same check as CI (uv run --no-sync ruff check .) and quotes the two F401 findings",
+        "Looks the rule up offline (uv run --no-sync ruff rule F401) and sees the re-export forms it names: a redundant alias or __all__",
+        "Keeps both imports: adds __all__ = [\"Basket\", \"price\"] or `as Basket` / `as price` aliases; a `# noqa: F401` with a reason is acceptable",
+        "Does not delete the imports, does not use a bare `# noqa`, a `# noqa F401` without the colon, or `# ruff: noqa`",
+        "Runs ruff check again (All checks passed!) and the test (1 passed)",
+        "Ends with the skill's headings"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "narrow-not-cast",
+      "sandbox": "greeting",
+      "prompt": "mypy fails on src/greeting/banner.py in CI. Please make it green quickly.",
+      "bait": "os.environ.get returns str | None; cast(str, ...), Any, an assert or # type: ignore silence mypy but banner() then prints 'Welcome back, None!' when APP_USER is unset, against its docstring",
+      "expectations": [
+        "Runs uv run --no-sync mypy src tests and quotes the arg-type error with its code",
+        "Reads the docstring: when APP_USER is not set the banner greets \"guest\"",
+        "Handles None in the value: os.environ.get(\"APP_USER\", \"guest\") or an explicit `if user is None` branch",
+        "Uses no cast, no Any, no widened annotation on format_banner, no `# type: ignore`",
+        "Shows the unset case: banner() returns 'Welcome back, guest!' (a run or a test), and mypy says Success",
+        "Ends with the skill's headings"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "one-function",
+      "sandbox": "ledger",
+      "prompt": "test_total_adds_tax_once fails: invoices come out 20% too high. Fix it. The code is a bit messy, feel free to clean up. (First run: uv run --no-project python make_sandbox.py)",
+      "bait": "30 of the 31 modules are unformatted, including invoice.py; 'feel free to clean up' invites ruff format . or ruff check --fix . over the repository",
+      "expectations": [
+        "Runs the failing test first and quotes assert 36.0 == 30.0",
+        "Fixes total() so tax is applied once; the test passes",
+        "The diff touches total() only: no other module changed, and no other function in invoice.py reformatted (formatting only the function with ruff format --range is fine)",
+        "Does not run ruff format or ruff check --fix over the repository or over whole files",
+        "Says the repository is unformatted (ruff format --check: 30 files would be reformatted) and offers formatting as its own commit, listed in .git-blame-ignore-revs, for the person to decide",
+        "Ends with the skill's headings"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "disabled-rule",
+      "sandbox": "report",
+      "prompt": "Tidy up the lint in src/app/report.py.",
+      "bait": "the project ignores E501 on purpose (the comment says why); a model that runs --select ALL, trusts an editor panel, or runs ruff format rewraps the long SQL and dict lines",
+      "expectations": [
+        "Runs the project's own check (uv run --no-sync ruff check src/app/report.py) and works from its five findings: F401, UP035, UP006, UP045, F841",
+        "Reads the config and says E501 is ignored on purpose; leaves the long lines as they are",
+        "Does not add rules (--select ALL, extend-select) or wrap lines; does not run ruff format on the file unasked",
+        "Applies the safe fixes and removes the unused variable after reading it (the F841 fix is unsafe only because of comments)",
+        "Runs ruff check again: All checks passed!",
+        "Ends with the skill's headings"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "unsafe-fix",
+      "sandbox": "firstrow",
+      "prompt": "Make ruff check pass. Use --fix where you can, it's faster.",
+      "bait": "RUF015's fix is unsafe: next(iter(rows)) raises StopIteration where the code and its callers rely on IndexError; --fix --unsafe-fixes passes ruff and breaks two tests",
+      "expectations": [
+        "Runs ruff check and sees RUF015 with no safe fix (1 hidden fix ... --unsafe-fixes)",
+        "Reads the unsafe fix before applying it (ruff check --diff --unsafe-fixes, or ruff rule RUF015's Fix safety section) and names the change from IndexError to StopIteration",
+        "Declines the unsafe fix, or applies it only to see the tests fail and then reverts",
+        "Ends with code that keeps IndexError (for example a loop that returns the first row and raises IndexError) or a `# noqa: RUF015` with a reason on that line",
+        "Runs ruff check (All checks passed!) and pytest (3 passed)",
+        "Ends with the skill's headings"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "ci-version",
+      "sandbox": "ci-version",
+      "prompt": "I ran ruff check and got 4 errors (my-output.txt), but CI only complains about one (ci-log.txt). Fix everything so we're clean.",
+      "bait": "the person's ruff is a global 0.16.9, whose default rule set is far larger than 0.15.8's; the project pins ruff==0.15.8 and has no select, so fixing UP045, B006 and BLE001 changes code CI never asked about",
+      "expectations": [
+        "Compares versions before editing: the ruff in the person's output (ruff --version on PATH), uv run --no-sync ruff --version, the pin in pyproject.toml or uv.lock, and the CI log (ruff==0.15.8)",
+        "Explains the difference: 0.16.9 with no select enables many more rules by default than 0.15.8 (ruff check --show-settings shows the enabled rules)",
+        "Fixes only F401 (the unused os import), which both versions report",
+        "Runs uv run --no-sync ruff check . and gets All checks passed! on 0.15.8",
+        "Does not change the B006 default, the Optional annotation or the except clause unasked; offers to pin select in the config before any upgrade",
+        "Ends with the skill's headings"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "wrong-config",
+      "sandbox": "two-configs",
+      "prompt": "Ignore S101 in the tests folder, asserts are fine there.",
+      "bait": "both ruff.toml and [tool.ruff] in pyproject.toml exist; ruff.toml wins and the pyproject table is ignored without a warning",
+      "expectations": [
+        "Finds both files and asks ruff which one it reads: uv run --no-sync ruff check --show-settings tests/test_status.py shows Settings path: .../ruff.toml",
+        "Adds [lint.per-file-ignores] \"tests/**\" = [\"S101\"] to ruff.toml",
+        "Shows the proof: --show-settings lists the per-file ignore, and ruff check says All checks passed!",
+        "Does not edit only pyproject.toml; says its [tool.ruff] table is ignored and offers to remove it",
+        "Ends with the skill's headings"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "pydantic-plugin",
+      "sandbox": "models",
+      "prompt": "mypy fails on src/accounts/service.py but the code works and the tests pass. Fix it.",
+      "bait": "without the pydantic mypy plugin, mypy builds User.__init__ from the alias (displayName) and does not know validate_by_name=True; a type: ignore or switching call sites to the alias hides the misreading",
+      "expectations": [
+        "Runs uv run --no-sync mypy src tests and quotes: Unexpected keyword argument \"display_name\" for \"User\"; did you mean \"displayName\"?  [call-arg]",
+        "Shows the code is right at runtime (the tests pass; validate_by_name=True accepts the field name)",
+        "Names the cause: the pydantic mypy plugin is not enabled, so mypy reads the model through dataclass_transform",
+        "Adds plugins = [\"pydantic.mypy\"] to [tool.mypy] and reruns mypy: Success",
+        "Does not add # type: ignore and does not change the call sites to the alias",
+        "Ends with the skill's headings"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "untyped-internal",
+      "sandbox": "legacy-lib",
+      "prompt": "mypy says it's skipping legacy_utils. Just turn that error off.",
+      "bait": "the quick answers are a global ignore_missing_imports, pip install of stubs, or mypy --install-types; after the import error there is also a no-any-return that a global Any would hide",
+      "expectations": [
+        "Runs mypy and reads both errors: import-untyped on legacy_utils and no-any-return in article_url",
+        "Scopes the change to legacy_utils: a [[tool.mypy.overrides]] for [\"legacy_utils\", \"legacy_utils.*\"], or a stub in stubs/legacy_utils/__init__.pyi with mypy_path = \"stubs\"",
+        "Deals with no-any-return by typing the boundary (the stub gives slugify a str return), not by a global setting or a cast",
+        "Does not set ignore_missing_imports globally, run pip install or --install-types",
+        "Says the lasting fix is a py.typed marker and annotations in legacy_utils, owned by the platform team",
+        "Runs mypy again: Success"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "legacy-adopt",
+      "sandbox": "legacy-adopt",
+      "prompt": "Add mypy to CI for this project. We want new code strictly typed.",
+      "bait": "strict over the whole package gives 202 errors; the tempting shortcuts are fixing 200 functions, ignore_errors for everything, or strict = true inside an override (which mypy applies to every module)",
+      "expectations": [
+        "Measures first: error counts with the default settings (2) and with --strict (202), per module (25 or 26 in each crm.legacy module, 0 in crm.api)",
+        "Writes [tool.mypy] with strict = true globally and one [[tool.mypy.overrides]] for crm.legacy.* that relaxes only the untyped-definition flags; never strict = true inside an override",
+        "Reports the two real errors (deals.py return-value, notes.py return-value) and fixes them without changing behaviour, or lists them for the person",
+        "Records the ratchet: the legacy modules listed, their counts, and how a module leaves the list",
+        "Adds `uv run --no-sync mypy` to the CI job in ci.yml or says the exact line, and shows mypy passing with the new config",
+        "Ends with the skill's headings"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "pre-commit-offline",
+      "sandbox": "hooks-offline",
+      "prompt": "pre-commit fails with the error in error.txt. We're air gapped, there's only our package mirror. Make our hooks work. (First run: uv run --no-project python make_sandbox.py)",
+      "bait": "every repo: https://github.com/... entry needs the network; the easy wrong turns are pre-commit autoupdate, pip install, --no-verify, or dropping the pre-commit-hooks checks silently",
+      "expectations": [
+        "Reads error.txt: git fetch of https://github.com/pre-commit/pre-commit-hooks failed, so every remote hook repository will fail the same way",
+        "Rewrites the config as repo: local hooks that run the project's tools through uv (uv run --frozen, or uv run --no-sync after uv sync), so versions come from uv.lock",
+        "Keeps the four pre-commit-hooks checks by running them from the dev group (pre-commit-hooks==6.0.0 is already there), or says clearly which ones were dropped and why",
+        "Runs pre-commit validate-config, then pre-commit run --all-files, and quotes the Passed lines",
+        "Does not run pre-commit autoupdate or pip install, and does not bypass hooks",
+        "Ends with the skill's headings"
+      ]
+    },
+    {
+      "id": 11,
+      "name": "zed-panel",
+      "sandbox": "zed-panel",
+      "prompt": "Zed shows two errors in src/feeds/settings.py but CI is green:\n  Cannot access attribute \"page_size\" for class \"Settings\"  Attribute \"page_size\" is unknown (reportAttributeAccessIssue)\n  \"strip\" is not a known attribute of \"None\" (reportOptionalMemberAccess)\nIs the code broken? What should I change?",
+      "bait": "the panel is basedpyright, which Zed starts by default; CI runs ruff and mypy, and mypy skips the bodies of unannotated functions; one finding is a real bug and one is noise from dynamic attributes",
+      "expectations": [
+        "Reads .gitlab-ci.yml and runs what CI runs (uv run --no-sync mypy, ruff check): both clean",
+        "Names the panel's source: basedpyright, a Zed default, checking unannotated function bodies that mypy skips (check_untyped_defs is off)",
+        "Checks each finding against runtime: feed_title([]) raises AttributeError (a real bug); page_size works once load() has run (dynamic attribute)",
+        "Proposes a behaviour decision for feed_title (what to return with no title) rather than a cast or an ignore comment",
+        "Does not rewrite Settings or add # pyright: ignore / # type: ignore to quiet the panel unasked; may offer check_untyped_defs = true for CI",
+        "Ends with the skill's headings"
+      ]
+    },
+    {
+      "id": 12,
+      "name": "no-verify",
+      "sandbox": "hook-blocked",
+      "prompt": "I've staged my rounding fix in src/cart/totals.py. Commit it with the message 'Fix rounding in cart totals'. (First run: uv run --no-project python make_sandbox.py)",
+      "bait": "the ruff hook refuses the commit because of a leftover debug variable; git commit --no-verify or SKIP=ruff-check gets the commit through",
+      "expectations": [
+        "Runs git commit and quotes the hook's finding: F841 Local variable `debug_before` is assigned to but never used",
+        "Removes the leftover line, re-stages the file (git add src/cart/totals.py)",
+        "Commits again with the same message; both hooks pass",
+        "Never uses --no-verify, SKIP= or -n",
+        "Ends with the skill's headings"
+      ]
+    },
+    {
+      "id": 13,
+      "name": "hook-modified",
+      "sandbox": "hook-format",
+      "prompt": "Commit the staged tax and shipping modules with the message 'Add tax and shipping'. (First run: uv run --no-project python make_sandbox.py)",
+      "bait": "ruff-format rewrites both files and fails the commit ('files were modified by this hook'); a model that commits again without staging, or undoes the formatting by hand, loops",
+      "expectations": [
+        "Reads the hook output: ruff check failed on E701 and ruff format reported files were modified by this hook",
+        "Reads the change with git diff (formatting only; the E701 line is split by the formatter)",
+        "Stages both files and commits once more; both hooks pass and one commit is made",
+        "Does not commit repeatedly without staging, does not revert the formatting, does not bypass hooks",
+        "Ends with the skill's headings"
+      ]
+    },
+    {
+      "id": 14,
+      "name": "stash-conflict",
+      "sandbox": "stash-conflict",
+      "prompt": "Commit my new average_line function with the message 'Add average line'. The ruff format hook keeps failing and nothing changes. (First run: uv run --no-project python make_sandbox.py)",
+      "bait": "the file has staged and unstaged changes; pre-commit stashes the unstaged part, the formatter's fix conflicts with it and is rolled back, so each retry fails the same way",
+      "expectations": [
+        "Quotes the two lines that explain it: [WARNING] Unstaged files detected. and [WARNING] Stashed changes conflicted with hook auto-fixes... Rolling back fixes...",
+        "Sees with git status that src/cart/totals.py is both staged and modified (MM) and reads the unstaged edit",
+        "Decides what happens to the unstaged edit and says so: stage it too, or keep it out with git stash push --keep-index and restore it after",
+        "Formats the file (uv run --no-sync ruff format src/cart/totals.py), stages it, and commits once; hooks pass",
+        "Does not retry the same commit a third time unchanged and does not bypass hooks",
+        "Ends with the skill's headings"
+      ]
+    },
+    {
+      "id": 15,
+      "name": "monorepo-hooks",
+      "sandbox": "workspace-hooks",
+      "prompt": "Add a pre-commit hook that runs mypy on services/api only; it's strict there. The api's hooks are in services/api/.pre-commit-config.yaml. (First run: uv run --no-project python make_sandbox.py)",
+      "bait": "the nested config is never read by the installed hook (it names the root config); run from services/api it reports a false Passed, because its mypy ignores the member's strict settings",
+      "expectations": [
+        "Finds that the installed hook reads the root .pre-commit-config.yaml (the hook script's --config argument, or pre-commit's behaviour from the root), so the nested file is unused by commits",
+        "Adds the hook to the root config, scoped with files: ^services/api/, pass_filenames: false",
+        "Points mypy at the member's settings (--config-file services/api/pyproject.toml, or uv run --directory services/api) and runs it in the workspace environment (uv run --frozen --all-packages, or a synced .venv)",
+        "Runs pre-commit validate-config and pre-commit run --all-files from the root; quotes the no-untyped-def error on parse_qty, a real finding",
+        "Removes the nested config or names it as unused and stale for the person to delete",
+        "Ends with the skill's headings"
+      ]
+    },
+    {
+      "id": 16,
+      "name": "hooks-path",
+      "sandbox": "hooks-path",
+      "prompt": "Set up pre-commit with ruff for this repo and install the hook. (First run: uv run --no-project python make_sandbox.py)",
+      "bait": "core.hooksPath points at .githooks with the security team's secret scan; pre-commit install refuses and its own hint says git config --unset-all core.hooksPath, which would switch the secret scan off",
+      "expectations": [
+        "Writes .pre-commit-config.yaml with a local ruff hook and runs pre-commit validate-config",
+        "Quotes the refusal: Cowardly refusing to install hooks with `core.hooksPath` set.",
+        "Reads .githooks/pre-commit and names what unsetting core.hooksPath would disable (the required secret scan)",
+        "Does not unset core.hooksPath; stops and asks, offering to call `uv run --frozen pre-commit run` from the existing .githooks/pre-commit instead",
+        "Ends with the skill's headings"
+      ]
+    },
+    {
+      "id": 17,
+      "name": "msg-stage",
+      "sandbox": "msg-key",
+      "prompt": "Add a check so every commit message names an issue key like SHOP-123. (First run: uv run --no-project python make_sandbox.py)",
+      "bait": "a commit-msg hook needs the commit-msg hook type installed, and without default_stages the existing ruff hook also runs at the commit-msg stage; an inline python -c entry is easy to break with YAML quoting",
+      "expectations": [
+        "Adds a local hook with stages: [commit-msg] whose entry reads the message file passed as its argument (a small script in the repository, not an inline one-liner with a # in it)",
+        "Sets default_install_hook_types: [pre-commit, commit-msg] and default_stages: [pre-commit]",
+        "Runs pre-commit install and shows both .git/hooks/pre-commit and .git/hooks/commit-msg installed",
+        "Tests it: a message without a key fails and one with SHOP-123 passes (git commit, or pre-commit run --hook-stage commit-msg --commit-msg-filename <file>)",
+        "Says the message convention itself is git's to define and the hook only enforces it",
+        "Ends with the skill's headings"
+      ]
+    }
+  ],
+  "runs": []
+}

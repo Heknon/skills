@@ -1,0 +1,12 @@
+from decimal import ROUND_HALF_UP, Decimal
+
+
+def line_total(price_cents: int, qty: int) -> int:
+    return price_cents * qty
+
+
+def cart_total(lines: list[tuple[int, int]], discount: float = 0.0) -> int:
+    subtotal = sum(line_total(p, q) for p, q in lines)
+    debug_before = subtotal
+    discounted = Decimal(subtotal) * (1 - Decimal(str(discount)))
+    return int(discounted.quantize(Decimal("1"), rounding=ROUND_HALF_UP))

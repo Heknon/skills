@@ -1,0 +1,7 @@
+#!/bin/sh
+# Company secret scan, required on every repository (security team).
+# core.hooksPath points here; see https://intranet.example/secret-scan
+if git diff --cached -U0 | grep -E '^\+.*(AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----)' >/dev/null; then
+    echo "secret-scan: a key was found in the staged changes" >&2
+    exit 1
+fi
