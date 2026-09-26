@@ -1,0 +1,224 @@
+{
+ "skill_name": "pydantic",
+ "notes": "Scenarios for checking that a weak model using this skill writes pydantic v2 code from evidence (a probe it ran, the installed source, the trace script) and not from v1 memory or the person's first idea. Each names a sandbox under evals/sandboxes/, copied fresh before the run. The sandboxes are uv projects pinned to pydantic 2.13.5, pydantic-settings 2.15.0 and pydantic-partial 0.11.1 (partial-old: 0.5.5), with pytest; pyright-alias also needs pyright 1.1.414; env-cwd, who-set-port and shared-dotenv need hatchling to install the project. Every bait was reproduced, and every intended fix passed, on Python 3.12.3 with those pins (Linux).",
+ "how_to_run": [
+  "copy the skill folder without evals/ to <skill>",
+  "copy evals/sandboxes/<sandbox> to a fresh <work>; run uv sync there (for env-cwd: in services/billing)",
+  "start the model in <work> with: 'Load the skill at <skill>/SKILL.md and follow it. Task: <prompt>'; add the machine's operating system",
+  "grade each expectation by hand, from the answer and the diff"
+ ],
+ "evals": [
+  {
+   "id": 0,
+   "name": "optional-is-not-optional",
+   "sandbox": "optional-required",
+   "prompt": "Clients that leave out nickname get 422 'Field required' from POST /profiles, but nickname is Optional in ProfileIn. Is pydantic broken? Fix it.",
+   "bait": "Optional[str] with no default is required but nullable; the obvious fix is to add '= None' to every Optional field, which also makes referrer optional against the contract in the docstring",
+   "expectations": [
+    "Runs a probe (or the tests) showing that a body without nickname fails with type missing at loc ('nickname',) and a body with nickname null passes",
+    "Explains that Optional[X] only allows None; a default makes a field optional to send",
+    "Adds a default only to nickname (nickname: Optional[str] = None or str | None = None)",
+    "Leaves referrer required, citing the docstring's contract, and the test test_referrer_must_be_sent still passes",
+    "Runs the probe again and the tests: 2 passed"
+   ]
+  },
+  {
+   "id": 1,
+   "name": "no-v1-validator",
+   "sandbox": "v1-validator",
+   "prompt": "Add a check that Product.sku is upper case: reject lower case, don't convert it. Follow the style of the existing validator in catalogue/models.py.",
+   "bait": "the existing validator is a v1 @validator, which still works on 2.13.5 with a PydanticDeprecatedSince20 warning; copying its style writes new v1 code",
+   "expectations": [
+    "Recognises @validator as v1 and deprecated (quotes the PydanticDeprecatedSince20 warning from the test run or a probe)",
+    "Writes the new check with @field_validator('sku') and @classmethod, and names its mode (after, the default)",
+    "Raises ValueError, not TypeError, so a bad sku is a ValidationError",
+    "Shows a probe with accepted and rejected inputs, for example 'AB-1' accepted and 'ab-1' rejected with value_error",
+    "Offers to migrate name_not_blank to field_validator, or does it and says so, without changing its behaviour; the tests pass"
+   ]
+  },
+  {
+   "id": 2,
+   "name": "before-validator-crash",
+   "sandbox": "before-mode",
+   "prompt": "POST /vouchers with {\"code\": 42, \"percent\": 10} returns a 500: AttributeError: 'int' object has no attribute 'strip'. Codes are always strings. Fix it.",
+   "bait": "the before validator calls .strip() on raw input; the quick fix str(v) turns None into 'NONE' and a list into \"['A']\", accepting garbage",
+   "expectations": [
+    "Reproduces the crash with a probe through create_voucher and explains that a before validator receives the raw input, and that an AttributeError is not turned into a ValidationError",
+    "Fixes it with an isinstance(v, str) guard that returns other values unchanged, or by switching to the default after mode",
+    "Does not use str(v) on every input, or if it considers it, shows that None becomes 'NONE'",
+    "Shows the result: 42 gives 422 with type string_type at ('code',), ' spring10 ' still becomes 'SPRING10'",
+    "Runs the tests: 2 passed"
+   ]
+  },
+  {
+   "id": 3,
+   "name": "cats-become-dogs",
+   "sandbox": "pet-union",
+   "prompt": "Cats sent without 'indoor' come back as dogs (they get a breed). Fix it without breaking payloads that already work.",
+   "bait": "a plain Union[Dog, Cat] where both members accept the payload picks the first; the easy fixes are more Optional fields or reordering the union, which turns dogs into cats",
+   "expectations": [
+    "Reproduces with a probe: {'type': 'cat', 'name': 'Tom'} becomes Dog",
+    "Explains smart mode: both members validate, and on a tie the first member wins",
+    "Makes type a Literal in each model and the union discriminated on it (Field(discriminator='type'))",
+    "Shows cat without indoor is Cat, dog is Dog, and an unknown type is rejected with union_tag_invalid",
+    "Does not reorder the union or add Optional fields as the fix; the tests pass"
+   ]
+  },
+  {
+   "id": 4,
+   "name": "not-fully-defined",
+   "sandbox": "two-modules",
+   "prompt": "Creating an Order fails with 'Order is not fully defined; you should define Customer, then call Order.model_rebuild()'. The two models refer to each other and live in separate files. Fix it.",
+   "bait": "the quick fixes are replacing the annotation with Any, merging the files, or importing at module level into a circular import",
+   "expectations": [
+    "Runs the tests and quotes the PydanticUserError",
+    "Explains that the TYPE_CHECKING import leaves the name undefined at run time, so the model cannot be built until both classes exist",
+    "Calls Order.model_rebuild() and Customer.model_rebuild() after both are imported, for example in shop/__init__.py",
+    "Keeps the real types (no Any, no removed annotation, no merged files)",
+    "Runs the tests: 2 passed"
+   ]
+  },
+  {
+   "id": 5,
+   "name": "camel-case-output",
+   "sandbox": "camel-output",
+   "prompt": "The mobile app needs camelCase JSON from order_response, but we get snake_case although OrderOut has an alias generator. Should I rename the fields to camelCase?",
+   "bait": "aliases exist but model_dump_json() serializes by field name unless by_alias is set; renaming the fields breaks Python callers and the naming convention",
+   "expectations": [
+    "Reads the installed pydantic version before choosing a config key",
+    "Explains that aliases are used for input by default and for output only with by_alias=True (or serialize_by_alias=True, 2.11 and later)",
+    "Fixes it with model_dump_json(by_alias=True) or ConfigDict(serialize_by_alias=True), and does not rename the fields",
+    "Shows the dumped JSON before and after: order_id then orderId",
+    "Runs the tests: 2 passed"
+   ]
+  },
+  {
+   "id": 6,
+   "name": "checker-and-alias",
+   "sandbox": "pyright-alias",
+   "prompt": "Zed underlines Payment(amount_cents=...) in service.py: 'No parameter named \"amount_cents\"'. The code works at run time. Should I add a type: ignore?",
+   "bait": "pyright sees Field(alias=...) as the __init__ parameter name; a bare type: ignore hides it and every future error on that line",
+   "expectations": [
+    "Runs pyright (uv run pyright) and quotes both errors: Argument missing for parameter \"amountCents\" and No parameter named \"amount_cents\"",
+    "Explains that checkers read alias as the __init__ parameter name, while populate_by_name (validate_by_name) is a run time setting they do not see",
+    "Fixes it without a suppression: Field(validation_alias='amountCents', serialization_alias='amountCents'), or constructing with Payment(amountCents=...)",
+    "Runs pyright again: 0 errors; and the tests: 3 passed (provider_body still gives amountCents)",
+    "Does not add a bare type: ignore; leaves checker configuration to the linting skill"
+   ]
+  },
+  {
+   "id": 7,
+   "name": "dotenv-and-working-directory",
+   "sandbox": "env-cwd",
+   "prompt": "billing ignores services/billing/.env when I start it from the repository root with 'uv run --project services/billing python -m billing.main'; from inside services/billing it works. Make it work from anywhere.",
+   "bait": "env_file='.env' is resolved from the working directory and a missing file is not an error; the quick fixes are copying .env to the root or hard-coding values",
+   "expectations": [
+    "Runs it from both folders and quotes the two outputs (port 8000 against 7001)",
+    "Explains that a relative env_file is resolved from the working directory and that a missing file is skipped silently",
+    "Anchors the path to the code: env_file=Path(__file__).resolve().parents[2] / '.env' (or equivalent), not a copied .env or hard-coded values",
+    "Runs it again from the root and from services/billing: both print port 7001, currency GBP",
+    "Mentions that environment variables still win over the file"
+   ]
+  },
+  {
+   "id": 8,
+   "name": "who-set-the-port",
+   "sandbox": "who-set-port",
+   "prompt": "The API listens on 9000 but .env says API_PORT=7000. I've changed .env three times. We start it with run.ps1 (run.sh on Linux). Where does 9000 come from?",
+   "bait": "settings_customise_sources puts file secrets first, secrets/api_port holds 9000, the start script sets API_PORT=8080; the person keeps editing .env, and a secret sits next to the answer",
+   "expectations": [
+    "Traces every source: runs the skill's trace script (or builds each source alone) with API_PORT=8080 set as the start script does",
+    "Names the winner: the file secrets/api_port through SecretsSettingsSource, first because settings_customise_sources returns init, secrets, env, dotenv",
+    "Lists the others that also set port: environment 8080, .env 7000, default 8000",
+    "Never prints the value of db_password (masked, or only its presence or length)",
+    "Proposes a fix and leaves the choice to the person (delete secrets/api_port, or change the source order), without changing the order unasked",
+    "Ends with the headings of the skill"
+   ]
+  },
+  {
+   "id": 9,
+   "name": "shared-dotenv",
+   "sandbox": "shared-dotenv",
+   "prompt": "Since we added the docker compose keys to .env, the shop fails at startup with 'Extra inputs are not permitted'. Fix the app, not the file: compose needs those keys.",
+   "bait": "BaseSettings forbids extra keys and a .env key without the prefix still counts; the easy fixes are deleting the compose keys or extra='allow', which puts them on the settings object",
+   "expectations": [
+    "Reproduces the error and names the two keys (compose_project_name, pgadmin_default_email) with type extra_forbidden",
+    "Reads the installed pydantic-settings version (2.15.0)",
+    "Fixes it with dotenv_filtering='match_prefix' (2.14 and later, keeps typo detection for APP_ keys) or extra='ignore', and says what each gives up",
+    "Does not delete keys from .env and does not use extra='allow'",
+    "Runs the app: shop on port 8000, debug=True"
+   ]
+  },
+  {
+   "id": 10,
+   "name": "patch-resets-fields",
+   "sandbox": "patch-resets",
+   "prompt": "PATCH /users/1 with {\"name\": \"Xavier\"} also clears the user's email and sets status back to active. Fix patch_user.",
+   "bait": "patch.model_dump() includes every field, unset ones as None or their default; adding exclude_unset alone still skips the full model's checks because model_copy validates nothing",
+   "expectations": [
+    "Reproduces with a probe and shows the patch dump with and without exclude_unset=True",
+    "Uses model_dump(exclude_unset=True), not exclude_none (which would stop a client from clearing email with null)",
+    "Merges onto the stored data and validates the result with the full model User (not model_copy(update=...))",
+    "Shows: {'name': 'Xavier'} keeps email and status; {'email': None} clears email; {'name': 'Al'} is rejected with string_too_short",
+    "Adds tests for the unset and null cases, and the suite passes"
+   ]
+  },
+  {
+   "id": 11,
+   "name": "nested-partial",
+   "sandbox": "nested-partial",
+   "prompt": "PATCH /users/1 with {\"address\": {\"city\": \"Lyon\"}} fails with 'address.street Field required' although UserPatch is built with recursive=True. Fix it.",
+   "bait": "recursive=True only reaches nested models that inherit PartialModelMixin; after that fix, the shallow dict.update still replaces the whole address",
+   "expectations": [
+    "Reads the installed pydantic-partial version and its partial.py (or the skill's table) to find that recursive only applies to PartialModelMixin subclasses",
+    "Adds PartialModelMixin to Address",
+    "Notices that merged.update replaces the whole address, and merges nested dicts key by key before validating with User",
+    "Shows the result: city Lyon, street and postcode kept; the name patch still works",
+    "Runs the tests and adds one for the nested patch"
+   ]
+  },
+  {
+   "id": 12,
+   "name": "partial-validator-500",
+   "sandbox": "partial-500",
+   "prompt": "PATCH /users/1 with {\"name\": null} returns a 500 (AttributeError: 'NoneType' object has no attribute 'strip'). Just delete the validator, it's only cosmetic.",
+   "bait": "UserPatch inherits tidy_name and passes None to it; deleting the validator removes the tidying the test expects",
+   "expectations": [
+    "Reproduces the 500 with a probe and explains that the partial model inherits the full model's validators and passes None for a field sent as null",
+    "Disagrees once with deleting the validator, with evidence (test_patch_name_is_tidied would fail)",
+    "Makes the validator return None unchanged, and keeps the full-model validation of the merged result",
+    "Shows: {'name': null} is now a ValidationError string_type at ('name',) (a 422), and '  bea   stone ' still becomes 'Bea Stone'",
+    "Runs the tests: 2 passed"
+   ]
+  },
+  {
+   "id": 13,
+   "name": "old-pydantic-partial",
+   "sandbox": "partial-old",
+   "prompt": "Our OpenAPI schema shows the PATCH body as 'UserPartial'. Rename it to 'UserPatch'; partial_cls_name should do it.",
+   "bait": "pydantic-partial 0.5.5 is installed; partial_cls_name arrived in 0.7.0 and raises TypeError here; upgrading is not possible air gapped",
+   "expectations": [
+    "Reads the installed version first (uv pip show pydantic-partial: 0.5.5) and checks the installed partial.py or the skill's table",
+    "Says partial_cls_name does not exist in 0.5.5 (TypeError) instead of writing it",
+    "Names the class another way: create_model('UserPatch', __base__=User.model_as_partial()) or a subclass, and checks the schema title is UserPatch",
+    "Does not upgrade or add a package",
+    "Runs the test: 1 passed"
+   ]
+  },
+  {
+   "id": 14,
+   "name": "patch-bypasses-constraints",
+   "sandbox": "patch-min-length",
+   "prompt": "Creating a user named 'Al' is rejected (at least 3 characters) but PATCH accepts 'Al'. Fix it.",
+   "bait": "the partial model drops min_length and max_length from required fields, and model_copy(update=...) validates nothing; the easy fix copies the constraints into a hand-written patch model",
+   "expectations": [
+    "Shows with a probe that UserPatch.model_fields['name'] has no constraints while User's has MinLen(3) and MaxLen(40)",
+    "Validates the merged result with the full model User instead of model_copy(update=...)",
+    "Does not duplicate the constraints in a hand-written patch model",
+    "Shows: 'Al' gives string_too_short, 41 characters give string_too_long, null gives string_type, 'Bea' passes",
+    "Adds a test for the short name on PATCH; the suite passes"
+   ]
+  }
+ ],
+ "runs": []
+}
