@@ -12,9 +12,13 @@ safe and unsafe fixes, per-file ignores, `extend`, import sorting, how
 `ruff format` differs from black), mypy and pyright (reading errors,
 strictness, gradual adoption on legacy code, missing imports and stubs
 offline, the pydantic mypy plugin, `reveal_type` to debug an error),
-where each tool reads its configuration, matching CI's versions, and
-pre-commit with no network. It carries knowledge and judgement, not
-enforcement.
+where each tool reads its configuration, and matching CI's versions.
+
+It is also the home of pre-commit, in full: the runner that ties every
+check to a commit. Its configuration and YAML traps, hook types and
+stages, installing and running, hooks with no network, monorepos, CI,
+Windows, and a catalogue of hooks with the skill that owns each check.
+It carries knowledge and judgement, not enforcement.
 
 ## 2. The environment it is written for
 
@@ -30,7 +34,11 @@ enforcement.
   Which ones start by default (pyright, basedpyright, ruff, ty) is to
   verify in the lab. CI is the standard; the panel is a hint.
 - **pre-commit cannot fetch hook repositories offline.** Every
-  `repo: https://...` entry fails on first use.
+  `repo: https://...` entry fails on first use, and `autoupdate` cannot
+  run. `pre-commit install` writes the absolute path of the Python that
+  ran it into `.git/hooks/pre-commit` (seen: a path in uv's cache when
+  run through `uvx`), so cleaning that cache or deleting that venv breaks
+  every commit.
 - **pyright is a Node program.** The PyPI wheel carries the JavaScript
   but, without its `nodejs` extra, fetches Node through `nodeenv` from
   the web; `pyright[nodejs]` takes it from `nodejs-wheel-binaries` in
@@ -49,7 +57,9 @@ enforcement.
 | **Match CI** | local and CI disagree | versions and config on each side, the difference |
 | **Format** | format code, or move from black to `ruff format` | the scope formatted, the diff size, differences from black named |
 | **Imports** | a checker cannot find a module or its types | the environment it used, what is installed, the narrowest setting |
-| **Pre-commit** | set up or repair hooks offline | `.pre-commit-config.yaml` with local hooks, a run's output |
+| **Pre-commit** | set up, extend or repair hooks: offline, per stage, per folder of a monorepo | `.pre-commit-config.yaml`, which files and stage each hook covers, `pre-commit run --all-files` output |
+| **Hook blocked** | a commit is refused, or a hook changed files | the hook id and its output; fixed and re-staged, or skipped by name only when asked |
+| **Hooks in CI** | run the same hooks in a pipeline | the command (`run --all-files` or `--from-ref`/`--to-ref`), versions matching the lock; deployment writes the job |
 
 ## 4. The failures it targets
 
@@ -58,6 +68,12 @@ enforcement.
 | **Blanket suppression** | bare `# noqa`, `# type: ignore` or `# pyright: ignore` with no code; a file-level `# ruff: noqa` |
 | **Silencing with types** | `Any`, `cast(...)` or a widened annotation to quiet mypy, instead of narrowing or fixing the value |
 | **Reformatting the world** | `ruff format .` or `ruff check --fix .` over the repository inside an unrelated change |
+| **Past the hook** | `git commit --no-verify`, or `SKIP=` every hook, to get a commit through |
+| **Hook loop** | a formatter hook changes files, the commit fails, and the model commits again without reading or re-staging, or fights the hook by hand |
+| **Nested config** | a `.pre-commit-config.yaml` in a member folder: `pre-commit run` there used it (no hooks, exit 0) while the git hook uses the root one |
+| **YAML comment in an entry** | an unquoted `entry:` containing ` #` is cut there; pre-commit fails with "No closing quotation" |
+| **Hooks at every stage** | with `commit-msg` installed, hooks with no `stages` also run on the message file, unless `default_stages` says otherwise |
+| **hooksPath removed** | `pre-commit install` refuses while `core.hooksPath` is set; the model unsets it and disables another tool's hooks |
 | **Fixing a disabled rule** | rewriting code for a rule the project ignores, after `--select ALL` or trusting Zed's panel |
 | **Trusting unsafe fixes** | `--fix --unsafe-fixes` applied without `--diff`, changing behaviour |
 | **Wrong version** | a global ruff or mypy that differs from `uv.lock` and CI; the model "fixes" the noise |
@@ -70,7 +86,7 @@ enforcement.
 
 ```
 skills/linting/
-  SKILL.md           router over the ten kinds, invariants; glossary.md
+  SKILL.md           router over the twelve kinds, invariants; glossary.md
   core/
     run-like-ci.md   find CI's command, versions, config; run the same
     read-finding.md  from an output line to the code, meaning, cause
@@ -79,7 +95,6 @@ skills/linting/
     config-files.md  which file each tool reads, precedence, proof
     adopt.md         legacy code: counts, per-module settings, ratchet
     zed.md           which server feeds the panel; why it disagrees
-    pre-commit.md    local hooks through uv, nothing fetched
   ruff/
     rules.md         select, extend-select, preview, ruff rule
     fixes.md         safe and unsafe fixes, --diff, per-rule settings
@@ -94,16 +109,87 @@ skills/linting/
     pydantic.md      the plugin: enabling it, settings, what changes
     suppression.md   type: ignore[code], unused and codeless ignores
     versions.md      what mypy 2 changed for a 1.x codebase
+  pre-commit/
+    config.md        repos, hooks, files, exclude, types, stages,
+                     default_stages, default_install_hook_types, YAML traps
+    offline.md       repo: local through uv run --no-sync; language
+                     system or python; hook repos mirrored in GitLab;
+                     PRE_COMMIT_HOME
+    install.md       hook types, the interpreter path it records,
+                     core.hooksPath, worktrees, reinstalling
+    run.md           --all-files, --files, --from-ref/--to-ref,
+                     --hook-stage, SKIP, exit codes, files modified
+    blocked.md       a refused commit: read, fix, re-stage; never
+                     --no-verify unasked
+    monorepo.md      one config at the root, files: per member, nested
+                     configs, per-member tools and versions
+    ci.md            the command for a job, cache, --show-diff-on-failure
+    catalogue.md     hooks worth having and the skill that owns each check
+    windows.md       hooks under Git for Windows' sh, CRLF, paths
+    alternatives.md  prek, plain git hooks: recognise only
   pyright/
     errors.md        report rules, severities, reading output
     strictness.md    typeCheckingMode, strict paths, file comments
     config.md        pyrightconfig.json against [tool.pyright]
     suppression.md   pyright: ignore[rule], unnecessary ignores
     install.md       pyright[nodejs], basedpyright, no-Node errors
-  recipes/           configs that ran, pre-commit local hooks included
+  recipes/           configs that ran; a pre-commit config for one
+                     project and one for a uv workspace, both offline
   examples/          worked tasks with the real commands and output
   evals/             scenarios and sandboxes
 ```
+
+## 5a. Pre-commit, in full
+
+**What was checked while planning** (pre-commit 4.6.2 through `uvx`, on
+Linux; each to rerun on Windows in the lab):
+
+- `repo: local` hooks with `language: system` run with no hook
+  repository fetched; `files:` limits a hook to a folder
+  (`^services/api/.*\.py$`).
+- `default_install_hook_types: [pre-commit, commit-msg]` installs both
+  hooks. A `stages: [commit-msg]` hook gets the message file as `$1`.
+  Without `default_stages: [pre-commit]`, the other hooks ran at the
+  commit-msg stage too.
+- A hook that changes files fails the commit ("files were modified by
+  this hook"); the fix is to read the change, stage it, commit again.
+- `SKIP=<id>` skips one hook by id; the others still run.
+- `pre-commit run --from-ref HEAD~1 --to-ref HEAD` checks only the
+  files changed in that range, the form for CI on a merge request.
+- Run from a folder with its own `.pre-commit-config.yaml`, pre-commit
+  used that file; from a folder without one, the root file. The
+  installed hook names the root file. So a nested config is ignored by
+  commits and gives a false pass by hand.
+- `pre-commit install` with `core.hooksPath` set: "Cowardly refusing to
+  install hooks with `core.hooksPath` set."
+- An unquoted `entry:` with ` #` in it is cut at the YAML comment.
+
+**Offline, in order of preference.** `repo: local` hooks that run the
+project's own tools with `uv run --no-sync` (the lock's versions, the
+same as CI); `language: python` local hooks whose
+`additional_dependencies` come from the mirror (how pre-commit is
+pointed at the mirror, and whether it installs through uv, is to verify
+in the lab); hook repositories mirrored into GitLab, pinned by tag. The
+standard `pre-commit-hooks` checks (large files, private keys, merge
+markers, end of file) come from a repository, so offline they need the
+mirror or the second form.
+
+**Monorepos.** One config at the repository root; a hook per tool and
+member where versions or settings differ, scoped with `files:`; tools
+run from the member with `uv run --package <member>` where the
+workspace needs it. Nested configs are removed or named as unused.
+
+**The catalogue, and who owns each check.** Formatting and lint (ruff),
+types (mypy, pyright): linting. Commit message format (`commit-msg`):
+git's convention. `uv lock --locked` so the lock matches
+`pyproject.toml`: packaging. Private keys and large files: git's
+clean-up rules. Tests do not belong in `pre-commit`; at most a fast
+subset in `pre-push`, as the team decides (pytest owns which subset).
+
+**Invariants.** Never `--no-verify` or a blanket `SKIP` unasked; a hook
+that fails is read like any other finding. Hooks run the lock's versions.
+Configs are validated with `pre-commit validate-config` and run with
+`--all-files` once after any change.
 
 ## 6. Dependencies and boundaries
 
@@ -197,6 +283,18 @@ the named evidence, not only clean output.
     hooks through `uv run --no-sync`, and a run's output.
 12. **zed-panel.** The prompt pastes pyright findings from Zed; CI runs
     only mypy. Pass: names what CI runs; no rewrite for the other.
+13. **no-verify.** A ruff hook blocks "commit my fix". Pass: the finding
+    fixed and re-staged. Fail: `--no-verify` or `SKIP=ruff`.
+14. **hook-modified.** The format hook rewrites two files. Pass: the
+    change read and staged, one commit. Fail: a loop of commits, or the
+    formatting undone by hand.
+15. **monorepo-hooks.** A workspace; "run mypy only on `services/api`";
+    a stale nested config in `services/api`. Pass: a root hook with
+    `files:`, the nested file named, a run from the root.
+16. **hooks-path.** Another tool owns `core.hooksPath`. Pass: stops and
+    asks. Fail: unsets it.
+17. **msg-stage.** "Add a check that messages carry an issue key." Pass:
+    a `commit-msg` hook, `default_stages` set, both hook types installed.
 
 ## 9. Decisions needed
 
@@ -223,3 +321,12 @@ the named evidence, not only clean output.
 - **L7. pre-commit hooks.** *Recommended:* `repo: local` hooks running
   `uv run --no-sync ruff` and `mypy`, so the version is the lock's and
   CI's. Hooks from an internal Git mirror are the alternative.
+- **L8. Where pre-commit lives.** *Recommended:* the `pre-commit/`
+  folder here, since most hooks run linting's tools; the checks that
+  are not linting's are named with their owning skill in
+  `catalogue.md`. A skill of its own only if non-Python hooks grow.
+- **L9. prek.** A Rust reimplementation reading the same config (0.5.3
+  on the index). *Recommended:* recognised, not taught, until the team
+  uses it. Does anyone?
+- **L10. Tests in hooks.** *Recommended:* none at `pre-commit`; a fast
+  subset at `pre-push` only if the team asks.
