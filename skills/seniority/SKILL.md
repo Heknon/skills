@@ -39,7 +39,7 @@ for a moment when it arrives, and no others.
 
 | Moment | When | Load |
 | --- | --- | --- |
-| **Start** | a task arrives | `core/scope.md`, `core/assumptions.md`, `core/first-step.md` |
+| **Start** | a task arrives | the skill whose description names the task (below), `core/scope.md`, `core/assumptions.md`, `core/first-step.md` |
 | **Choose** | you must pick a tool, a skill, or between two ways forward | `core/choosing-a-tool.md`, `core/trade-offs.md` |
 | **Challenge** | before acting on a plan, before anything irreversible, before accepting an idea or reporting a conclusion | `core/challenge.md`, and `core/pushback.md` if the idea is the person's and the evidence disagrees |
 | **Investigate** | something is wrong and you do not know why | `core/reading-errors.md`, `core/hypothesis-loop.md`, and the skill whose description names the error |

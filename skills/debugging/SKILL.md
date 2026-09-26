@@ -13,9 +13,19 @@ message and exit code in it was run on Python 3.12.14 (and 3.13.15,
 Windows-only facts are marked *not run on Windows*. Nothing is written
 from memory: find it here, or ask the interpreter.
 
-Read this file, then load only what the task needs. Seniority is loaded
-too: its hypothesis loop (`core/hypothesis-loop.md`) is the heart of step
-5 of `core/loop.md`, and this skill does not repeat it.
+Read this file, then load only what the task needs, and always the
+files for the task's kind: this file is a router, not the answer.
+
+**An error or an exception in front of you, or a question about one?**
+Before you explain it or change code, open `core/understand-error.md`
+and look the exception up in `python/exceptions.md`; for a traceback,
+`core/read-traceback.md` first. **Asked to make an error better?** Open
+`core/improve-the-error.md` before editing. Never explain an error from
+memory.
+
+Seniority is loaded too: its hypothesis loop (`core/hypothesis-loop.md`)
+is the heart of step 5 of `core/loop.md`, and this skill does not repeat
+it.
 
 ## Check the versions first
 
