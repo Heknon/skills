@@ -23,7 +23,7 @@ and look the exception up in `python/exceptions.md`; for a traceback,
 `core/improve-the-error.md` before editing. Never explain an error from
 memory.
 
-Seniority is loaded too: its hypothesis loop (`core/hypothesis-loop.md`)
+Seniority is loaded too: its hypothesis loop (`skills/seniority/core/hypothesis-loop.md`)
 is the heart of step 5 of `core/loop.md`, and this skill does not repeat
 it.
 
