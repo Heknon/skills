@@ -68,8 +68,9 @@ AppError                        one base per application or library
   send `{"code": ..., "detail": ...}`; the problem-details shape is
   api's).
 - Domain errors never subclass `HTTPException`. *lab:* a subclass of
-  `HTTPException` raised in a service does give a 404 with its detail, which is why it
-  looks fine; it still ties the service to FastAPI (L4, L11).
+  `HTTPException` raised in a service does give a 404 with its detail,
+  which is why it looks fine; it still ties the service to FastAPI (L4,
+  L11).
 - A domain error may also subclass a built-in when callers outside the
   application catch the built-in: `class NotFoundError(AppError,
   LookupError)` (*lab:* an `OrderNotFoundError` below it was caught by

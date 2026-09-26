@@ -12,9 +12,9 @@ route and every worker repeats the `try` and imports the driver. Turned
 into `HTTPException` in the repository, a worker gets an HTTP error.
 Without `from`, the log loses the driver's message (ruff `B904`).
 
-**Target.** `except IntegrityError as exc: raise DuplicateEmailError(email) from exc`
-in the repository, at the flush that runs the INSERT; one
-`ConflictError` handler. The response stays the same.
+**Target.** `except IntegrityError as exc: raise
+DuplicateEmailError(email) from exc` in the repository, at the flush that
+runs the INSERT; one `ConflictError` handler. The response stays the same.
 
 ## Before
 

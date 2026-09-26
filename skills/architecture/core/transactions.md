@@ -57,12 +57,12 @@ transactions (rare) cannot be written; say so if the task needs one.
 ## One document in MongoDB needs no transaction
 
 A single-document write is atomic; the mongodb skill's
-`core/transactions.md` says when a transaction is needed and what it
-costs. So the Beanie recipe's service opens a transaction only for the
-transfer, not for `open_account` or `get`, while the SQL recipe's
+`skills/mongodb/core/transactions.md` says when a transaction is needed
+and what it costs. So the Beanie recipe's service opens a transaction only
+for the transfer, not for `open_account` or `get`, while the SQL recipe's
 service wraps every use case (every SQL statement runs in a transaction,
-and without a commit it is lost). The unit of work is the same idea;
-where the service uses it differs by database.
+and without a commit it is lost). The unit of work is the same idea; where
+the service uses it differs by database.
 
 ## The unit of work per database
 

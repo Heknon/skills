@@ -3,9 +3,9 @@
 **Verdict you produce:** where the client session starts, which calls
 carry it, and the rollback test.
 
-What a Mongo transaction needs and costs (a replica set, write
-conflicts, the 60-second lifetime, `with_transaction` retries) is the
-mongodb skill's `core/transactions.md`. This file is the unit of work
+What a Mongo transaction needs and costs (a replica set, write conflicts,
+the 60-second lifetime, `with_transaction` retries) is the mongodb skill's
+`skills/mongodb/core/transactions.md`. This file is the unit of work
 around it.
 
 ## The unit of work

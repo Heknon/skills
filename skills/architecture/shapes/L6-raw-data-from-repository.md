@@ -79,9 +79,9 @@ def open_totals() -> list[CustomerTotalOut]:
     return [CustomerTotalOut(**t.model_dump()) for t in InvoiceRepository().open_totals()]
 ```
 
-The list here stands in for `Invoice.aggregate([...]).to_list()`,
-which returns `dict`s keyed by `_id` (the mongodb skill's
-`core/aggregation.md`); the mapping line is the same.
+The list here stands in for `Invoice.aggregate([...]).to_list()`, which
+returns `dict`s keyed by `_id` (`skills/mongodb/core/aggregation.md`); the
+mapping line is the same.
 
 ## The test both pass
 

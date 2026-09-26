@@ -21,15 +21,17 @@ Making it takes a few searches and reads; skipping it is how a
    other entry points       ^if __name__ == .__main__.:
    ```
 
-   Also read `[project.scripts]` in `pyproject.toml`. How the program starts and which entry points exist is navigation's
-   Orient question (`skills/navigation/core/orient.md`,
-   `python/entry-points.md`). A worker or CLI that calls the same code
-   as a route matters to every later decision: note it.
-2. **Trace one request from route to database.** Pick a route that
-   writes. Follow each call to its definition (navigation's Follow,
-   `core/follow.md`) and write each hop as `path:line`: route, the
-   function it calls, the one that calls, down to the ORM or ODM call.
-   Note every `Depends(...)` on the way: those are the providers.
+   Also read `[project.scripts]` in `pyproject.toml`. How the program
+   starts and which entry points exist is navigation's Orient question
+   (`skills/navigation/core/orient.md`,
+   `skills/navigation/python/entry-points.md`). A worker or CLI that calls
+   the same code as a route matters to every later decision: note it.
+2. **Trace one request from route to database.** Pick a route that writes.
+   Follow each call to its definition (navigation's Follow,
+   `skills/navigation/core/follow.md`) and write each hop as `path:line`:
+   route, the function it calls, the one that calls, down to the ORM or
+   ODM call. Note every `Depends(...)` on the way: those are the
+   providers.
 3. **Name the layout** from the tree and the trace, with
    `core/layouts.md`: by layer, by feature, crud per feature, hexagonal,
    or flat (no layers).

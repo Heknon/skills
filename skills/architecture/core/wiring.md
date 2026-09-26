@@ -12,7 +12,8 @@ test:     <test and run line>
 
 How `Depends` works (the per-request cache, `yield` teardown and its
 scope, how overrides are looked up, clearing them) is the api skill's:
-`skills/api/fastapi/dependencies.md` and `fastapi/testing.md`. This
+`skills/api/fastapi/dependencies.md` and
+`skills/api/fastapi/testing.md`. This
 file is what to inject and what to swap.
 
 ## The chain

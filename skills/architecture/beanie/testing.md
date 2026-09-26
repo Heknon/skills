@@ -42,7 +42,8 @@ tests' `conftest.py` did not skip: pytest 9.1.1 printed a traceback
 ending in `Skipped: set MONGODB_URI` and exited 1 without running a
 test. Skip in a fixture or a test module instead.
 
-mongomock's limits are the mongodb skill's (`pymongo/mongomock.md`); the
+mongomock's limits are the mongodb skill's
+(`skills/mongodb/pymongo/mongomock.md`); the
 recipes do not use it.
 
 ## Runs (*lab*)

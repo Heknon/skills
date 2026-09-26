@@ -13,7 +13,7 @@ test:        <test per status code, run line>
 
 Which classes to define and their fields: `placement/custom-errors.md`.
 The response body and status codes: the api skill
-(`skills/api/core/errors.md`, `fastapi/errors.md`).
+(`skills/api/core/errors.md`, `skills/api/fastapi/errors.md`).
 
 ## One translation per boundary
 
@@ -31,16 +31,16 @@ IntegrityError                 DuplicateAccountError(ConflictError)         409
 - **Service**: raises domain errors for rule failures
   (`InsufficientFundsError`); lets the repository's pass through; knows
   no HTTP.
-- **Edge**: one handler per category registered in the app factory.
-  *lab,* Starlette 1.7.0: a handler registered for a base class caught
-  every subclass (`NotFoundError` 404 caught `OrderNotFoundError`), and
-  with handlers for several classes in one MRO the nearest class won
-  whatever the registration order: `AppError` then `NotFoundError`, or
-  the reverse, both gave 404 for `OrderNotFoundError` and 500 (the
-  `AppError` handler) for `ConflictError`; adding a handler for
-  `OrderNotFoundError` itself gave it that one. The lookup walks
-  `type(exc).__mro__` (`starlette/_exception_handler.py:16`). So a new specific error needs
-  no new handler; a new category does.
+- **Edge**: one handler per category registered in the app factory. *lab,*
+  Starlette 1.7.0: a handler registered for a base class caught every
+  subclass (`NotFoundError` 404 caught `OrderNotFoundError`), and with
+  handlers for several classes in one MRO the nearest class won whatever
+  the registration order: `AppError` then `NotFoundError`, or the reverse,
+  both gave 404 for `OrderNotFoundError` and 500 (the `AppError` handler)
+  for `ConflictError`; adding a handler for `OrderNotFoundError` itself
+  gave it that one. The lookup walks `type(exc).__mro__`
+  (`starlette/_exception_handler.py:16`). So a new specific error needs no
+  new handler; a new category does.
 - A worker or CLI catches the base or a category by type
   (`except AppError`), never `HTTPException`.
 

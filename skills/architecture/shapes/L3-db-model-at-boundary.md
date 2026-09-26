@@ -5,19 +5,19 @@ body, return value or `response_model`. Requests parse into a schema;
 responses are built from a schema; the repository returns domain models
 (`core/boundary-models.md`).
 
-**Why.** *lab* (FastAPI 0.141.1, Beanie 2.2.0): a returned `Document`
-with no response model sent `password_hash`, `is_admin` and the id as
-`_id`, and a missing document came back as `200 null`; a `Document` as
-the body let a client set `is_admin` and even `_id`. With a response
-model the output is filtered, but the row is still read after the
-session's work is done: on SQLAlchemy async that raised
-`MissingGreenlet` inside a `ResponseValidationError` (`sqlalchemy/loading.md`).
+**Why.** *lab* (FastAPI 0.141.1, Beanie 2.2.0): a returned `Document` with
+no response model sent `password_hash`, `is_admin` and the id as `_id`,
+and a missing document came back as `200 null`; a `Document` as the body
+let a client set `is_admin` and even `_id`. With a response model the
+output is filtered, but the row is still read after the session's work is
+done: on SQLAlchemy async that raised `MissingGreenlet` inside a
+`ResponseValidationError` (`sqlalchemy/loading.md`).
 
 **Target.** The repository maps the row to a domain model while the
-session is open; the route maps the domain model to the response
-schema. The shapes below return a filtered row *before*, so the
-behaviour is the same on both sides. A before that leaks is a bug:
-fix the leak first, then reshape (refactoring decides; `core/boundary-models.md`).
+session is open; the route maps the domain model to the response schema.
+The shapes below return a filtered row *before*, so the behaviour is the
+same on both sides. A before that leaks is a bug: fix the leak first, then
+reshape (refactoring decides; `core/boundary-models.md`).
 
 ## Before
 

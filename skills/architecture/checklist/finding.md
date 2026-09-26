@@ -38,7 +38,7 @@ verdict:   <no layering findings | findings: IDs>
 ## The searches
 
 The editor's `grep` takes Rust regular expressions, one line at a time
-(navigation's `core/search-patterns.md`); the lab ran the same patterns
+(`skills/navigation/core/search-patterns.md`); the lab ran the same patterns
 with ripgrep 14, which uses the same regex engine.
 
 ```
@@ -114,6 +114,12 @@ L11 all non-test      raise\s+Exception\(|except\s+Exception\b|in\s+str\(\w+\)|s
 
 If the project already runs them (the linting skill runs them; never add
 them unasked): ruff `B904`, `BLE001`, `TRY002`, `N818`, `PLC0415`; an
-import-linter contract (`recipes/*/pyproject.toml`, `[tool.importlinter]`;
-*lab,* import-linter 2.15: `lint-imports` exits 1 and prints
-`app.accounts.service is not allowed to import fastapi: - app.accounts.service -> fastapi (l.2)`).
+import-linter contract (`recipes/*/pyproject.toml`,
+`[tool.importlinter]`). *lab,* import-linter 2.15, a service importing
+`fastapi`: `lint-imports` exited 1 and printed
+
+```
+app.accounts.service is not allowed to import fastapi:
+
+-   app.accounts.service -> fastapi (l.2)
+```

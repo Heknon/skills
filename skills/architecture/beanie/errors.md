@@ -7,8 +7,8 @@
 | `insert()` with a duplicate unique key | `pymongo.errors.DuplicateKeyError`; MRO `DuplicateKeyError`, `WriteError`, `OperationFailure`, `PyMongoError`; `code` 11000; `details` keys `index`, `code`, `errmsg`, `keyPattern`, `keyValue`; message `E11000 duplicate key error collection: archprobe.users index: email_1 dup key: { email: "a@x" }` | a `ConflictError` subclass (`DuplicateAccountError`) |
 | a malformed id given to `PydanticObjectId(...)` | `bson.errors.InvalidId` | the not-found error |
 | a document built before `init_beanie` | `beanie.exceptions.CollectionWasNotInitialized` (empty message) | none: a startup or test-setup bug |
-| a stale write with `use_revision` | `RevisionIdWasChanged` (the mongodb skill's `beanie/writes.md`) | a `ConflictError` subclass, or a retry |
-| a write conflict inside a transaction | `WriteConflict`, labelled `TransientTransactionError` (mongodb's `core/transactions.md`) | a retry of the whole use case, or a `ConflictError` |
+| a stale write with `use_revision` | `RevisionIdWasChanged` (`skills/mongodb/beanie/writes.md`) | a `ConflictError` subclass, or a retry |
+| a write conflict inside a transaction | `WriteConflict`, labelled `TransientTransactionError` (`skills/mongodb/core/transactions.md`) | a retry of the whole use case, or a `ConflictError` |
 
 `keyPattern` tells which unique index failed when a collection has
 several: check it before choosing the domain error, and re-raise

@@ -7,8 +7,9 @@ Beanie 2.2.0 on PyMongo 4.18.2, MongoDB 8.0.32 as a single-node replica
 set, *lab*. What each Beanie call sends to the server, and the query
 patterns worth copying (projections, `$in` instead of `fetch_links`, a
 dotted `$set` on the revision), are the mongodb skill's:
-`skills/mongodb/beanie/` and `skills/mongodb/recipes/beanie_app/app/queries.py`.
-This file is the class around them. The recipe:
+`skills/mongodb/beanie/` and
+`skills/mongodb/recipes/beanie_app/app/queries.py`. This file is the class
+around them. The recipe:
 `recipes/beanie_service/app/accounts/repository.py`.
 
 ## The contract

@@ -53,8 +53,8 @@ shape. The outputs are from a lab run (sandbox crud-by-feature, FastAPI
      ProjectRow | None`, and `list_projects` filters `not p.archived`
      (the filter is a query, so it lives in crud, not in the route);
    - `app/projects/schemas.py`: `archived: bool` on `ProjectOut`
-     (an added response field: additive, the api skill's
-     `core/compatibility.md`);
+     (an added response field: additive, 
+     `skills/api/core/compatibility.md`);
    - `app/projects/router.py`: `POST /projects/{project_id}/archive`,
      404 like its siblings.
 7. **Tests** in `tests/test_projects.py`, in the file's style: archive
