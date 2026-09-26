@@ -67,15 +67,24 @@ processes, counts failures, and keeps the first failure's output:
 ```
 run 1: exit 1
 run 2: exit 1
-run 3: exit 1
-3 of 3 failed
-first failure kept in /home/user/dbg/sb/race-orig/run_n-first-failure.txt
+2 of 2 failed
+first failure kept in /tmp/run_n-first-failure.txt
 ```
+
+and `$LASTEXITCODE` was 2, the failure count.
 
 With `-TimeoutSeconds 5` on the deadlock sandbox, each run printed
 `timed out after 5 s`, and no `python -m sync` process was left
 running. On the leftover-breakpoint sandbox the empty stdin made the
 `(Pdb)` prompt end at once (`exit 1`) instead of waiting.
+
+Call it from a PowerShell prompt, as above or as `& <path>\run_n.ps1
+...`. *lab:* `pwsh -File run_n.ps1 -Times 1 -- ...` failed with
+`Parameter cannot be processed because the parameter name '' is
+ambiguous`: under `-File`, the `--` is not taken as the end of the
+script's parameters. Whether the execution policy lets a `.ps1` run at
+all on the team's Windows machines was not checked (not run on
+Windows).
 
 `-Times 1` is a single run with a time limit. For a stack dump at the
 limit, run the command under `recipes/watchdog.py` inside it.
