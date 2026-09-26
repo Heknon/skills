@@ -1,6 +1,6 @@
 ---
 name: refactoring
-description: Change the structure of Python code without changing what it does, in small named steps, each checked and committed before the next. Refactor, restructure, clean up, tidy, simplify, rename a function, class, method, parameter or module, move a function or module, split a long module into a package, extract or inline a function, variable or class, introduce a parameter object, replace a conditional or a magic number, delete dead or unused code, untangle a diff that mixes a refactoring with a behaviour change, and make untested legacy code safe to change with characterization tests, golden masters and seams. Every rename and move is done by search and edit, without IDE refactoring tools, and proven complete by searches, the tests, the type checker and an import-everything check. Verified on Python 3.12 with pytest 9.1, ruff 0.16, mypy 2.3, pyright 1.1.414 and git 2.43.
+description: Change the structure of Python code without changing what it does, in small named steps, each checked and committed before the next. Refactor, restructure, clean up, tidy, simplify, rename a function, class, method, parameter or module, move a function or module, split a long module into a package, extract or inline a function, variable or class, introduce a parameter object, replace a conditional or a magic number, delete dead or unused code, untangle a diff that mixes a refactoring with a behaviour change, and make untested legacy code safe to change with characterization tests, golden masters and seams. Reshape a FastAPI service towards the architecture skill's shapes, step by step: move logic out of a router into a service, a query into a repository, a database model off the HTTP boundary, HTTPException out of a service, commits into a unit of work, a module-level object behind a provider. Every rename and move is done by search and edit, without IDE refactoring tools, and proven complete by searches, the tests, the type checker and an import-everything check. Verified on Python 3.12 with pytest 9.1, ruff 0.16, mypy 2.3, pyright 1.1.414, git 2.43, and FastAPI 0.141 with SQLAlchemy 2.1 for the recipes.
 ---
 
 # Refactoring
@@ -9,8 +9,9 @@ This skill knows how to change structure while keeping behaviour: pin
 what the code does, take one step from the catalogue, prove every
 reference was found, check, commit, and undo a step that goes red.
 Every command, message and trap in it was run on Python 3.12.14, pytest
-9.1.1, ruff 0.16.9, mypy 2.3.1, pyright 1.1.414 and git 2.43.0. Nothing
-is written from memory: find it here, or run it.
+9.1.1, ruff 0.16.9, mypy 2.3.1, pyright 1.1.414 and git 2.43.0, and the
+recipes on FastAPI 0.141.1, pydantic 2.13.5 and SQLAlchemy 2.1.1 on
+aiosqlite. Nothing is written from memory: find it here, or run it.
 
 Read this file, then load only what the task needs. Seniority is loaded
 too; its behaviour probe (`core/scope.md` question 6) and its habits are
@@ -35,7 +36,7 @@ runs it, is the linting skill's (`skills/linting/core/run-like-ci.md`).
 | --- | --- | --- |
 | **Plan** | say how to restructure something, without doing it | `core/before-you-start.md`, `core/plan-steps.md`, the `steps/` file of each step |
 | **Step** | do one named refactoring: rename, extract, inline, move, split, change a signature | `core/before-you-start.md`, `core/step-loop.md`, the `steps/` file; for a rename, move or signature change also `core/every-reference.md` and `core/public-surface.md` |
-| **Reshape** | move code towards a target shape: a service out of a router, a repository, separate DB and API models, a feature layout | the recipes arrive with the architecture skill; until then, treat it as a **Plan** of catalogue steps and do each as a **Step** |
+| **Reshape** | move code towards a target shape: a service out of a router, a repository, separate DB and API models, domain errors, a unit of work, a provider to override | `recipes/README.md`, then the recipe of the checklist ID (`recipes/L<n>-*.md`); the end state is the architecture skill's `shapes/L<n>-*.md`; each recipe step goes through `core/step-loop.md` |
 | **Pin** | make untested code safe to change | `legacy/characterization.md`, `legacy/seams.md`, and `legacy/golden-master.md` for many outputs |
 | **Tidy** | "clean up", "improve", "refactor" with no named result | `core/before-you-start.md`, `core/plan-steps.md`, then **Step** for each step |
 | **Remove** | delete dead or unused code | `core/dead-code.md`, `core/every-reference.md` |
@@ -51,8 +52,9 @@ After every step, `core/checks.md`. A bug found on the way:
 | `core/` | the procedures, each ending in a verdict |
 | `steps/` | the catalogue: rename, change signature, extract function, inline function, extract variable, extract class, introduce parameter object, move function, move module, split module, replace conditional, replace magic value; each with preconditions, mechanics and the traps seen in the lab |
 | `legacy/` | characterization tests, golden masters, seams (clock, files, environment), sprout and wrap |
+| `recipes/` | one per layering violation L1 to L11 of the architecture skill: the steps from its shape's before to its after, each diff, commit and check, and the traps seen; `run_recipes.py` replays them |
 | `tools/` | `import_all.py` (imports every module, resolves dotted paths in config, imports scripts) and `public_names.py` (public names and signatures, to compare before and after), with a page each |
-| `reference/` | `change-check.md` (what seniority's harness reports on a correct refactoring), `windows.md` |
+| `reference/` | `change-check.md` (what seniority's harness reports on a correct refactoring, and what it misses), `windows.md` |
 | `examples/` | a rename proven complete (`rename-everywhere.md`), a move with a shim (`move-with-shim.md`), a red step undone (`red-step-undone.md`), a function pinned before restructuring (`pinned-function.md`) |
 
 `glossary.md` fixes the words. The tools run with `uv run --no-sync

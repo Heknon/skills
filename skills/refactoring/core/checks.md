@@ -79,6 +79,12 @@ what none of them sees (strings, docs, other repositories).
   `ruff check --fix` removes the shim. Write re-exports as
   `from new import name as name` or list them in `__all__`
   (`core/public-surface.md`).
+- **A new type finding about old behaviour.** Typing a value the old
+  code left untyped can show a bug it always had: in recipe L3, mypy
+  reported `union-attr` for a missing user that was a 500 before and
+  after the step. Show with the probe that behaviour is the same, report
+  the finding under *Findings*, and never silence it; the fix is its own
+  commit.
 - **Formatting is not a check of the step.** Run `ruff format --check`
   only if CI does, and only on the files the step touched.
 

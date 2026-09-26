@@ -55,6 +55,7 @@ commit, what is committed is correct and useful.
 | change a widely used signature | `steps/change-signature.md`: new parameter with a default, or a new function beside the old; callers moved; the old form kept or removed when asked |
 | shorten a long function | pin; then `steps/extract-variable.md` and `steps/extract-function.md`, one piece per step |
 | untested code | `legacy/seams.md` for the smallest seam, `legacy/characterization.md`, then the steps above |
+| move code towards an architecture shape (a service, a repository, a provider) | the recipe of the violation's ID (`recipes/README.md`): the new place added unused, callers switched, the old removed last |
 
 ## Never
 

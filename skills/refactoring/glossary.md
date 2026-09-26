@@ -8,6 +8,8 @@ One sentence per term. Use these words and no synonyms.
 | refactoring | A change of structure that keeps behaviour, done as a sequence of steps. |
 | step | One named change from the catalogue in `steps/`, small enough to check and commit on its own. |
 | catalogue | The steps this skill knows, one file each in `steps/`, with preconditions, mechanics and traps. |
+| shape | The architecture skill's end state for one layering violation (L1 to L11): a before, an after and a test both pass, in its `shapes/`. |
+| recipe | The steps from a shape's before to its after, one file per violation ID in `recipes/`, each step a diff, a commit and its checks. |
 | green | Every check in `core/checks.md` passes, with the same results as the baseline. |
 | red | Any check fails, or gives a result the baseline did not. |
 | baseline | The results of every check, and the probe output, recorded before the first edit. |
