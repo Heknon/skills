@@ -2,7 +2,9 @@
 
 **What it decides:** what you are looking at when a repository does not
 use pre-commit itself. Verified on prek 0.5.3 (the version on the
-index); the team has not chosen it, so this skill does not teach it.
+index). A repository that uses it is recognised by the signs below;
+its config is pre-commit's, and where the two behave differently the
+facts come from prek's own `--help`, not from this skill.
 
 ## prek
 

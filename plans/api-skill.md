@@ -212,9 +212,11 @@ bait is reproduced on the pinned versions before the skill is written.
 
 ### A1. Versions
 
-*Recommended:* the latest in the mirror (FastAPI 0.141.1 today) and the
-oldest a team service pins (a deployment sandbox pins 0.118.0), with
-`fastapi/versions.md` listing the differences. Which versions run?
+*Decided:* written on FastAPI 0.141.1, with 0.118.0 as the older line,
+and `fastapi/versions.md` listing what changed between them. No version
+is assumed for a task: the skill reads the one the project runs from
+`uv.lock` (or `uv run python -c "import fastapi; print(fastapi.__version__)"`)
+and applies the differences for it.
 
 ### A2. One error shape
 

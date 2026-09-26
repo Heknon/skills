@@ -383,9 +383,11 @@ class as table and schema invites the leak L3 forbids.
 
 ### AR6. SQL database for the lab
 
-*Recommended:* PostgreSQL with asyncpg for the recipes, aiosqlite for
-the evals so they run anywhere. Which PostgreSQL version does the team
-run?
+*Decided:* PostgreSQL with asyncpg for the recipes, aiosqlite for the
+evals so they run anywhere. No PostgreSQL version is assumed: the
+patterns here are SQLAlchemy's, and where a task depends on the server,
+the skill reads it (`SELECT version()`, or the image tag in the compose
+file or chart).
 
 ### AR7. Severity, and tools that enforce layers
 
@@ -408,8 +410,10 @@ alone. Split it out only if non-backend projects become the common case.
 *Recommended:* positional fields passed to `super().__init__(*fields)`,
 the message built in `__str__`, an optional class-level `code`. Taught
 for reading: keyword-only fields with a `__reduce__`, and `@dataclass`
-exceptions (fine to pickle, unhashable). Which form does the team use
-today?
+exceptions (fine to pickle, unhashable). *Decided:* in a codebase that
+already defines exceptions, the form its nearest sibling uses wins
+(placement's precedent rule); the recommended form is only for a
+codebase with none, or for fixing one that breaks pickling.
 
 ### AR10. Error file names and granularity
 
@@ -434,8 +438,8 @@ precedent, the precedent, including `exceptions.py` or one central file.
 - **AR6.** PostgreSQL with asyncpg for the recipes, aiosqlite for the
   evals. No PostgreSQL server could be run in the lab (section 11), so
   the recipes ran on aiosqlite and every PostgreSQL fact is read in
-  source and marked *not run on PostgreSQL*. The team's PostgreSQL
-  version is still open.
+  source and marked *not run on PostgreSQL*. No server version is
+  assumed; a task that depends on it reads it.
 - **AR7.** Each checklist item suggests a severity on code-review's
   scale (blocker, major, minor, nit, from its plan's CR1); the searches
   are the default check; import-linter contracts appear in the recipes
@@ -444,8 +448,8 @@ precedent, the precedent, including `exceptions.py` or one central file.
   file to a FastAPI service".
 - **AR9.** Positional fields passed to `super().__init__(*fields)`, the
   message in `__str__`, an optional class-level `code`; keyword-only
-  with `__reduce__` and `@dataclass` exceptions taught for reading. The
-  team's current form is still open.
+  with `__reduce__` and `@dataclass` exceptions taught for reading. A
+  codebase's own form, found by the precedent search, wins.
 - **AR10.** `errors.py`, one per feature, base and categories in the
   package's shared `errors.py`; the precedent wins where one exists.
 

@@ -186,7 +186,7 @@ types (mypy, pyright): linting. Commit message format (`commit-msg`):
 git's convention. `uv lock --locked` so the lock matches
 `pyproject.toml`: packaging. Private keys and large files: git's
 clean-up rules. Tests do not belong in `pre-commit`; at most a fast
-subset in `pre-push`, as the team decides (pytest owns which subset).
+subset in `pre-push`, when the person asks (pytest owns which subset).
 
 **Invariants.** Never `--no-verify` or a blanket `SKIP` unasked; a hook
 that fails is read like any other finding. Hooks run the lock's versions.
@@ -328,10 +328,12 @@ the named evidence, not only clean output.
   are not linting's are named with their owning skill in
   `catalogue.md`. A skill of its own only if non-Python hooks grow.
 - **L9. prek.** A Rust reimplementation reading the same config (0.5.3
-  on the index). *Recommended:* recognised, not taught, until the team
-  uses it. Does anyone?
-- **L10. Tests in hooks.** *Recommended:* none at `pre-commit`; a fast
-  subset at `pre-push` only if the team asks.
+  on the index). *Decided:* recognised whenever a project uses it (a
+  `prek` binary, or prek in the lock or the docs); its config is
+  pre-commit's, and prek's own `--help` settles where the two differ
+  (`alternatives.md` lists what the lab saw differ).
+- **L10. Tests in hooks.** *Decided:* none at `pre-commit`; a fast
+  subset at `pre-push` only when the person asks for it.
 
 ## 10. Decisions taken as defaults
 
@@ -363,9 +365,11 @@ the named evidence, not only clean output.
   alternative.
 - **L8. Where pre-commit lives.** The `pre-commit/` folder here; the
   catalogue names the owning skill of each check.
-- **L9. prek.** Recognised, not taught (`pre-commit/alternatives.md`).
+- **L9. prek.** Recognised when a project uses it; its config is
+  pre-commit's, and its own `--help` settles where it differs
+  (`pre-commit/alternatives.md`).
 - **L10. Tests in hooks.** None at `pre-commit`; a fast subset at
-  `pre-push` only if the team asks (pytest owns the subset).
+  `pre-push` only when the person asks (pytest owns the subset).
 
 ## 11. How it was verified
 

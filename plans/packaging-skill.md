@@ -294,9 +294,14 @@ storage; otherwise those lines are marked *not run on Windows*.
 
 *Recommended:* one uv workspace for members developed and upgraded
 together; independent projects for services that need different versions
-of a shared library or of Python; every sibling requirement bounded. How
-many of the team's repositories are monorepos, and do members release
-on their own?
+of a shared library or of Python; every sibling requirement bounded.
+*Decided:* "monorepo" is not a label the skill needs in advance. It
+reads the repository for logical units (anything that builds, runs or
+deploys on its own) and the ties between them (imports, path hacks,
+`PYTHONPATH`, path dependencies, copies, a workspace), places the repo
+on that spectrum, and improves it one step at a time. It asks the
+person only what the evidence cannot decide, once, with the default it
+will take (`core/monorepo.md`).
 
 ## 10. Decisions taken as defaults
 

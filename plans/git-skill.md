@@ -305,16 +305,20 @@ shows in the grade.
 
 ### G1. Git versions
 
-*Recommended:* current Git for Windows and the same release on Linux,
-plus the team's oldest git as a floor. Below 2.35, `zdiff3` falls back
-to `diff3`. Which is the oldest?
+*Decided:* written on 2.43.0 and checked on 2.55.0. No floor is
+assumed: the skill reads `git --version` at Orient, and every command
+newer than some release carries its fallback (`zdiff3` needs 2.35, else
+`diff3`; `--force-if-includes` needs 2.30, else fetch and compare by
+hand).
 
 ### G2. Merge or rebase, and pushing
 
 *Recommended:* merge main into a pushed branch. Rebase only commits never
 pushed, or a branch the person says is theirs alone, then push with
 `--force-with-lease --force-if-includes`. Push only when asked, never to
-a protected or default branch. Does the team have a rule?
+a protected or default branch. A repository's own rule wins when one
+is written down (`CONTRIBUTING.md`, a merge request template) or
+enforced (a protected branch refusing the push).
 
 ### G3. Session settings, not global configuration
 
@@ -339,20 +343,24 @@ asked. Messages follow the convention found as in section 5a (G6).
 
 *Recommended:* plain imperative subjects with an issue trailer, as in
 section 5a; Conventional Commits only where the repository uses them or a
-tool enforces them. Which tracker do the teams use for issue keys: GitLab
-issues (`#12`) or Jira (`PROJ-12`)?
+tool enforces them. The issue key's form is read from recent subjects
+and branch names (`#12` for GitLab issues, `PROJ-12` for Jira); with no
+key in the history and none in the request, the message carries none.
 
 ### G7. Branch name default with no convention
 
 *Recommended:* `<type>/<issue>-<slug>`, types `feat`, `fix`, `chore`,
-`docs`, `refactor`. Does the team have a pattern, or GitLab push rules?
+`docs`, `refactor`, used only when `git branch -r` shows no pattern and
+no push rule rejects it; a push rule's rejection message is followed.
 
 ### G8. When to tidy history
 
 *Recommended:* only when asked, or offered once when an unpushed branch
 holds `WIP` or `fixup!` commits before a merge request; never on pushed
-history unless the person says the branch is theirs alone. Does GitLab
-squash on merge in the team's projects?
+history unless the person says the branch is theirs alone. Whether a
+project squashes on merge is read from GitLab when the deployment
+skill's API access is available; unknown, the skill assumes it does not
+and tidies only when asked.
 
 ## 10. Decisions taken as defaults
 
@@ -362,8 +370,9 @@ Each decision took its *Recommended* answer.
   version; 2.55.0 (the newest release on 2026-09-26, built from the
   kernel.org tarball) checked the tidy, reword, rebase, stash and push
   recipes. Git 3.0 had not shipped; its planned defaults are in
-  `reference/versions.md`. The team's oldest git (the floor) is still
-  open; `reference/versions.md` lists what to check below 2.43.
+  `reference/versions.md`. There is no floor to agree: Orient reads
+  `git --version`, and `reference/versions.md` lists what to check below
+  2.43.
 - **G2. Merge a pushed branch;** rebase only unpushed commits or a
   branch the person says is theirs; push only when asked, rewritten
   branches only with `--force-with-lease --force-if-includes`.

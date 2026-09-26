@@ -20,7 +20,7 @@ as a local hook on pre-commit 4.6.2, with the tools in the dev group.
 | `lint-imports` | `uv run --frozen lint-imports --no-logo`, `pass_filenames: false`, `types: [python]`; only where the project has contracts (`core/import-linter.md`) | pre-commit | architecture (the layer rules) |
 | `uv-lock` | `uv lock --locked --offline`, `pass_filenames: false`, `files: ^(pyproject\.toml\|uv\.lock)$` | pre-commit | packaging (the lock matches `pyproject.toml`) |
 | `issue-key` | `uv run --frozen python scripts/check_issue_key.py`, reading the file in its first argument | commit-msg | git (the message convention) |
-| a fast test subset | `uv run --frozen pytest -m "not slow" -x -q`, `pass_filenames: false`, `always_run: true` | pre-push, only if the team asks | pytest (which subset, the marker) |
+| a fast test subset | `uv run --frozen pytest -m "not slow" -x -q`, `pass_filenames: false`, `always_run: true` | pre-push, only when the person asks for it | pytest (which subset, the marker) |
 
 The `check-*` and fixer entries are console scripts of
 `pre-commit-hooks` 6.0.0, installed from the dev group; their names and
@@ -35,7 +35,8 @@ updated, but --locked was provided.` (exit 1) after a change to
 
 - **Tests at the pre-commit stage.** They make every commit slow, and a
   commit is not where tests are judged. At most a fast subset at
-  `pre-push`, when the team decides; the pytest skill owns which subset.
+  `pre-push`, when the person asks for it; the pytest skill owns which
+  subset.
 - **Two tools for one job**, such as black and `ruff format`, or isort
   and ruff's `I` rules: they rewrite each other's output and every
   commit loops (`ruff/format.md`).

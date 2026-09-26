@@ -204,9 +204,9 @@ Each sandbox (a seeded lab database or pasted output) baits one failure.
 
 ### M1. MongoDB server version
 
-*Recommended:* write on 8.0, note 7.0 differences the lab shows, and read
-the running version at Orient every time. Which version does the team
-run, Community or Enterprise?
+*Decided:* written on 8.0, with the 7.0 differences the lab showed.
+No version is assumed: Orient reads the running version and edition
+(`db.version()`, `buildInfo`) every time and applies the differences.
 
 ### M2. Driver and Beanie versions
 
@@ -251,8 +251,8 @@ for pipelines, which Beanie does not type (to verify in the lab).
 
 - **M1.** Written on MongoDB 8.0 (8.0.32, the newest 8.0 on
   fastdl.mongodb.org on 2026-09-26); 7.0.43 run for the differences in
-  `server/versions.md`. Which version and edition the team runs is still
-  to confirm; Orient reads it every time.
+  `server/versions.md`. Nothing to confirm: Orient reads the version and
+  edition every time.
 - **M2.** Beanie 2.x on PyMongo's `AsyncMongoClient`; sync `MongoClient`
   for scripts and diagnosis; `beanie/versions.md` recognises 1.x on
   Motor. Motor is not taught.

@@ -203,9 +203,9 @@ secret). Every bait and fix is reproduced on the pins first.
 
 ### PD1. Versions
 
-Which releases do the mirror and the services have? *Recommended:*
-2.13.5 and the oldest 2.x minor in use; `reference/versions.md` covers
-what lies between.
+*Decided:* written on 2.13.5; `reference/versions.md` covers the 2.x
+minors before it. No release is assumed for a task: the skill reads the
+one the project runs from `uv.lock` and applies the differences.
 
 ### PD2. How much v1
 
@@ -252,8 +252,8 @@ configuration.
 - **PD1. Versions.** pydantic 2.13.5 (pydantic-core 2.46.5),
   pydantic-settings 2.15.0, pydantic-partial 0.11.1, Python 3.12, all
   available on the public index. Where behaviour differs, 2.10.6,
-  2.11.10 and 2.12.5 were run too (`reference/versions.md`); the
-  mirror's versions are still to confirm.
+  2.11.10 and 2.12.5 were run too (`reference/versions.md`); a task
+  reads the version the project runs from its lock.
 - **PD2. v1 for migration and reading only.** `core/migrate.md` uses the
   bundled `pydantic.v1` (1.10.26) to show what v1 code did; it is never
   the target for new code.

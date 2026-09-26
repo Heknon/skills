@@ -146,8 +146,10 @@ navigation gets one pointer line in `tools/terminal-probes.md`.
 ### R2. Versions to pin
 
 The plans agree where they overlap. Every one was read from the public
-index on 2026-09-25 and must be confirmed against the internal mirror,
-along with the versions the team's services actually run.
+index on 2026-09-25. Nothing needs confirming ahead of time: every
+skill reads the versions a project actually runs (from `uv.lock`, the
+server, or `--version`) at the start of a task and applies the
+differences its `versions.md` records.
 
 | Package | Version | Used by |
 | --- | --- | --- |

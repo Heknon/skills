@@ -24,9 +24,8 @@ result.
 
 ## Older than 2.43
 
-Not run. The plan's floor question (the team's oldest git) is open.
-Features this skill uses and may be missing on old versions, to check
-with `git <cmd> -h`: `git switch` and `git restore`, `--conflict=zdiff3`,
+Not run. Orient reads `git --version`; on an older git, check each
+feature this skill uses before relying on it, with `git <cmd> -h`: `git switch` and `git restore`, `--conflict=zdiff3`,
 `--force-if-includes`, `git stash push --include-untracked` with
 `show --include-untracked`, `git commit --trailer`, `--fixup=amend:`.
 

@@ -206,16 +206,18 @@ pointer line in `tools/terminal-probes.md`.
 ### OD1. Scope
 
 *Recommended:* Python packages and the standard library, plus asking
-any CLI about itself. No other languages. Is there a copy of Python's
-own docs (CHM, an internal Sphinx build)? Until one is named, the
-standard library source in `Lib\` is the reference.
+any CLI about itself. No other languages. *Decided:* the standard
+library source in `Lib\` is the reference; a local copy of Python's
+docs (CHM, an internal Sphinx build) is used when the environment has
+one or the person names it, ranked below the source like any page.
 
 ### OD2. Fetching internal documentation pages
 
 May the model read pages over HTTP (`Invoke-RestMethod`, `curl.exe`)
-from a devpi or Nexus docs host, and which? *Recommended:* yes, read
-only, from hosts the person names or the index in `uv.toml`; a page
-ranks below the installed source unless it names the installed version.
+from a devpi or Nexus docs host? *Decided:* yes, read only, from hosts
+the person names or the index host found in `uv.toml`, `pip.conf` or
+`[[tool.uv.index]]`; a page ranks below the installed source unless it
+names the installed version.
 
 ### OD3. A throwaway environment for another version
 

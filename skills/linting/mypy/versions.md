@@ -20,7 +20,7 @@ from `mypy.options.Options()` in each.
 1. Run 2.x once and diff the error lists; the `bytes` change is the
    usual source of new errors.
 2. For each new error, fix the code (convert with `bytes(...)`) or, if
-   the team decides to keep the old rule for now, set
+   the person wants to keep the old rule for now, set
    `strict_bytes = false` in `[tool.mypy]` with a comment.
 3. If the config uses `allow_redefinition`, rerun with and without it
    and read what changed.
