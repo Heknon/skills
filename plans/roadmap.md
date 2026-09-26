@@ -1,7 +1,9 @@
 # Roadmap: the next eleven skills
 
-Status: all eleven plans written, one branch each, and reconciled here.
-Nothing is built yet. Section 7 records what the plans changed.
+Status: all eleven skills are built and merged here, into
+`claude/ai-air-gapped-skills-cv1bws`, each from its own branch; each
+plan says how its skill was verified. Section 7 records what the plans
+changed, section 8 what the builds changed.
 
 This file is the map the eleven plans share: what each skill is, which
 branch its plan lives on, what it depends on, and where the line runs
@@ -50,14 +52,14 @@ on navigation. Seniority is loaded on every task and is not listed.
 | debugging | none | offline-docs, git (bisect), packaging | pytest, navigation, observability, deployment |
 | offline-docs | none | navigation (which interpreter runs) | navigation |
 | pydantic | none | offline-docs, linting, api, mongodb | deployment, documentation, pytest |
-| packaging | none | offline-docs | deployment, pytest, navigation |
-| linting | none | pydantic, offline-docs, git | pytest, navigation, deployment, documentation |
-| git | none | none | navigation, deployment, pytest |
-| api | pydantic | pydantic, offline-docs | pytest, observability, deployment, navigation |
+| packaging | none | offline-docs, linting (the dev group its hooks run) | deployment, pytest, navigation |
+| linting | none | pydantic, offline-docs, git, architecture (the import-linter contracts it runs) | pytest, navigation, deployment, documentation |
+| git | none | linting (pre-commit with `core.hooksPath`, formatting commits) | navigation, deployment, pytest |
+| api | pydantic | pydantic, offline-docs, architecture (custom error classes) | pytest, observability, deployment, navigation |
 | mongodb | pydantic | pydantic, offline-docs | observability, pytest, deployment |
 | architecture | pydantic, api, mongodb | api, mongodb, pydantic | pytest, navigation |
 | refactoring | architecture (only its `recipes/`) | architecture, linting, git, debugging | pytest, navigation, seniority's harness |
-| code-review | architecture, linting | architecture, linting, pydantic, api, mongodb, offline-docs, git | pytest, navigation, deployment |
+| code-review | architecture, linting | architecture, linting, pydantic, api, mongodb, offline-docs, git, debugging (the reproduction template), refactoring (restructurings are named for it) | pytest, navigation, deployment |
 
 The "Needs" column as a graph:
 
@@ -130,7 +132,7 @@ points at it.
 | flaky tests (order, seeds, xdist) | pytest | debugging owns timing bugs in the code under test |
 | building a Python distribution and cutting a release | packaging | deployment owns container images, Helm charts and the CI job that publishes |
 | a monorepo's packages: its kind, the workspace, one lock or several, bounds on siblings, member versions | packaging | deployment owns building only what changed and one member per image; linting owns hooks per member |
-| pre-commit: config, hook types and stages, offline hooks, monorepos, running in CI | linting | each hook's check stays with its owner (commit-msg format: git; `uv lock --locked`: packaging; tests at `pre-push`: pytest); git owns `core.hooksPath` and never passing `--no-verify` unasked; deployment writes the CI job |
+| pre-commit: config, hook types and stages, offline hooks, monorepos, running in CI | linting; hook entries run the lock's tools with `uv run --frozen`, not `--no-sync` (a worktree without its own `.venv` ran a global tool) | each hook's check stays with its owner (commit-msg format: git; `uv lock --locked`: packaging; tests at `pre-push`: pytest); git owns `core.hooksPath` and never passing `--no-verify` unasked; deployment writes the CI job |
 | GitLab API access (tokens, certificates, PowerShell calls) | deployment | code-review uses only the merge request diff and note endpoints |
 
 ## 6. Decisions for the whole family
@@ -159,11 +161,14 @@ along with the versions the team's services actually run.
 | PyMongo | 4.18.2 | mongodb, architecture |
 | MongoDB server | 8.0 | mongodb |
 | SQLAlchemy | 2.1.1 | architecture |
+| SQLModel | 0.0.47, reading note only; it requires SQLAlchemy below 2.1, so its lab ran on 2.0.54 | architecture |
+| import-linter | 2.15 | architecture (contracts), linting (runs it) |
 | ruff, mypy, pyright | 0.16.9, 2.3.1, 1.1.414 | linting |
 | hatchling | 1.32.4 | packaging |
 
-Open: Beanie's own test setup pins FastAPI below 0.130; the pairing with
-0.141 is to verify in the lab before architecture's recipes are written.
+Beanie's own test setup pins FastAPI below 0.130. *Closed:* the
+architecture lab ran Beanie 2.2.0 with FastAPI 0.141.1 in its Beanie
+recipe (15 passed on a MongoDB 8.0.32 replica set) and its shapes.
 
 ### R3. Where the plans merge
 
@@ -176,7 +181,8 @@ then built on its own branch.
 The pydantic plan found, on pydantic 2.13.5 and pydantic-partial 0.11.1,
 that a partial model drops length constraints, passes `None` into the
 full model's validators (an `AttributeError`, so a 500), and does not
-reach nested models without the mixin (all to reconfirm in the lab). It
+reach nested models without the mixin (all three reconfirmed in its
+lab). It
 recommends validating the merged result with the full model. The mongodb
 plan recommends writing a patch as a dotted `$set`. They fit together:
 
@@ -191,6 +197,28 @@ plan recommends writing a patch as a dotted `$set`. They fit together:
 
 *Recommended:* this flow, with the pydantic, api and mongodb skills each
 teaching their own steps and naming the others.
+
+What the builds added, each now in the skill that owns it:
+
+- **Parse with a flag, return early on it** (pydantic). An inherited
+  model validator runs on the partial, which holds defaults, not the
+  stored values: it rejected a valid PATCH. The body is parsed with
+  `context={"partial": True}`, and each inherited model validator
+  returns early when it sees that flag
+  (`skills/pydantic/partial/validators.md`).
+- **Validators are idempotent** (pydantic). Step 3 validates the merged
+  result again, so validators re-run on stored values: a hashing
+  validator re-hashed a stored hash.
+- **The endpoint takes a `dict` body** (api). FastAPI validates a body
+  parameter with no validation context, so the partial model cannot be
+  the parameter. The PATCH endpoint takes a `dict`, calls pydantic's
+  `apply_patch`, and turns its `ValidationError` into a 422 (re-raised
+  as `RequestValidationError`); raised inside the endpoint it would be
+  a 500 (`skills/api/core/put-and-patch.md`).
+- **A `dict`-typed field is written whole from the validated model**
+  (pydantic, mongodb). `apply_patch` merges it key by key, but
+  `Patched.changes` holds only the keys the body sent; the store writes
+  the field from `Patched.model` (`skills/mongodb/recipes/patch_to_set/`).
 
 ### R5. SQL and migrations have no owner
 
@@ -249,3 +277,16 @@ snapshot.
   pagination, validation errors, transactions, `pyproject.toml` and
   seniority's hypothesis loop.
 - Four gaps now have decisions: R4 to R7.
+
+## 8. What the builds changed
+
+- R4 gained four rules (above), found in the pydantic, api and mongodb
+  labs.
+- R2: SQLModel needs SQLAlchemy below 2.1; Beanie 2.2.0 runs with
+  FastAPI 0.141.1; import-linter 2.15 is pinned.
+- Hook entries use `uv run --frozen`, not `--no-sync` (linting).
+- Section 3 gained the pointers the built skills make: debugging and
+  refactoring for code-review, linting for git and packaging,
+  architecture for linting and api.
+- R7's harness change was made in three widenings; what it still
+  misses is listed there.
