@@ -59,11 +59,14 @@ Answer 0, and say the docstring is wrong for this version.
 ## Into the standard library
 
 The standard library's source is on the machine: the interpreter's `Lib\`
-folder (Linux: `lib/python3.12/`), printed by
-`uv run --no-sync python -c "import sysconfig; print(sysconfig.get_paths()['stdlib'])"`.
-It is outside the project, so read it with
-`recipes/lookup.py lines <path> <start> <end>` when the editor cannot open
-it.
+folder (Linux: `lib/python3.12/`), printed by:
+
+```powershell
+uv run --no-sync python -c "import sysconfig; print(sysconfig.get_paths()['stdlib'])"
+```
+
+It is outside the project, so read it with `recipes/lookup.py lines
+<path> <start> <end>` when the editor cannot open it.
 
 Worked in eval `vendored-copy`: fetchkit 2.0.0's `_send` passes
 `timeout=None` to `urllib.request.urlopen(req, timeout=timeout)`

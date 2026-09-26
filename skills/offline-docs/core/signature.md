@@ -31,7 +31,10 @@ Pin the version first (`core/pin-version.md`).
    ```
 
    Without the recipe:
-   `uv run --no-sync python -c "import inspect, fetchkit as m; print(inspect.signature(m.get)); print(inspect.getsourcefile(m.get), inspect.getsourcelines(m.get)[1])"`.
+
+   ```powershell
+   uv run --no-sync python -c "import inspect, fetchkit as m; print(inspect.signature(m.get)); print(inspect.getsourcefile(m.get), inspect.getsourcelines(m.get)[1])"
+   ```
 
 2. **Read the `def`** at that line (`recipes/lookup.py lines <path> <n>`,
    or the editor's `read_file` when the path is inside the project).

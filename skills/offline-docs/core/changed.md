@@ -99,10 +99,19 @@ the answer that you ran it. Never `uv add`, `uv sync`, `uv lock` or
 ## Since when, and deprecations
 
 - **Since when does X exist**: run the check under each version, oldest
-  worth asking first:
-  `uv run --isolated --no-project --with pkg==<v> python -c "import pkg; print(hasattr(pkg, 'X'))"`.
-  Say which versions you checked; "added in" is only as precise as the
-  versions you tried.
+  worth asking first, and say which versions you checked; "added in" is
+  only as precise as the versions you tried:
+
+  ```powershell
+  uv run --isolated --no-project --with pkg==<v> python -c "import pkg; print(hasattr(pkg, 'X'))"
+  ```
+
+  *Lab*: `hasattr(fetchkit, 'post')` was `False` for 1.4.0 and 1.5.0 and
+  `True` for 2.0.0, so `post` appeared in 2.0.0, among the versions on
+  hand.
+
+  For a standard library module, typeshed's `VERSIONS` file answers
+  without running anything (`python/stubs.md`).
 - **Is X deprecated**: search the installed package for the warning:
   `lookup.py grep pydantic "DeprecationWarning"` gave 7 matches in
   pydantic 1.10.26, such as `main.py:468`, where `dict(skip_defaults=...)`

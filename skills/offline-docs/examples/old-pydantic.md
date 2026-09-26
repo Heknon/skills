@@ -55,7 +55,8 @@ what to look for, not the answer.
    module:    pydantic.main at .../site-packages/pydantic/main.cpython-312-x86_64-linux-gnu.so
    ```
 
-   The method is compiled (Cython), so `inspect.getsource` fails; its
+   (The annotations of `include` and `exclude` are shortened here.) The
+   method is compiled (Cython), so `inspect.getsource` fails; its
    code object names `main.py` line 450, the `.py` shipped beside the
    compiled module in the same wheel (`python/inspect.md`).
 
