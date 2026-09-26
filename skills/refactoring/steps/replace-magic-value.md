@@ -24,7 +24,9 @@ Give a literal (`0.2`, `30`, `"EUR"`) a name as a module constant.
 | another module imports the constant by name (`from pricing import VAT`) | it holds its own copy; patching `pricing.VAT` does not reach it (pytest's `core/mocking.md`: patch where used) |
 
 Seniority's change check reports a changed module constant as a
-warning (`module-constants`); a new one is not reported.
+warning (`module-constants`) and a removed public one as a failure
+(`public-signature`, `was removed or renamed`); a new one is not
+reported.
 
 ## Probe inputs
 

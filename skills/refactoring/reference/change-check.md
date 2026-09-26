@@ -12,6 +12,11 @@ aliases, method aliases, `mod.name` and star-import shims, looks under
 every `src` folder up to three levels down, and gives a function moved
 into an existing file its old error-handler count), on the part-1 lab
 cases, a matrix of shim shapes, and every step of the eleven recipes.
+A third widening (its fixture is
+`harness/seniority-checks/fixtures/move3/`) treats a public
+module-level value as part of the API and lets a star shim re-export
+only what the target's `__all__` lists; both rows below were rerun on
+it.
 
 ## What it reads correctly
 
@@ -26,6 +31,8 @@ cases, a matrix of shim shapes, and every step of the eleven recipes.
 | a function moved into a module that existed before, with its `except` that does not re-raise | pass: the handler keeps its old count (the `move-util` move) |
 | a re-export from a module of the project that does not exist (`from pkg.cores import parse`) | fail: every name `removed or renamed`. Real: the import breaks |
 | a provider or a method removed (recipes L3 `get_session`, L7 `Member.to_out`) | fail: `removed or renamed`. Real; name the removal and the search that found no caller |
+| a public module constant or variable removed (recipe L2 `TIERS`, L9 `rates`) | fail: `TIERS was removed or renamed`. Real: `from shop import TIERS` breaks. A private one (`_cache`) is not compared |
+| a star shim whose target leaves the name out of `__all__` | fail: `save was removed or renamed`. Real: `from pkg.util import save` raises `ImportError: cannot import name 'save'`. List the names in the shim, or add the name to the target's `__all__` |
 
 ## What it reports although the refactoring is correct
 
@@ -43,8 +50,6 @@ A rename or signature change the person asked for is reported as
 
 | Shape | What it misses | What sees it |
 | --- | --- | --- |
-| a public module constant or variable removed (recipe L2 `TIERS`, L9 `rates`) | nothing reported; it compares only constants whose value changed | `tools/public_names.py` |
-| a star shim whose target leaves the name out of `__all__` | pass, while `from pkg.util import load` raises `ImportError: cannot import name 'load'` | the tests and import-all, when they import it |
 | a module `__getattr__` shim | treated as unreadable: pass, even when the name behind it changed its default (`(text, strict=True)` at run time) | `tools/public_names.py`, the probe |
 | a function moved into a new file, gaining an `except` that does not re-raise | pass: files not in the snapshot are not compared | the diff, read before the commit |
 | a commit moved out of a repository (recipe L5) | pass: it compares signatures, not what a body does | the test that failed first |

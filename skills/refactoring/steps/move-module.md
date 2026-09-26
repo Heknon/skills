@@ -49,7 +49,7 @@ into several is `split-module.md`.
 
 | Trap | What happens |
 | --- | --- |
-| a shim written as `from app.tools.export import *` | skips names starting with `_` and anything left out of the new module's `__all__`: `ImportError: cannot import name 'load'`, while seniority's change check passes it (`reference/change-check.md`). List names explicitly |
+| a shim written as `from app.tools.export import *` | skips names starting with `_` and anything left out of the new module's `__all__`: `ImportError: cannot import name 'load'`; seniority's change check reports it as `removed or renamed` (`reference/change-check.md`). List names explicitly |
 | an old `app/reports.py` left beside a new package `app/reports/` | the package wins and the file is ignored without a word (lab: `app.reports.__file__` was `app/reports/__init__.py`); delete the file with `git mv` or `git rm` in the same step |
 | a case-only rename (`Reports.py` to `reports.py`) | on Windows the file system ignores case but Python does not: its finder compares the names in the folder listing exactly unless `PYTHONCASEOK` is set (source: `importlib/_bootstrap_external.py`, 3.12), so `import reports` does not find `Reports.py`. Rename with `git mv`, which records it (git's `reference/windows.md`); `not run on Windows` |
 | pickled objects of a class in the module | stored data names the old module path; keep the shim (`core/public-surface.md`) |
