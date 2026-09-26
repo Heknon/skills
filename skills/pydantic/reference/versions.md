@@ -35,7 +35,7 @@ Checked by importing each release (*lab*):
 | default source order init, env, `.env`, secrets, defaults | the same on 2.8.1, 2.12.0 and 2.15.0 (run) |
 | `NestedSecretsSettingsSource` | 2.12.0 (absent in 2.11.0) |
 | `env_prefix_target` | 2.13 (absent in 2.12.0, present in 2.13.1) |
-| `dotenv_filtering` | 2.14 (absent in 2.13.1, present in 2.14.1) |
+| `dotenv_filtering` | 2.14 (absent in 2.13.1, present in 2.14.1); on 2.13.1 the key is ignored with no warning |
 | `PYDANTIC_SETTINGS_DEBUG` source logging | 2.15.0 (absent in 2.14.1) |
 
 The trace script in `recipes/settings/` ran on 2.15.0 and 2.12.0.

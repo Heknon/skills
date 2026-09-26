@@ -84,8 +84,11 @@ compose, pgAdmin), choose:
 | `extra="ignore"` | ignored | ignored | all |
 | `extra="allow"` | **kept on the settings object** (*lab:* `compose_project_name='shop'` in the dump) | kept | all |
 
-Prefer `match_prefix` where installed; else `extra="ignore"`. Never
-`extra="allow"`, and never delete other tools' keys from a shared file.
+Prefer `match_prefix` where installed; else `extra="ignore"`. Check the
+version first: *lab:* on 2.13.1, `dotenv_filtering="match_prefix"` was
+accepted with no warning and did nothing (the compose key still gave
+`extra_forbidden`). Never `extra="allow"`, and never delete other
+tools' keys from a shared file.
 
 ## Never commit `.env`
 
