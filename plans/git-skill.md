@@ -1,6 +1,8 @@
 # Plan: the git skill
 
-Status: draft for decision. Nothing is built yet.
+Status: built in `skills/git/`. The defaults in section 10 were taken so
+the skill could be built; each can be changed. Sections 11 and 12 record
+how it was verified and what the lab changed.
 
 ## 1. What it is
 
@@ -351,3 +353,118 @@ issues (`#12`) or Jira (`PROJ-12`)?
 holds `WIP` or `fixup!` commits before a merge request; never on pushed
 history unless the person says the branch is theirs alone. Does GitLab
 squash on merge in the team's projects?
+
+## 10. Decisions taken as defaults
+
+Each decision took its *Recommended* answer.
+
+- **G1. Versions.** Git 2.43.0, the lab's installed git, is the pinned
+  version; 2.55.0 (the newest release on 2026-09-26, built from the
+  kernel.org tarball) checked the tidy, reword, rebase, stash and push
+  recipes. Git 3.0 had not shipped; its planned defaults are in
+  `reference/versions.md`. The team's oldest git (the floor) is still
+  open; `reference/versions.md` lists what to check below 2.43.
+- **G2. Merge a pushed branch;** rebase only unpushed commits or a
+  branch the person says is theirs; push only when asked, rewritten
+  branches only with `--force-with-lease --force-if-includes`.
+- **G3. Session environment variables,** never global configuration
+  (`recipes/session.ps1`, `session.sh`).
+- **G4. Rotate first;** untrack in a new commit; rewrite only unpushed
+  commits or after the person decides; `git filter-repo` from the
+  mirror, with its side effects written down.
+- **G5. `.gitattributes` decides;** `core.autocrlf` is never changed;
+  renormalising is its own commit, only when asked.
+- **G6. Plain imperative subjects with the repository's issue trailer**
+  when no convention is found; Conventional Commits only where used or
+  enforced. The tracker question (GitLab `#12` or Jira `PROJ-12`) is
+  open; the skill copies whatever form the history uses.
+- **G7. `<type>/<issue>-<slug>`** when no pattern is found.
+- **G8. Tidy only when asked,** or offered once for `WIP` or `fixup`
+  commits before a merge request; never pushed history.
+
+Layout changes from section 5: `recipes/` also holds `todo.py` (a
+sequence editor that follows a written plan and refuses to lose a
+commit), `stage_hunks.py` (hunk staging without `add -p`),
+`bisect_test.py`, `eol.py` and the session scripts; the `.gitattributes`
+and `.gitignore` are shipped as `example.gitattributes` and
+`example.gitignore` so they do not act on the skills repository itself.
+Secrets have their own procedure, `core/secrets.md`.
+
+## 11. How it was verified
+
+- **The hang test.** Every command in `core/`, `recipes/` and
+  `examples/` ran on git 2.43.0 on Linux with `GIT_EDITOR` and
+  `GIT_SEQUENCE_EDITOR` set to a script that records its call and exits
+  1, and stdin from `/dev/null`. The commands that can still reach an
+  editor were also run under a pseudo-terminal (`script`), and those
+  that read the keyboard under a terminal held open for 4 seconds.
+- **Evals first.** The 20 sandboxes of section 8 are Python setup
+  scripts run with `uv run`, building `repo/`, a bare `origin.git/` and
+  `colleague/` with fixed dates, so hashes repeat. Every bait was
+  reproduced and every intended fix passed on 2.43.0; the naming, tidy
+  and conflict fixes also on 2.55.0. The `crlf` scenario reproduces on
+  Linux (a CRLF file saved with LF).
+- **Source.** Where behaviour depends on a condition the lab could not
+  set up, the git source of the same release was read: `editor.c` (`:`),
+  `pager.c` (`cat`), `builtin/merge.c` and `sequencer.c` (when merge and
+  revert edit), `builtin/bisect.c` (exit codes), `builtin/reflog.c` and
+  `builtin/gc.c` (expiry), and `Documentation/BreakingChanges.adoc`
+  (3.0, case-colliding refs).
+- **Tools.** git-filter-repo 2.47.0 from the public index (`uvx`), uv
+  0.8.17, Python 3.11, pytest 9.1.1 for `bisect-test.sh`.
+- **Not run.** Windows and PowerShell 5.1 and 7 (every such fact is
+  marked `not run on Windows`); Git Credential Manager; ssh with
+  `BatchMode` (no ssh client in the lab); GitLab 19.4 (protected branch
+  and push rule answers, closing patterns, merge request refs after a
+  rewrite, squash on merge); gits older than 2.43.
+
+## 12. What the lab changed
+
+Findings that corrected the plan or a common belief, each now in the
+skill:
+
+- **A no-terminal hang test misses merge and revert.** `git merge` and
+  `git revert` call the editor only when stdin is a terminal (source,
+  and lab under a pseudo-terminal); `merge --continue`,
+  `rebase --continue` and `commit --amend` call it always. The skill
+  passes `--no-edit` everywhere and sets `GIT_MERGE_AUTOEDIT=no`; the
+  eval notes tell graders to read the command lines.
+- **The Windows editor value.** Git treats `GIT_EDITOR=:` as no editor
+  without running a program, and `GIT_PAGER=cat` as no pager (source,
+  both releases). With `PATH` empty, `:` finished a rebase and `true`
+  failed. So `:` and `cat` should work under Git for Windows too (to
+  confirm there).
+- **`--force-with-lease` alone erased a colleague's commit** after a
+  fetch: the lease compares with `origin/<branch>`, which the fetch had
+  updated. `--force-if-includes` refused the same push.
+- **`--ours` in a rebase silently lost the branch's commit:** after
+  taking main's line, `rebase --continue` found nothing to commit,
+  dropped the commit and printed `Successfully rebased`.
+- **`git status --short` hides operations in progress:** a concluded
+  but uncommitted merge showed as `M  discount.py`; only the long form
+  said `still merging` or `bisecting`.
+- **`git rebase --autosquash` without `-i` did nothing on 2.43.0** (it
+  works from 2.44); the skill always uses `-i` with
+  `GIT_SEQUENCE_EDITOR=:`. `--fixup=reword:` still refuses `-m` on
+  2.55.0, so the `amend!` commit stays the recipe.
+- **`core.autocrlf=true` did not stop line-ending churn** for a file
+  whose index copy has CRLF; restoring the file's endings did.
+- **`git filter-repo` removed the `origin` remote and deleted the
+  working-tree `.env`;** git 2.43.0 has no `filter-repo` of its own.
+- **`Refs PROJ-302` is not a git trailer** (no colon); `--trailer`
+  writes `Refs: ...` as a new paragraph. The skill copies the
+  repository's form with a last `-m`.
+- **A revert whose editor failed left its changes staged with no revert
+  in progress;** `revert --abort` refused and `reset --merge` cleaned it.
+- **`git switch -c <name> origin/main` tracks `origin/main`,** and the
+  first `git push` then fails; the skill uses `--no-track`.
+- **Git commits conflict markers without a word;** only
+  `git diff --check` catches them.
+- Smaller: `git bisect reset -q` is not an option and leaves the bisect
+  running; `git branch -m` keeps the old upstream; `git add
+  --renormalize .` also stages other modified files; `git am <folder>`
+  applied nothing and said nothing; a local-path submodule needs
+  `protocol.file.allow=always`; a failing sequence editor aborts the
+  rebase with nothing changed; the rebase todo format differs between
+  2.43.0 and 2.55.0 (`pick <hash> # <subject>`).
+
