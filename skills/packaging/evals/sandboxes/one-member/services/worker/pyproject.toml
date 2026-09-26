@@ -8,7 +8,7 @@ dependencies = [
 ]
 
 [project.scripts]
-acme-worker = "acme_worker.cli:main"
+acme-worker = "acme_worker:main"
 
 [build-system]
 requires = ["hatchling>=1.32"]

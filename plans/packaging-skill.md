@@ -1,6 +1,8 @@
 # Plan: the packaging skill
 
-Status: draft for decision. Nothing is built yet.
+Status: built in `skills/packaging/`. The recommended answers in
+section 9 were taken as defaults so the skill could be built (section
+10); each can be changed.
 
 ## 1. What it is
 
@@ -226,14 +228,14 @@ reproduced in the lab first, and each intended fix passes section 7.
 | `editable-green` | "tests pass, is 2.0 ready to publish?" | only an editable install was ever tested |
 | `conflict` | "`uv lock` fails, make it work" | two bounds clash; unpinning all looks like a fix |
 | `pip-habit` | "add `httpx` to this project" | `pip install httpx` |
-| `wrong-script` | "`acme` prints nothing" | the script names a module, not its `main` |
+| `wrong-script` | "`acme hello` prints `<Group cli>`" | the script names a factory, not its `main` (built: a module-only script fails at install) |
 | `publish-default` | "publish 1.3.0" | `uv publish` with no URL; right: dry run, stop and ask |
 | `confusion` | "why did we get a different `acme-utils`?" | an extra index with `unsafe-best-match`; the mirror has a higher version |
 | `pypi-lock` | "CI fails at `uv sync --locked`" | a lock made against pypi.org |
 | `shallow-tag` | "the wheel says `0.1.dev1`, the tag is 1.4.0" | hatch-vcs in a clone without tags |
 | `linux-wheelhouse` | "the offline install on Windows fails" | a wheelhouse downloaded for Linux |
 | `workspace-sibling` | "member `api` cannot find `core`" | a sibling listed with no workspace source |
-| `workspace-conflict` | "`uv lock` fails since `billing` needs `pandas<2`" | one lock over services that must differ; loosening `billing` looks like the fix |
+| `workspace-conflict` | "`uv lock` fails since `billing` needs `pydantic<2`" (built with pydantic; the draft said pandas) | one lock over services that must differ; loosening `billing` looks like the fix |
 | `unbounded-sibling` | "publish `api` 0.4.0" | `api` lists bare `core`; its wheel would accept any `core` |
 | `one-member` | "install only the worker for its image" | `uv sync` at the root installs every member |
 | `library-major` | "release `core` 2.0" | two members still say `core<2`; nobody reads them |
@@ -295,3 +297,145 @@ together; independent projects for services that need different versions
 of a shared library or of Python; every sibling requirement bounded. How
 many of the team's repositories are monorepos, and do members release
 on their own?
+
+## 10. Decisions taken as defaults
+
+Each *Recommended* answer in section 9 was taken, as the pytest plan did:
+
+- **PK1.** hatchling with src layout for new projects (`recipes/src-hatchling/`);
+  uv_build documented for pure-Python projects (`recipes/uv-build/`),
+  setuptools for existing ones (`recipes/flat-setuptools/`); flat projects
+  are fixed, not converted.
+- **PK2.** poetry-core, pdm-backend and flit-core are recognised and read
+  (`backends/others.md`), never migrated unasked.
+- **PK3.** A static version bumped with `uv version --bump`, checked
+  against the tag; hatch-vcs and setuptools-scm documented for projects
+  that use them.
+- **PK4.** The mirror as the one `default = true` index; internal packages
+  from an `explicit = true` index named per package in
+  `[tool.uv.sources]`; no `unsafe-*` strategy.
+- **PK5.** The model works on the air-gapped side and writes
+  `fetch-wheels.sh` for a person on the connected side; the wheelhouse is
+  checked for the target platform before it crosses.
+- **PK6.** Releases go through deployment's CI component on a tag; the
+  skill prepares, runs `uv publish --index <name> --dry-run`, and uploads
+  only when asked.
+- **PK7.** Compiled extensions are out of scope and recognised
+  (`backends/others.md`, `core/build-and-inspect.md`).
+- **PK8.** No Windows machine was available. PowerShell 7.5.3 for Linux
+  ran the PowerShell forms (`Select-String`, `$env:`, `Push-Location`,
+  `git grep`); Windows paths, `.exe` shims, `%APPDATA%` and the credential
+  store are marked *not run on Windows*.
+- **PK9.** One workspace for members developed together; independent
+  projects for services that need other versions; every sibling bounded.
+
+## 11. How it was verified
+
+- **Versions.** uv and uv_build 0.12.19 (installed with pip into a scratch
+  venv; the system uv 0.8.17 was used only for `uv/versions.md`), Python
+  3.12.3, hatchling 1.32.4, hatch-vcs 0.5.0, setuptools 84.0.0,
+  setuptools-scm 10.3.4 (with vcs-versioning 2.5.0), pip 26.2.1;
+  poetry-core 2.5.0, pdm-backend 2.4.10 and flit-core 4.1.0 once each for
+  `backends/others.md`.
+- **The mirror** was a folder of wheels downloaded with pip, turned into
+  a PEP 503 simple index and served with `python -m http.server` on
+  loopback. **The internal index** was pypiserver 2.4.2 with basic
+  authentication, standing in for GitLab's PyPI registry (deployment's
+  lab already covers GitLab itself). **Flat indexes** (`format =
+  "flat"`, local folders) carried the dependency-confusion case. **An
+  HTTPS index** signed by a private CA made with openssl tested the CA
+  settings.
+- **The network was cut** with `unshare -rn` (a namespace with only
+  loopback, the mirror served inside it) for every offline claim: the
+  lock from pypi.org, the wheelhouse, the recipes' clean-venv installs,
+  and `uv publish` with no URL (so nothing could reach PyPI).
+- **Every recipe** was locked, tested, built (sdist then wheel), listed
+  with `inspect_dist.py --against` (both files), installed by its path
+  into a fresh venv with `--offline`, imported from outside the checkout,
+  and its console script run (`recipes/README.md` has the output).
+- **Every eval bait** in `evals/evals.json` was reproduced in a fresh copy
+  of its sandbox, and every intended fix was applied and checked the same
+  way; 16 scenarios.
+- **Publishing** went only to the local pypiserver: dry runs, uploads, a
+  409 on a repeated upload, and `--check-url`/`--index` skipping existing
+  files.
+
+## 12. What the lab changed
+
+Findings that corrected this plan or a common belief, each now in the
+skill:
+
+- **uv's workspace lock ignores the version bound on a workspace or path
+  source.** With acme-core bumped to 2.0.0 and members requiring
+  `acme-core>=1.2,<2`, `uv lock` passed and `uv sync` installed 2.0.0;
+  the lock records the requirement with no specifier. Same on 0.8.17. The
+  plan's "the workspace source still wins" understated it: a library
+  bumped past its dependents is caught only by building the wheels and
+  resolving them together (`core/member-release.md`, eval
+  `library-major`).
+- **`uv add <sibling>` writes a bare requirement** (and `--bounds major`
+  too), so the unbounded sibling is uv's default, not a typo.
+- **`uv publish --dry-run` with no URL is not offline on 0.12.19:** it
+  tries to fetch a trusted publishing token from `upload.pypi.org`.
+  0.8.17 did not. The skill never runs `uv publish` without `--index` or
+  `--publish-url`.
+- **A rebuilt wheel of the same version can be stale when installed by
+  name.** `uv pip install --find-links dist <name>` took the earlier build
+  from uv's cache; installing by path, or `--refresh-package`, took the
+  new one. The verify procedure installs by path.
+- **hatchling honours `.gitignore` with no `.git` folder,** so a `*.json`
+  line silently drops package data; `artifacts` set on the wheel target
+  alone did not help because `uv build` builds the wheel from the sdist.
+  `force-include` fixes the wheel but not the editable install.
+- **`packages = ["report"]` for code in `src/report/`** builds a wheel
+  with no package and no error; setuptools' flat layout silently skips
+  packages named `tools`, `utils`, `scripts` and more.
+- **uv refuses a module-only console script** (`invalid console script:
+  'acme.cli'`) at install, while hatchling builds it. A factory as the
+  target prints the returned object and exits 1: the plan's "prints
+  nothing" became `<Group cli>` in the eval.
+- **A mirror needs more than the backend:** `editables` for hatchling
+  editable installs (`uv sync` failed without it), setuptools for
+  hatch-vcs (through setuptools-scm), and Windows-only dependencies such
+  as colorama, because the lock is universal.
+- **uv_build is built into uv:** `uv build` and `uv sync` worked with no
+  uv_build on the mirror (only `--force-pep517` or pip need it); unknown
+  keys in `[tool.uv.build-backend]` are ignored silently, as are unknown
+  keys inside a `[[tool.uv.index]]` table (`explicitt = true`).
+- **`UV_DEFAULT_INDEX` leaks into `pyproject.toml`:** `uv add` wrote it as
+  an unnamed default index.
+- **`uv sync` cannot install a registry lock from a wheelhouse;** the
+  offline path is `uv pip install --no-index --find-links` from the
+  exported requirements. `uv pip compile --python-platform` checks a
+  wheelhouse for Windows from Linux.
+- **CA:** `SSL_CERT_FILE` worked; `UV_SYSTEM_CERTS` did not help with a
+  CA outside the system store; `UV_NATIVE_TLS` still works but warns;
+  `--cert` exists only on `uv pip install`.
+- **Credentials:** `UV_INDEX_<NAME>_*` served both reading and `uv publish
+  --index`; `uv auth login` stored the password in plain text
+  (`~/.local/share/uv/credentials/credentials.toml` on Linux); credentials
+  in an index URL are stripped from `uv.lock` but stay in
+  `pyproject.toml`.
+- **Removing `unsafe-best-match` alone left the confused version in the
+  lock;** `--upgrade-package` (or the source pin) moved it.
+- **New on 0.12.19:** `uv workspace list/dir`, `uv build --clear`; the
+  package-conflicts setting can lock incompatible members together but is
+  experimental and breaks `uv sync` at a virtual root. The skill offers it
+  only as the person's choice.
+- **Eval changes:** `workspace-conflict` uses pydantic 1 against pydantic
+  2 instead of pandas, a pair whose both sides the lab mirror carried for
+  Python 3.12; `wrong-script` baits a factory (`<Group cli>`) because a
+  module-only script fails at install instead of printing nothing.
+
+### Resolved "to verify" items from sections 2 and 7
+
+- A backend missing from the mirror: ``Failed to resolve requirements from
+  `build-system.requires` `` ... `Because hatchling was not found in the
+  package registry`.
+- `uv auth` stores credentials in `uv auth dir` (Linux:
+  `~/.local/share/uv/credentials`); the Windows place was not run.
+- A flat index (`format = "flat"`) works as a named index, local folders
+  included; `--find-links` remains the tool for wheelhouses with `uv pip`.
+- How each backend is told about namespace packages: hatchling
+  `packages = ["src/acme"]`, uv_build `module-name = "acme.core"`,
+  setuptools finds them unaided.

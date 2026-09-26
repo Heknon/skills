@@ -18,7 +18,7 @@
     "Builds the wheel (`uv build`) and lists it (`recipes/tools/inspect_dist.py` or an equivalent listing): only dist-info files, no report/ package",
     "Names the cause: `packages = [\"report\"]` points at a folder that does not exist; the package is at src/report",
     "Changes it to `packages = [\"src/report\"]` (and nothing that edits sys.path, PYTHONPATH or the pytest config)",
-    "Rebuilds and shows report/__init__.py, report/cli.py and report/render.py in the wheel",
+    "Rebuilds and shows report/__init__.py and report/cli.py in the wheel",
     "Installs the wheel by its path in a fresh venv and runs `acme-report 2026-08 --total 3` from outside the checkout: `Report 2026-08: 3.00`",
     "Says why the tests did not catch it: pytest's pythonpath setting imports from src/, not from the installed package",
     "Ends with the packaging headings (Result, Checked, Not checked)"
