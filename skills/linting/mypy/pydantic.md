@@ -19,10 +19,11 @@ warn_required_dynamic_aliases = true
 
 In `mypy.ini`: `plugins = pydantic.mypy` under `[mypy]`, and a
 `[pydantic-mypy]` section with `True`. The plugin ships inside pydantic
-(`pydantic/mypy.py`), so nothing is installed. Its settings, read in
-that file: `init_forbid_extra` (no `**kwargs` in `__init__`),
-`init_typed` (typed `__init__` arguments), `warn_required_dynamic_aliases`,
-and `debug_dataclass_transform` (for pydantic's own tests).
+(the installed package's `mypy.py`), so nothing is installed. Its
+settings, read in that file: `init_forbid_extra` (no `**kwargs` in
+`__init__`), `init_typed` (typed `__init__` arguments),
+`warn_required_dynamic_aliases`, and `debug_dataclass_transform` (for
+pydantic's own tests).
 
 ## What changes, on one model
 

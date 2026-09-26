@@ -17,7 +17,10 @@ The member paths in `files`, `--config-file` and the mypy paths. One
 mypy hook per member that has its own settings or should be checked on
 its own; one ruff hook for all.
 
-## Checked (*lab*, pre-commit 4.6.2, uv 0.12.19, network cut off, `.venv` deleted first)
+## Checked
+
+*Lab:* pre-commit 4.6.2, uv 0.12.19, network cut off, `.venv`
+deleted first.
 
 ```
 $ uv run --frozen pre-commit validate-config        # no output, exit 0

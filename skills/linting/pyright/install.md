@@ -6,8 +6,8 @@ errors look like when it cannot. Verified on the pyright 1.1.414 wheel,
 network cut off (a network namespace, and a dead proxy).
 
 pyright is a Node program. The PyPI wheel carries pyright's JavaScript;
-it still needs a `node` to run it. The wheel's `pyright/node.py` looks,
-in order, for:
+it still needs a `node` to run it. The wheel's installed `node.py`
+looks, in order, for:
 
 1. the `nodejs-wheel-binaries` package, installed by `pyright[nodejs]`
    (switch off with `PYRIGHT_PYTHON_NODEJS_WHEEL=0`);

@@ -43,7 +43,8 @@ warning.
   `mypy.ini`, `.mypy.ini`, `pyproject.toml` with `[tool.mypy]`, and
   `setup.cfg` with `[mypy]`, in that order; it stops at a folder with
   `.git` or `.hg`, and then tries `~/.config/mypy/config` and
-  `~/.mypy.ini` (read in `mypy/config_parser.py`, 2.3.1 and 1.20.2).
+  `~/.mypy.ini` (read in the installed mypy's `config_parser.py`, 2.3.1
+  and 1.20.2).
 - So the config depends on where mypy is started, not on the files it
   checks. *Lab:* in a uv workspace, `mypy services/api/src` from the
   root printed `Config File: Default` and missed the member's

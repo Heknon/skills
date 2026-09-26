@@ -34,8 +34,8 @@ ARGS=(hook-impl --config=.pre-commit-config.yaml --hook-type=pre-commit)
 
 1. `INSTALL_PYTHON` if that file exists;
 2. otherwise `pre-commit` on `PATH`, which may be another version;
-3. otherwise the commit fails: ``pre-commit` not found.  Did you forget
-   to activate your virtualenv?``
+3. otherwise the commit fails: `` `pre-commit` not found.  Did you
+   forget to activate your virtualenv? ``
 
 *Lab:* installed with `uvx pre-commit@4.6.2 install`, the path was in
 uv's cache (`.../archive-v0/<hash>/bin/python`); after `uv cache clean`

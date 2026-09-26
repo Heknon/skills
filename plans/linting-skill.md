@@ -1,6 +1,8 @@
 # Plan: the linting skill
 
-Status: draft for decision. Nothing is built yet.
+Status: built on branch `claude/skill-linting` (`skills/linting/`).
+Sections 10 to 13 record the decisions taken, how it was verified, and
+what the lab changed; where they differ from sections 1 to 9, they win.
 
 ## 1. What it is
 
@@ -330,3 +332,173 @@ the named evidence, not only clean output.
   uses it. Does anyone?
 - **L10. Tests in hooks.** *Recommended:* none at `pre-commit`; a fast
   subset at `pre-push` only if the team asks.
+
+## 10. Decisions taken as defaults
+
+- **L1. Which checkers.** ruff, mypy and pyright, with basedpyright
+  documented as Zed's default and pyright's alternative. ty is not
+  covered; it gets a folder when it reaches 1.0.
+- **L2. mypy 1.x as well.** Written against 2.3.1; `mypy/versions.md`
+  records what differs on 1.20.2, compared in the lab.
+- **L3. pyright offline.** `pyright[nodejs]` from the mirror, in the dev
+  group; basedpyright as the alternative (it always brings
+  `nodejs-wheel-binaries`).
+- **L4. Suppression form.** A code and a reason on the line, in forms
+  checked for each tool: `# noqa: F401  # reason`,
+  `# type: ignore[arg-type]  # reason`,
+  `# pyright: ignore[rule]  # reason`. `PGH004`, `RUF100`,
+  `warn_unused_ignores` and `ignore-without-code` are suggested, not
+  added unasked.
+- **L5. An unformatted repository.** Never formatted inside another
+  change; `ruff format --range` for the task's own lines; a separate
+  formatting commit offered, listed in `.git-blame-ignore-revs`.
+- **L6. Gradual adoption.** Global strict with a written ratchet of
+  relaxed legacy modules; `ruff check --add-noqa` only when a baseline
+  is asked for.
+- **L7. pre-commit hooks.** `repo: local` hooks running the lock's tools,
+  **amended by the lab to `uv run --frozen`** (and `--all-packages` in a
+  workspace) instead of `uv run --no-sync`; see section 13.
+  `pre-commit-hooks` goes in the dev group so its checks run the same
+  way. Hook repositories mirrored in GitLab are the documented
+  alternative.
+- **L8. Where pre-commit lives.** The `pre-commit/` folder here; the
+  catalogue names the owning skill of each check.
+- **L9. prek.** Recognised, not taught (`pre-commit/alternatives.md`).
+- **L10. Tests in hooks.** None at `pre-commit`; a fast subset at
+  `pre-push` only if the team asks (pytest owns the subset).
+
+## 11. How it was verified
+
+Every command, option, config key and message in the skill was run, or
+read in the installed source where the file says so, on: ruff 0.16.9
+(and 0.15.8, the global one on the lab machine), mypy 2.3.1 and 1.20.2,
+pyright 1.1.414 with and without the `nodejs` extra
+(`nodejs-wheel-binaries` 24.19.0), basedpyright 1.40.1, pydantic 2.13.5,
+black 26.5.1, pre-commit 4.6.2, pre-commit-hooks 6.0.0, prek 0.5.3,
+uv 0.12.19 and Python 3.12, on Linux. All pinned versions were on the
+public index.
+
+- **Offline.** Offline runs used a network namespace (`unshare -n`) with
+  only a local PEP 503 index served inside it standing in for the
+  mirror; a dead proxy alone was not enough, since the lab reached
+  `pypi.org` directly. `ruff rule`, `ruff linter`, `ruff config`,
+  `--show-settings`, `uv tree --frozen` and `mypy --version` all worked
+  with no network.
+- **Precedence** was tested with two config files side by side for
+  each tool, and with nested configs for ruff and mypy.
+- **Every ruff rule code** quoted in the skill (35) was checked with
+  `ruff rule <CODE>` on 0.16.9; three invalid codes are quoted on
+  purpose as examples (`TCH001`, `TCH003`, `F999`).
+- **pre-commit** was run with local and remote hooks, a mirrored hook
+  repository (a bare git mirror standing in for GitLab), `language:
+  python` hooks against the local index with and without
+  `PIP_INDEX_URL`, `PIP_CONFIG_FILE` and uv's index variables,
+  `commit-msg`, `pre-push` (with a bare remote) and `manual` stages,
+  `validate-config` on broken configs, a git worktree, `core.hooksPath`,
+  a legacy hook, and a uv workspace.
+- **PowerShell** forms were run in PowerShell 7.4 on Linux; nothing was
+  run on Windows or in Windows PowerShell 5.1, and the files say so.
+- **Zed** was not run: its Python defaults were read in Zed 1.21.0's
+  source (`assets/settings/default.json`,
+  `crates/languages/src/python.rs`).
+- **Recipes** ran as shipped (`recipes/*/README.md` has the output), the
+  pre-commit ones with the network cut off.
+- **Evals**: 18 scenarios with sandboxes (`evals/evals.json`), one or
+  more per failure in section 4, plus a stash conflict the lab found.
+  Every bait was reproduced and every intended fix passed.
+
+## 12. Evals
+
+`evals/evals.json` keeps the seventeen of section 8 (as `noqa-code` to
+`msg-stage`) and adds `stash-conflict`. Sandboxes that need git or
+generated files have a `make_sandbox.py`; `ci-version` pins ruff 0.15.8
+so the newer default rule set shows up against a global 0.16.9.
+
+## 13. What the lab changed
+
+Findings that corrected this plan or a common belief, each now in the
+skill:
+
+- **ruff 0.16 changed the default rules.** With no `select`, 0.15.8
+  enabled 59 rules and 0.16.9 enabled 413, including `I001`, `B006` and
+  `UP045` (and no longer `E401`, `E402`). A newer global ruff reports
+  findings CI never checks; the skill says to pin `select`.
+- **`uv run --no-sync` falls through to `PATH`.** In a checkout without
+  a synced `.venv` (a fresh clone, a git worktree), it created an empty
+  environment and silently ran a global ruff of another version.
+  `uv run --frozen` installed the locked version from the cache instead,
+  and put it back after a manual change; in a workspace it needs
+  `--all-packages` (`--package api` installed no dev tools, so the
+  `PATH` mypy ran). Decision L7 changed accordingly.
+- **`strict = true` inside a mypy override turns strict on everywhere**,
+  silently, on 2.3.1 and 1.20.2 (read in `config_parser.py`, 203
+  errors instead of 1). The adoption pattern is global strict with
+  relaxed legacy modules.
+- **mypy chooses its config by the current folder**, walking up to the
+  `.git` folder. Hooks run at the repository root, so a member's
+  `[tool.mypy]` needs `--config-file`.
+- **pre-commit installs `language: python` hooks with pip, not uv.**
+  `PIP_INDEX_URL` or a pip config reaches the mirror; `UV_DEFAULT_INDEX`
+  and `UV_INDEX_URL` do not. The mirror must carry setuptools, because
+  pre-commit pip-installs a placeholder package (or the hook
+  repository) from source. Built environments are then reused offline.
+- **A cleaned uv cache does not break every commit**, as section 2
+  said: the hook falls back to `pre-commit` on `PATH` (possibly another
+  version) and fails only when there is none, with `` `pre-commit` not
+  found.  Did you forget to activate your virtualenv? ``. Installing with
+  `uv run` records the project's `.venv`.
+- **A stale nested config is worse than a no-op.** Run from the member
+  folder, its hooks ran over the whole repository and passed where the
+  member's strict mypy failed. prek, unlike pre-commit, runs nested
+  configs as projects.
+- **An unstaged edit in a file a formatter hook changes** makes
+  pre-commit roll the fix back (`Stashed changes conflicted with hook
+  auto-fixes... Rolling back fixes...`), so every retry fails the same
+  way; `git stash --keep-index` then `pop` ended in a conflict. New eval
+  `stash-conflict`.
+- **`validate-config` misses the traps that matter most**: a misspelt
+  hook key (only `run` warns), and an entry cut by a YAML ` #` (the run
+  died with `No closing quotation`, exit 3). `entry` is split with
+  `shlex`, which also eats Windows backslashes. `language: system` is
+  now an alias of `unsupported`.
+- **The pyright wheel without Node fails even `--version`**, with
+  `RuntimeError: nodeenv failed; for more reliable node.js binaries try
+  pip install pyright[nodejs]`; with `node` on `PATH` it ran offline;
+  with the extra it needed nothing.
+- **Zed starts basedpyright and ruff for Python, not pyright**, and
+  forces basedpyright to `standard` mode; ty, pyrefly, pyright and pylsp
+  are off by default (Zed 1.21.0 source).
+- **mypy 2 differences** found by diffing defaults: `strict_bytes` and
+  `local_partial_types` on by default, and `--allow-redefinition` now
+  means the new semantics.
+- **Suppression details**: `# noqa F401` without the colon is a blanket
+  `noqa`; mypy needs the reason after its own `#` and reads `type:
+  ignore` only as the line's first comment; pyright treats any
+  `# type: ignore[...]` as a blanket ignore. ruff 0.16.9 has
+  `# ruff: ignore[CODE]` and `# ruff: disable[...]`/`enable[...]`.
+- **pydantic**: without the plugin, mypy rejects construction by field
+  name under `validate_by_name=True`; the plugin with its three settings
+  rejects the alias instead; pyright behaves like mypy without the
+  plugin.
+- **ruff format against black 26.5.1** differed in four places on one
+  sample: implicit concatenations joined (plain and f-strings), the
+  blank line after `class`, and a comment after an opening bracket.
+
+### Changes other skills need (not made here)
+
+- **navigation** (`tools/zed-tools.md`): a pointer that Zed's Python
+  diagnostics come from basedpyright and ruff by default
+  (`linting/core/zed.md`); and in `tools/type-checkers.md`, a pointer to
+  linting for the lasting setting behind `--follow-untyped-imports`.
+- **deployment** (`gitlab/python.md`): a pre-commit job using
+  `pre-commit/ci.md`'s commands needs enough git history for
+  `--from-ref` (a shallow clone failed); nothing in deployment sets the
+  depth yet.
+- **packaging**: dev-group advice for `pre-commit-hooks`,
+  `pyright[nodejs]`, and a `.python-version` (uv chose Python 3.14 in
+  the lab when only `requires-python = ">=3.12"` was set, which changes
+  mypy's target).
+- **git**: the `core.hooksPath` case (calling `pre-commit run` from the
+  existing hook) and `.git-blame-ignore-revs` for formatting commits.
+- **roadmap**: decision L7 now reads `uv run --frozen`, not `--no-sync`,
+  for hook entries.

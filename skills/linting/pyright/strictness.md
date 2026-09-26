@@ -44,10 +44,10 @@ also opt in with a comment on its first lines:
 ```
 
 which worked in a folder not listed in `strict`. `# pyright: basic`
-does the opposite: in a project set to `strict`, a file starting with it
-got the `basic` count (3 errors instead of 9). A rule can be set on its own, at any
-level: `reportUnnecessaryTypeIgnoreComment = "warning"`, or `"error"`,
-`"none"`.
+does the opposite: in a project set to `strict`, a file starting with
+it got the `basic` count (3 errors instead of 9). A rule can be set on
+its own, at any level: `reportUnnecessaryTypeIgnoreComment =
+"warning"`, or `"error"`, `"none"`.
 
 ## Adopting
 

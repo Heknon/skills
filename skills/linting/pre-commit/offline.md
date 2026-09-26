@@ -56,8 +56,9 @@ repos:
 ## 2. `language: python` hooks installed from the mirror
 
 pre-commit builds a virtualenv per hook with `virtualenv`, then runs
-`python -mpip install . <additional_dependencies>` in it (read in
-`pre_commit/languages/python.py`). It is **pip, not uv**:
+`python -mpip install . <additional_dependencies>` in it (read in the
+installed `pre_commit` package, `languages/python.py`). It is **pip,
+not uv**:
 
 | Setting | Offline result in the lab |
 | --- | --- |

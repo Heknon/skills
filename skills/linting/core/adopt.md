@@ -58,12 +58,13 @@ check_untyped_defs = true
 does not work:
 
 **`strict = true` inside `[[tool.mypy.overrides]]` turns strict on for
-every module.** mypy calls its global strict switch for any section that
-says `strict` and prints no warning (read in `mypy/config_parser.py`;
-*lab, 2.3.1 and 1.20.2*: an override for `crm.api.*` with
-`strict = true` gave 203 errors, the legacy modules included). Relax
-flags for old modules as above, or list the individual flags `--strict`
-turns on (`mypy/strictness.md`) in the override for new ones.
+every module.** mypy calls its global strict switch for any section
+that says `strict` and prints no warning (read in the installed mypy's
+`config_parser.py`; *lab, 2.3.1 and 1.20.2*: an override for
+`crm.api.*` with `strict = true` gave 203 errors, the legacy modules
+included). Relax flags for old modules as above, or list the individual
+flags `--strict` turns on (`mypy/strictness.md`) in the override for new
+ones.
 
 ## 3. Deal with what is left
 
