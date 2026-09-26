@@ -1,0 +1,258 @@
+{
+ "skill_name": "architecture",
+ "notes": "Scenarios for checking that a weak model using this skill recognises a codebase's structure before changing it, follows its precedent, and keeps the layer rules (no query in a route, no database model at the HTTP boundary, services without HTTP, one transaction owner, one error translation per boundary), and places one new thing (an error, a constant, a helper) where the codebase keeps its kind. Each names a sandbox under evals/sandboxes/, copied fresh before the run. The sandboxes are uv projects pinned to FastAPI 0.141.1, pydantic 2.13.5 and pytest 9.1.1 (Starlette 1.7.0 wants httpx2 for TestClient); transfer and lazy-after-commit use SQLAlchemy 2.1.1 on aiosqlite; users-beanie and review-diff use Beanie 2.2.0 on PyMongo 4.18.2, and users-beanie's tests need a MongoDB server in MONGODB_URI (they skip without one); constant-or-setting uses pydantic-settings 2.15.0. Every bait was reproduced, and every intended fix passed, on Python 3.12.14 with MongoDB 8.0.32.",
+ "how_to_run": [
+  "copy the skill folder without evals/ to <skill>",
+  "copy evals/sandboxes/<sandbox> to a fresh <work>",
+  "for users-beanie, start a MongoDB server and set MONGODB_URI",
+  "start the model in <work> with: 'Load the skill at <skill>/SKILL.md and follow it. Task: <prompt>'; add the machine's operating system",
+  "grade each expectation by hand, from the answer and the diff"
+ ],
+ "evals": [
+  {
+   "id": 0,
+   "name": "crud-by-feature",
+   "sandbox": "crud-by-feature",
+   "prompt": "Add an endpoint to archive a project. Archived projects must no longer appear in GET /projects.",
+   "bait": "the code is organised as projects/{router,crud,schemas}.py with no service layer; a textbook answer adds services/ and repositories/ folders or a ProjectService",
+   "expectations": [
+    "Starts with a structure card (layout style, one request traced as path:line hops, where models, wiring, transactions and errors live) before changing anything; the card says by feature, crud.py per feature, no service layer",
+    "Adds archive_project to app/projects/crud.py, the route to app/projects/router.py, the field to app/projects/schemas.py and app/db.py, and no new folder or layer",
+    "Filters archived projects in crud.list_projects, not in the route",
+    "Raises HTTPException(404) for a missing project the way the other routes of the feature do",
+    "Adds tests for the archive and the hidden listing and quotes the run: 6 passed",
+    "Ends with Structure, Result, Checked, Not checked"
+   ]
+  },
+  {
+   "id": 1,
+   "name": "leaky-user",
+   "sandbox": "users-beanie",
+   "prompt": "Add GET /users/{user_id} that returns a user.",
+   "bait": "returning the Beanie User from the repository (no response model) sends password_hash, is_admin and failed_logins, names the id _id, and answers a missing user with 200 null",
+   "expectations": [
+    "Starts with a structure card (layout style, one request traced as path:line hops, where models, wiring, transactions and errors live) before changing anything; notes that POST /users already maps to UserOut",
+    "Declares the response model (-> UserOut or response_model=UserOut) and never returns the User document",
+    "Answers 404 for a missing user",
+    "Adds a test that password_hash is absent from the response (set of keys or not-in) and a test for 404",
+    "Runs the tests with MONGODB_URI set, or says they were skipped and why",
+    "Ends with Structure, Result, Checked, Not checked"
+   ]
+  },
+  {
+   "id": 2,
+   "name": "mass-assign",
+   "sandbox": "users-beanie",
+   "prompt": "Add PATCH /users/me so a user can change their display name and bio.",
+   "bait": "a body typed as the User document, or a dict passed to user.set(), lets a client send is_admin: true and become an admin",
+   "expectations": [
+    "Starts with a structure card (layout style, one request traced as path:line hops, where models, wiring, transactions and errors live) before changing anything",
+    "Adds a request model listing only display_name and bio (extra='forbid' or the fields picked explicitly); the User document is never the body",
+    "Writes only the fields the client sent (model_dump(exclude_unset=True) into user.set), through the repository",
+    "Adds a test that sending is_admin: true is refused (422) or ignored, and that is_admin stays false in the database",
+    "Returns UserOut, not the document",
+    "Points to the api skill for the PATCH meaning (omitted unchanged) rather than restating it",
+    "Ends with Structure, Result, Checked, Not checked"
+   ]
+  },
+  {
+   "id": 3,
+   "name": "credit-limit",
+   "sandbox": "credit-limit",
+   "prompt": "Orders that would take a customer over their credit limit must be rejected with 409.",
+   "bait": "the rule goes in OrderService, which the nightly import in app/worker.py also calls; raising HTTPException there aborts the import on the first over-limit row and makes the service import FastAPI",
+   "expectations": [
+    "Starts with a structure card (layout style, one request traced as path:line hops, where models, wiring, transactions and errors live) before changing anything; the card finds app/worker.py as a second caller of OrderService.place",
+    "Puts the rule in the service and raises a domain error, not HTTPException; the service imports nothing from fastapi",
+    "Follows the precedent in app/errors.py: adds a ConflictError category under AppError and a CreditLimitExceededError(ConflictError) there, with positional fields passed to super().__init__",
+    "Registers one handler for the category in app/main.py (409), like the existing NotFoundError handler",
+    "Adds a test for the 409 and a worker test where an over-limit row is rejected and the other rows are placed",
+    "Ends with Structure, Result, Checked, Not checked"
+   ]
+  },
+  {
+   "id": 4,
+   "name": "transfer",
+   "sandbox": "transfer",
+   "prompt": "A customer says a transfer to a frozen account took money from her account but it never arrived. Fix it.",
+   "bait": "AccountRepository.debit and credit each commit, so the debit is kept when the credit fails; a try/except with session.rollback() in the route does not undo a committed debit",
+   "expectations": [
+    "Starts with a structure card (layout style, one request traced as path:line hops, where models, wiring, transactions and errors live) before changing anything; names who commits today (each repository method) as the cause",
+    "Writes a failing test first: a transfer to the frozen account 3 answers 409 and account 1 still has 10000",
+    "Removes the commits from the repository and gives the transaction one owner (the service through a unit of work, or one session.begin() around both writes)",
+    "Does not add a rollback in the route or a compensating credit",
+    "Quotes the run: the new test failed before and passes after, with the whole suite",
+    "Ends with Structure, Result, Checked, Not checked"
+   ]
+  },
+  {
+   "id": 5,
+   "name": "wrong-override",
+   "sandbox": "wrong-override",
+   "prompt": "test_read_note fails although we override the repository in the test. Make the test use the fake.",
+   "bait": "the test overrides NoteRepository, but the route depends on get_repo, so the override key is never looked up; changing the route to Depends(NoteRepository) or patching NOTES_DIR are wrong fixes",
+   "expectations": [
+    "Starts with a structure card (layout style, one request traced as path:line hops, where models, wiring, transactions and errors live) before changing anything; the chain is read_note -> Depends(get_repo)",
+    "Explains that dependency_overrides is keyed by the callable named in Depends, here get_repo, citing the api skill",
+    "Changes the test to override get_repo and clears the overrides after each test (fixture)",
+    "Notes that test_missing_note_is_404 passed for the wrong reason (the real repository had no data) and shows it can now fail",
+    "Does not change app/ code",
+    "Ends with Structure, Result, Checked, Not checked"
+   ]
+  },
+  {
+   "id": 6,
+   "name": "lazy-after-commit",
+   "sandbox": "lazy-after-commit",
+   "prompt": "POST /orders returns 500. Fix it.",
+   "bait": "the repository commits and returns the ORM row; with expire_on_commit on, reading it for the response needs IO outside the greenlet: MissingGreenlet inside a ResponseValidationError; a sync route or an except are wrong fixes",
+   "expectations": [
+    "Starts with a structure card (layout style, one request traced as path:line hops, where models, wiring, transactions and errors live) before changing anything",
+    "Reproduces with the test and quotes the error: get_attribute_error with (sqlalchemy.exc.MissingGreenlet) greenlet_spawn has not been called",
+    "Explains that commit expired the row and the response model read it after the session's IO context",
+    "Fixes it in the data layer: the repository returns a model built while the session is open (flush, then build, then commit), or the session uses expire_on_commit=False with relationships loaded eagerly; the route stays async",
+    "Does not catch the error, switch to a sync route, or add lazy loading options without a test",
+    "Quotes the run: 1 passed",
+    "Ends with Structure, Result, Checked, Not checked"
+   ]
+  },
+  {
+   "id": 7,
+   "name": "review-diff",
+   "sandbox": "review-diff",
+   "prompt": "Review the layering of the change in change.diff (already applied to the working tree). Do not change code.",
+   "bait": "L1 (Invoice.find in the overdue route), L6 (totals_by_customer returns aggregation dicts with _id, indexed by the route) and L8 (DuplicateKeyError turned into HTTPException inside the repository, without from) are real; the service that only forwards totals_by_customer follows the card (README team rule) and is not a finding",
+   "expectations": [
+    "Starts with a structure card (layout style, one request traced as path:line hops, where models, wiring, transactions and errors live) before changing anything; cites the README rule that every route goes through a forwarding service",
+    "Reports L1 at app/invoices/router.py overdue_invoices, with the service/repository method it should call instead",
+    "Reports L6 at app/invoices/repository.py totals_by_customer (list[dict] with _id) and the route that indexes r['_id']",
+    "Reports L8 at app/invoices/repository.py create (HTTPException in a repository; B904 missing from)",
+    "Does not report the forwarding service method as a finding, and says the card allows it",
+    "Gives each finding the checklist ID, path:line, a suggested severity, and a verdict for the change",
+    "Ends with Structure, Result, Checked, Not checked"
+   ]
+  },
+  {
+   "id": 8,
+   "name": "circular",
+   "sandbox": "circular",
+   "prompt": "The app does not start: ImportError about a circular import. Fix it.",
+   "bait": "app/models.py imports app/schemas.py for to_out and schemas imports models; moving the import inside to_out makes it start and hides the wrong direction",
+   "expectations": [
+    "Starts with a structure card (layout style, one request traced as path:line hops, where models, wiring, transactions and errors live) before changing anything; states the intended import direction (schemas may import models, never the reverse)",
+    "Quotes the ImportError: cannot import name 'Member' from partially initialized module 'app.models'",
+    "Removes the import of schemas from models and moves the mapping to the schema side (MemberOut.from_member or mapping in the route module)",
+    "Uses no function-level import and no TYPE_CHECKING trick to hide it",
+    "Quotes the run: 1 passed",
+    "Ends with Structure, Result, Checked, Not checked"
+   ]
+  },
+  {
+   "id": 9,
+   "name": "new-service",
+   "sandbox": "new-service",
+   "prompt": "Lay out this new service (see README.md). Create the files and a first test.",
+   "bait": "ports and adapters, a generic BaseRepository[T] and an abstract service base for two endpoints",
+   "expectations": [
+    "Says there is no code to recognise and uses the design procedure",
+    "Chooses the default by-feature layout (app/main.py, a shared db module, app/bookings/ with router, service, repository, schemas) or smaller, and says why",
+    "Puts the overlap rule in the service, the query in the repository, and returns domain or schema models from the repository, not ORM rows",
+    "Adds no generic BaseRepository, no ports/adapters folders and no abstract base classes; names what would justify them later (the reporting job, a second storage)",
+    "Starts app/errors.py with AppError and ConflictError (409), and says a convention was started",
+    "Writes a service test with a fake repository that needs no database, and runs it",
+    "Ends with Structure, Result, Checked, Not checked"
+   ]
+  },
+  {
+   "id": 10,
+   "name": "errors-precedent",
+   "sandbox": "errors-precedent",
+   "prompt": "GET /invoices/99 and POST /invoices/99/pay answer 500. They should answer 404.",
+   "bait": "the project has app/core/errors.py (AppError, NotFoundError, ConflictError), one handler for AppError, and per-feature errors.py files (billing/errors.py, customers/errors.py); a new exceptions.py, an error class in the service, a new handler, or HTTPException in the service are wrong",
+   "expectations": [
+    "Starts with a structure card (layout style, one request traced as path:line hops, where models, wiring, transactions and errors live) before changing anything; lists the error precedent: core/errors.py categories, feature errors.py files, one AppError handler that maps categories",
+    "Adds InvoiceNotFoundError(NotFoundError) to app/billing/errors.py with a code class attribute and positional fields, shaped like InvoiceAlreadyPaidError",
+    "Raises it in BillingService (get_invoice no longer returns None) and adds no handler",
+    "Adds tests for both paths expecting 404 and the code 'invoice_not_found', and quotes the run: 4 passed",
+    "Answer gives the precedent's path:line (app/billing/errors.py and app/customers/errors.py)",
+    "Ends with Structure, Result, Checked, Not checked"
+   ]
+  },
+  {
+   "id": 11,
+   "name": "builtin-fits",
+   "sandbox": "builtin-fits",
+   "prompt": "parse_quantity() must reject negative quantities.",
+   "bait": "a pure function whose only caller already catches ValueError; a new InvalidQuantityError/NegativeQuantityError hierarchy not derived from ValueError crashes the CLI",
+   "expectations": [
+    "Finds the caller in app/cli.py and that it catches ValueError",
+    "Raises ValueError with a message naming the input, and defines no new exception class",
+    "Says why no custom error is needed (no caller handles it differently from other bad input)",
+    "Adds a test with pytest.raises(ValueError, match=...) and quotes the run: 6 passed",
+    "Ends with Structure, Result, Checked, Not checked"
+   ]
+  },
+  {
+   "id": 12,
+   "name": "worker-pickle",
+   "sandbox": "worker-pickle",
+   "prompt": "The export worker logs TypeError: QuotaExceededError.__init__() missing 1 required keyword-only argument: 'limit' and the caller never sees the quota error. Fix it.",
+   "bait": "QuotaExceededError passes only a formatted message to super().__init__ and takes limit keyword-only, so pickle cannot rebuild it in the parent process; catching TypeError or BrokenProcessPool hides the real error",
+   "expectations": [
+    "Starts with a structure card (layout style, one request traced as path:line hops, where models, wiring, transactions and errors live) before changing anything",
+    "Reproduces with the failing test and quotes the TypeError and BrokenProcessPool",
+    "Explains that unpickling calls the class with self.args, which here is the message only",
+    "Changes the class to pass its fields to super().__init__(tenant, limit) and build the message in __str__; raise sites keep working",
+    "Does not catch TypeError, BrokenProcessPool or Exception in app/queue.py",
+    "Quotes the run: 2 passed",
+    "Ends with Structure, Result, Checked, Not checked"
+   ]
+  },
+  {
+   "id": 13,
+   "name": "utils-dump",
+   "sandbox": "utils-dump",
+   "prompt": "Articles and tags both need URL slugs ('Hello, World!' -> 'hello-world'). Add a slug helper both can use and set Article.slug and Tag.slug.",
+   "bait": "app/utils.py is a 900-line grab bag whose docstring asks for nothing more; app/text.py already holds shared text helpers (ascii_fold) that a slug needs",
+   "expectations": [
+    "Starts with a structure card (layout style, one request traced as path:line hops, where models, wiring, transactions and errors live) before changing anything; the placement search finds app/text.py as the home of shared text helpers",
+    "Adds slugify to app/text.py (or a new purpose-named module such as app/slugs.py, saying why), not to app/utils.py and not a new helpers.py or common.py",
+    "Reuses ascii_fold rather than copying it",
+    "Uses it in both services and adds tests, and quotes the run",
+    "Answer gives the precedent's path:line and the rule applied",
+    "Ends with Structure, Result, Checked, Not checked"
+   ]
+  },
+  {
+   "id": 14,
+   "name": "no-precedent",
+   "sandbox": "no-precedent",
+   "prompt": "Creating a note with a title that already exists must answer 409. Add a proper error for it.",
+   "bait": "there is no custom error anywhere yet; a textbook answer builds a large hierarchy, puts the class in store.py where it is first raised, or raises HTTPException from the store",
+   "expectations": [
+    "Searches for existing exception classes and error modules, and says there is no precedent",
+    "Creates one app/errors.py with a base (AppError), one category (ConflictError, 409) and, if a caller needs it, one specific class with positional fields",
+    "Raises it in the store and maps the category to 409 with one handler in app/main.py",
+    "Says a convention was started and what it is",
+    "Adds a test for the 409 and quotes the run: 3 passed",
+    "Ends with Structure, Result, Checked, Not checked"
+   ]
+  },
+  {
+   "id": 15,
+   "name": "constant-or-setting",
+   "sandbox": "constant-or-setting",
+   "prompt": "Make the product page size 50 in production and 10 in the tests.",
+   "bait": "PAGE_SIZE is a module constant; editing it, adding a second constant chosen by an environment check, or monkeypatching the constant in tests keeps a per-environment value in code",
+   "expectations": [
+    "Starts with a structure card (layout style, one request traced as path:line hops, where models, wiring, transactions and errors live) before changing anything; finds the existing Settings class in app/settings.py",
+    "Says the value now differs by environment, so it is a setting, and points to the pydantic skill for settings",
+    "Adds page_size to Settings (default 50, env CATALOGUE_PAGE_SIZE), passes it to listing.page, and reads it through Depends(get_settings)",
+    "Tests set 10 through a dependency override or the environment with the cache cleared, never by patching a module constant",
+    "Leaves MAX_NAME_LENGTH as a constant",
+    "Ends with Structure, Result, Checked, Not checked"
+   ]
+  }
+ ],
+ "runs": []
+}

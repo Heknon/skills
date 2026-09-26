@@ -1,0 +1,72 @@
+diff --git a/app/invoices/repository.py b/app/invoices/repository.py
+index 7720dad..46402b9 100644
+--- a/app/invoices/repository.py
++++ b/app/invoices/repository.py
+@@ -1,3 +1,6 @@
++from fastapi import HTTPException
++from pymongo.errors import DuplicateKeyError
++
+ from app.invoices.models import Invoice
+ from app.invoices.schemas import InvoiceIn
+ 
+@@ -7,4 +10,13 @@ class InvoiceRepository:
+         return await Invoice.find_one(Invoice.number == number)
+ 
+     async def create(self, data: InvoiceIn) -> Invoice:
+-        return await Invoice(**data.model_dump()).insert()
++        try:
++            return await Invoice(**data.model_dump()).insert()
++        except DuplicateKeyError:
++            raise HTTPException(409, f"invoice {data.number} already exists")
++
++    async def totals_by_customer(self) -> list[dict]:
++        return await Invoice.aggregate([
++            {"$match": {"paid": False}},
++            {"$group": {"_id": "$customer_id", "open_cents": {"$sum": "$amount_cents"}}},
++        ]).to_list()
+diff --git a/app/invoices/router.py b/app/invoices/router.py
+index da9f711..edefb3a 100644
+--- a/app/invoices/router.py
++++ b/app/invoices/router.py
+@@ -1,15 +1,30 @@
++import datetime as dt
+ from typing import Annotated
+ 
+ from fastapi import APIRouter, Depends, HTTPException
+ 
+ from app.invoices.schemas import InvoiceIn, InvoiceOut
+ from app.invoices.dependencies import get_invoice_service
++from app.invoices.models import Invoice
+ from app.invoices.service import InvoiceService
+ 
+ router = APIRouter(prefix="/invoices", tags=["invoices"])
+ ServiceDep = Annotated[InvoiceService, Depends(get_invoice_service)]
+ 
+ 
++@router.get("/overdue")
++async def overdue_invoices() -> list[InvoiceOut]:
++    today = dt.date.today()
++    rows = await Invoice.find(Invoice.paid == False, Invoice.due < today).to_list()  # noqa: E712
++    return [InvoiceOut.model_validate(r.model_dump()) for r in rows]
++
++
++@router.get("/open-totals")
++async def open_totals(service: ServiceDep) -> list[dict]:
++    rows = await service.totals_by_customer()
++    return [{"customer_id": r["_id"], "open_cents": r["open_cents"]} for r in rows]
++
++
+ @router.get("/{number}")
+ async def get_invoice(number: str, service: ServiceDep) -> InvoiceOut:
+     invoice = await service.get(number)
+diff --git a/app/invoices/service.py b/app/invoices/service.py
+index 5defac0..81e3967 100644
+--- a/app/invoices/service.py
++++ b/app/invoices/service.py
+@@ -14,3 +14,6 @@ class InvoiceService:
+ 
+     async def create(self, data: InvoiceIn) -> Invoice:
+         return await self.repo.create(data)
++
++    async def totals_by_customer(self) -> list[dict]:
++        return await self.repo.totals_by_customer()

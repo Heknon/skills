@@ -1,0 +1,15 @@
+[project]
+name = "no-precedent"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["fastapi==0.141.1", "pydantic==2.13.5"]
+
+[dependency-groups]
+dev = ["pytest==9.1.1", "httpx2"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
