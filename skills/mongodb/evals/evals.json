@@ -4,7 +4,7 @@
  "how_to_run": [
   "copy the skill folder without evals/ to <skill>",
   "copy evals/sandboxes/<sandbox> to a fresh <work>",
-  "server sandboxes (esr-order, skip-pages, case-insensitive-name, patch-wipes-address, stale-save, beanie-n-plus-one, startup-index, lookup-then-match, import-loop, sensor-array): start mongod 8.0 with --replSet rs0, run rs.initiate(), run 'uv run <skill>/recipes/seed/seed.py --uri <uri>', drop every index but _id on shop.orders and shop.customers, and set MONGODB_URI in the model's environment; tell the model it is a development server",
+  "server sandboxes (esr-order, skip-pages, case-insensitive-name, patch-wipes-address, lookup-then-match, import-loop, sensor-array, stale-save, beanie-n-plus-one, startup-index): start mongod 8.0 with --replSet rs0, run rs.initiate(), set MONGODB_URI in the model's environment, and tell the model it is a development server. For the shop-data sandboxes run 'uv run <skill>/recipes/seed/seed.py --uri <uri>' and leave only the _id index on shop.orders and shop.customers; for stale-save and beanie-n-plus-one run the sandbox's own seed.py instead",
   "start the model in <work> with: 'Load the skill at <skill>/SKILL.md and follow it. Task: <prompt>'; add the machine's operating system",
   "grade each expectation by hand, from the answer, the commands it ran and the diff"
  ],

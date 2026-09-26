@@ -1,0 +1,15 @@
+[project]
+name = "patch-to-set"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["pydantic>=2.11", "pymongo>=4.11"]
+
+[dependency-groups]
+dev = ["pytest>=8.4"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
