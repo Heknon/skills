@@ -9,7 +9,8 @@ installing other people's packages safely: `pyproject.toml` (PEP 621
 metadata, dependencies, extras, dependency groups), build backends and
 how to tell which one a project uses, src and flat layouts, package
 data, editable installs, entry points, wheels and sdists and what is in
-them, versions (static or from git tags), uv workspaces, lockfiles and
+them, versions (static or from git tags), monorepos (uv workspaces,
+independent projects side by side, path dependencies), lockfiles and
 conflicts, internal indexes, wheelhouses across the air gap, and
 publishing to an internal index.
 
@@ -47,7 +48,9 @@ that were built and installed; evals written first.
 | **Build** | build a wheel or sdist and say what is in it | file names, and the listing with what is missing or extra |
 | **Version** | bump, or derive from git tags | the version the built wheel carries, not the one intended |
 | **Dependencies** | add, pin, upgrade, or resolve a conflict | the resolver's error read, the one constraint changed, the new lock |
-| **Workspace** | set up or fix a uv workspace or monorepo | members, sources, `uv lock` and `uv sync --package` output |
+| **Monorepo** | say how a repository of many packages is organised, or choose how it should be | its kind (workspace, independent projects, path dependencies), each member with its role, and whether one lock fits |
+| **Workspace** | set up or fix a uv workspace: add, move or split a member | members, sources, bounds on siblings, `uv lock` and `uv sync --package` output |
+| **Member release** | build, version or publish one member | the member's wheel, its `Requires-Dist` on siblings, the tag, dependents checked |
 | **Index** | configure the mirror and internal indexes | the `[[tool.uv.index]]` tables, and the index each package came from |
 | **Across the gap** | bring packages in, or build a wheelhouse | the export, the download for the connected side, an offline install that passed |
 | **Publish** | prepare or publish a release to the internal index | version, files, target URL, a dry run; the upload only when asked |
@@ -69,16 +72,22 @@ that were built and installed; evals written first.
 | **Version from memory** | the tag says 1.4.0, the wheel says `0.1.dev1` because CI cloned without tags |
 | **Wrong-platform wheelhouse** | Linux wheels fetched for a Windows target, or sdists that need a compiler |
 | **Backend from memory** | a hatchling key in a setuptools project; setuptools' package data syntax invented |
+| **One lock for incompatible members** | two services that need different versions of a library forced into one workspace; the lock "fixed" by loosening the older service's bound |
+| **Unbounded sibling** | `dependencies = ["core"]` in a member; its published wheel says `Requires-Dist: core` and accepts any `core` ever released |
+| **Sibling without a source** | a member depends on a sibling with no `{ workspace = true }` entry; the model adds an index or a path instead |
+| **Whole workspace installed** | `uv sync` at the root in a Dockerfile or job that needs one member; a member's lock expected in its own folder |
+| **Library bumped alone** | `core` goes to 2.0 while `api` still says `core<2`; nobody checks the dependents |
 
 ## 5. Layout
 
 ```
 skills/packaging/
-  SKILL.md        router over the twelve kinds, invariants, answer shape
+  SKILL.md        router over the fourteen kinds, invariants, answer shape
   glossary.md     wheel, sdist, backend, frontend, editable, extra, group
   core/           one procedure per kind (orient, metadata, layout,
                   entry-points, build-and-inspect, versioning,
-                  dependencies, workspaces, indexes, across-the-gap,
+                  dependencies, monorepo (kinds, when one lock fits),
+                  workspaces, member-release, indexes, across-the-gap,
                   publish, debug) and verify.md: the wheel in a clean
                   venv, offline, imported and its scripts run
   backends/       hatchling, setuptools, uv-build; others.md recognises
@@ -86,12 +95,62 @@ skills/packaging/
   uv/             commands, config (variables, credentials, CA),
                   lockfile (reading uv.lock), versions
   recipes/        built, installed and run: src-hatchling,
-                  flat-setuptools, uv-build, workspace, internal-index,
+                  flat-setuptools, uv-build, workspace (libraries and
+                  services, bounded siblings), independent-projects,
+                  internal-index,
                   wheelhouse; tools/inspect_dist.py lists a wheel's or
                   sdist's files, METADATA and entry points (stdlib only)
   examples/       a data file lost in the wheel; a conflict; a release
   evals/          evals.json and sandboxes
 ```
+
+## 5a. Monorepos
+
+A monorepo is one repository holding many Python packages. The skill
+recognises which kind it is before changing anything:
+
+| Kind | Sign | One lock? |
+| --- | --- | --- |
+| uv workspace | `[tool.uv.workspace] members` in the root `pyproject.toml`; one `uv.lock` at the root | yes, for every member |
+| independent projects | a `pyproject.toml` and a `uv.lock` per folder, no workspace table | no; each resolves alone |
+| path dependencies | `{ path = "../core", editable = true }` in `[tool.uv.sources]`, no workspace | one per project |
+| other tools | `pants.toml`, `BUILD` files, Poetry or Hatch workspaces | recognised, never migrated unasked |
+
+Checked while planning on uv 0.8.17 (to recheck on the pinned 0.12.19):
+
+- **One lock means one version of everything.** Members that need
+  incompatible versions of a library make the workspace unsatisfiable
+  ("your workspace's requirements are unsatisfiable"). The lock's
+  `requires-python` is the strictest member's: one member needing 3.12
+  raises the floor for all. A workspace fits members that are
+  developed and upgraded together; services that must move at their own
+  pace are independent projects.
+- **A sibling needs a source.** Without `core = { workspace = true }`,
+  `uv lock` stops with "`core` is included as a workspace member, but is
+  missing an entry in `tool.uv.sources`".
+- **The declared requirement is what a wheel publishes.** A member that
+  lists a sibling as bare `core` builds a wheel with
+  `Requires-Dist: core`, which accepts any release; listing
+  `core>=1.2,<2` gives `Requires-Dist: core<2,>=1.2`. In development the
+  workspace source still wins; only the published metadata changes.
+- **Commands.** `uv lock` from any member's folder writes the root lock
+  (no lock appears in the member). `uv sync --package api` installs
+  `api` and the siblings it needs, nothing else. `uv build --package api`
+  builds that member's wheel and sdist. `uv lock --locked` fails when the
+  lock is stale.
+
+**Layout, with no precedent.** A root `pyproject.toml` holding the
+workspace table and the shared development tools as a dependency group;
+libraries under `packages/`, deployable services under `services/`, each
+a src-layout project with its own version. Shared namespaces (`acme.core`,
+`acme.api`) are implicit namespace packages with no `__init__.py` in
+`acme/`; how each backend is told so is to verify in the lab.
+
+**Versions and releases.** Each member has its own version, bumped when
+it changes; a library's major bump means reading every dependent's bound
+first (`grep` for the library in each member's `pyproject.toml`). Tags
+name the member (`core-v1.2.0`); git owns the tag, deployment the CI
+that builds only what changed.
 
 ## 6. Dependencies and boundaries
 
@@ -174,6 +233,11 @@ reproduced in the lab first, and each intended fix passes section 7.
 | `shallow-tag` | "the wheel says `0.1.dev1`, the tag is 1.4.0" | hatch-vcs in a clone without tags |
 | `linux-wheelhouse` | "the offline install on Windows fails" | a wheelhouse downloaded for Linux |
 | `workspace-sibling` | "member `api` cannot find `core`" | a sibling listed with no workspace source |
+| `workspace-conflict` | "`uv lock` fails since `billing` needs `pandas<2`" | one lock over services that must differ; loosening `billing` looks like the fix |
+| `unbounded-sibling` | "publish `api` 0.4.0" | `api` lists bare `core`; its wheel would accept any `core` |
+| `one-member` | "install only the worker for its image" | `uv sync` at the root installs every member |
+| `library-major` | "release `core` 2.0" | two members still say `core<2`; nobody reads them |
+
 ## 9. Decisions needed
 
 ### PK1. Backend and layout for a new project
@@ -223,3 +287,11 @@ compiler (C sources, `ext_modules`, a Rust backend) and says so.
 
 *Recommended:* use one for PowerShell, script shims and credential
 storage; otherwise those lines are marked *not run on Windows*.
+
+### PK9. Monorepo default
+
+*Recommended:* one uv workspace for members developed and upgraded
+together; independent projects for services that need different versions
+of a shared library or of Python; every sibling requirement bounded. How
+many of the team's repositories are monorepos, and do members release
+on their own?
