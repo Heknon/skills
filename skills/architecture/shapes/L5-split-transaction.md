@@ -149,4 +149,6 @@ def test_failed_credit_keeps_the_money(tmp_path):
 ```
 
 Checked with `uv run python check_shapes.py L5`; the after-only test
-fails on the before (`[70, 0]`). Steps: refactoring's recipe `L5`.
+fails on the before (`[70, 0]`).
+
+Steps from before to after: `skills/refactoring/recipes/L5-split-transaction.md`.

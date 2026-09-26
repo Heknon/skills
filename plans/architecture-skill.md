@@ -547,4 +547,11 @@ skill:
   ">=3.12"`; both recipes passed there too.
 - **The checklist grew no IDs**: L1 to L11 held for every bait; L10 and
   L11 are found partly by the placement searches and by reading.
+- **An after must pass the linting checks too.** Refactoring's replay
+  found the L3 and L6 afters added mypy findings (`union-attr` on the
+  missing user, `arg-type` on `dict[str, object]` rows), and L3's after
+  dropped `get_session`, so a test's override of it was silently unused.
+  L3 now chains `get_users` on `get_session` and raises on a missing user
+  (still a 500, said beside the shape); L6 types its raw rows with
+  `TypedDict`s; `check_shapes: 22 of 22 sides passed`.
 

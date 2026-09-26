@@ -141,5 +141,6 @@ def test_status_and_404():
 ```
 
 Checked with `uv run python check_shapes.py L10`. The search that
-finds this: `checklist/finding.md`, L10. Steps: refactoring's recipe
-`L10`.
+finds this: `checklist/finding.md`, L10.
+
+Steps from before to after: `skills/refactoring/recipes/L10-placed-against-precedent.md`.

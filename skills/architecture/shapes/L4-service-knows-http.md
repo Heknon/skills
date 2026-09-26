@@ -123,5 +123,6 @@ def test_worker_can_catch_the_domain_error():
     assert info.value.available == 0
 ```
 
-Checked with `uv run python check_shapes.py L4`. Steps: refactoring's
-recipe `L4`.
+Checked with `uv run python check_shapes.py L4`.
+
+Steps from before to after: `skills/refactoring/recipes/L4-service-knows-http.md`.

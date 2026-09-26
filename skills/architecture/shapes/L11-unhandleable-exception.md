@@ -106,5 +106,6 @@ def test_round_trip():
     assert (type(e), e.order_id, str(e)) == (OrderNotFoundError, 7, "order 7 not found")
 ```
 
-Checked with `uv run python check_shapes.py L11`. Steps: refactoring's
-recipe `L11`.
+Checked with `uv run python check_shapes.py L11`.
+
+Steps from before to after: `skills/refactoring/recipes/L11-unhandleable-exception.md`.

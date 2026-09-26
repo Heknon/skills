@@ -97,5 +97,6 @@ def test_gold_threshold():
     assert quote_total("ada", 10_000) == 9_000
 ```
 
-Checked with `uv run python check_shapes.py L2`. Steps: refactoring's
-recipe `L2`.
+Checked with `uv run python check_shapes.py L2`.
+
+Steps from before to after: `skills/refactoring/recipes/L2-logic-in-router.md`.

@@ -82,9 +82,13 @@ what none of them sees (strings, docs, other repositories).
 - **A new type finding about old behaviour.** Typing a value the old
   code left untyped can show a bug it always had: in recipe L3, mypy
   reported `union-attr` for a missing user that was a 500 before and
-  after the step. Show with the probe that behaviour is the same, report
-  the finding under *Findings*, and never silence it; the fix is its own
-  commit.
+  after the step. Keep the behaviour and make it explicit where the
+  checker points (L3: `if user is None: raise LookupError(...)`, still a
+  500), so the step ends clean. Show with the probe that behaviour is the
+  same, report the bug under *Findings*, and never silence the checker
+  (`# type: ignore`, `cast`); the fix is its own commit. A finding that
+  is only an untyped value, not a bug, goes by typing the value (L6: a
+  `TypedDict` for the raw rows).
 - **Formatting is not a check of the step.** Run `ruff format --check`
   only if CI does, and only on the files the step touched.
 

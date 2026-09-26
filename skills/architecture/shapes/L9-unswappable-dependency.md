@@ -115,5 +115,6 @@ def test_convert_with_a_fake():
         app.dependency_overrides.clear()
 ```
 
-Checked with `uv run python check_shapes.py L9`. Steps: refactoring's
-recipe `L9`.
+Checked with `uv run python check_shapes.py L9`.
+
+Steps from before to after: `skills/refactoring/recipes/L9-unswappable-dependency.md`.

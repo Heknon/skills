@@ -30,7 +30,7 @@ table were rerun on it, with every recipe.
 | `src` layout, and a package under `packages/<name>/src/` | pass, and a changed default is reported with absolute or relative re-exports |
 | a function moved into a module that existed before, with its `except` that does not re-raise | pass: the handler keeps its old count (the `move-util` move) |
 | a re-export from a module of the project that does not exist (`from pkg.cores import parse`) | fail: every name `removed or renamed`. Real: the import breaks |
-| a provider or a method removed (recipes L3 `get_session`, L7 `Member.to_out`) | fail: `removed or renamed`. Real; name the removal and the search that found no caller |
+| a method removed (recipe L7 `Member.to_out`) | fail: `removed or renamed`. Real; name the removal and the search that found no caller |
 | a public module constant or variable removed (recipe L2 `TIERS`, L9 `rates`) | fail: `app/main.py: TIERS was removed or renamed`. Real: an importer of `app.main.TIERS` breaks; re-export it, or name the removal and the search that found no importer. A private one (`_cache`) is not compared |
 | a star shim whose target leaves the name out of `__all__` | fail: `save was removed or renamed`. Real: `from pkg.util import save` raises `ImportError: cannot import name 'save'`. List the names in the shim, or add the name to the target's `__all__` |
 

@@ -89,13 +89,13 @@ module per step (`steps/move-module.md`).
 | Never build a repository or service at import | L1: a test that set `app.state.rows` got the rows from import time |
 | A global that tests patch is a reference: move the patch in the step that moves the global | L2, L9: `AttributeError: ... has no attribute 'TIERS'` |
 | A step that changes behaviour is its own commit, with a test that failed first | L5 |
-| A new type-checker finding about behaviour the code already had is a finding: report it, never silence it | L3: `union-attr` on the missing user, a 500 before and after |
+| A new type-checker finding about behaviour the code already had is a finding: keep the behaviour, make it explicit, report it, never silence it | L3: `union-attr` on the missing user, a 500 before and after; an explicit `raise` keeps the 500 and clears it |
 
 ## What the checks say on a reshape
 
 - **Tests and probe**: identical after every step of every recipe,
   except L5's last step, which is a behaviour change on purpose.
-- **OpenAPI**: identical in every recipe except L6 step 3, where the
+- **OpenAPI**: identical in every recipe except L6 step 4, where the
   response gains a named schema.
 - **Public names**: a route's line changes whenever its parameters do
   (`app.main.get_user`); names only imported (`HTTPException`,
@@ -104,8 +104,7 @@ module per step (`steps/move-module.md`).
   (`reference/change-check.md`): it reports a route's changed or added
   parameter as a broken signature (L1, L3, L9), and a narrowed `except`
   as a new swallowed error (L11); neither is. It reports the removal of
-  a provider or a method (L3, L7), which is real and named in the
-  answer. It does not see a public module constant or variable removed
+  a method (L7), which is real and named in the answer. It does not see a public module constant or variable removed
   (L2 `TIERS`, L9 `rates`); `tools/public_names.py` does.
 
 ## How they were run
