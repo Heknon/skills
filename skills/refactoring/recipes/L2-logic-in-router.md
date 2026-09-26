@@ -147,7 +147,7 @@ passed, while a non-HTTP caller got `fastapi.exceptions.HTTPException:
 | Trap | What happened |
 | --- | --- |
 | a test patched the moved global: `monkeypatch.setattr(main, "TIERS", {...})` | after step 2: `AttributeError: ... has no attribute 'TIERS'`. With the re-export kept, it passed silently wrong: `{'total_cents': 10000}` instead of 9000, because the rule reads `app.pricing.TIERS`. Move the patch target to `app.pricing` in step 2. `monkeypatch.setitem(main.TIERS, ...)` kept working through the re-export: it changes the shared dict |
-| seniority's change check | `OK` at every step: it does not report `TIERS` gone from `app.main`, a public module constant; the public-names comparison does |
+| seniority's change check | from step 2: `app/main.py: TIERS was removed or renamed`. Real for anything that imports `app.main.TIERS`; the step's search found no importer, so the answer names the removal and that search. Where something imports it, keep the re-export line of step 2 and the check passes |
 
 ## What the checks said (lab)
 
@@ -158,9 +158,9 @@ L2   1. Extract the gold discount into quote_total
       names none lost | openapi same | change check OK
 L2   2. Move quote_total and TIERS to app.pricing
       tests 3 passed | ruff same | mypy same | import-all 3 ok, 0 failed, 0 skipped
-      names lost or changed app.main.TIERS | openapi same | change check OK
+      names lost or changed app.main.TIERS | openapi same | change check FAIL public-signature; app/main.py: TIERS was removed or renamed
 L2   3. Test quote_total without HTTP
       tests 4 passed | ruff same | mypy same | import-all 3 ok, 0 failed, 0 skipped
-      names lost or changed app.main.TIERS | openapi same | change check OK
+      names lost or changed app.main.TIERS | openapi same | change check FAIL public-signature; app/main.py: TIERS was removed or renamed
 L2   end    identical to the shape's after (4 files)
 ```

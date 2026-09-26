@@ -123,7 +123,7 @@ Commit: `Test convert with a fake behind get_rates`
 | Trap | What happened |
 | --- | --- |
 | a test with `monkeypatch.setattr(main, "rates", FixedRates())` | passed at the start and after steps 1 and 2; after step 3: `AttributeError: <module 'app.main' ...> has no attribute 'rates'`. Its patch is a reference of step 3 |
-| seniority's change check | from step 2: `convert gained required parameter 'rates'; existing callers break`. FastAPI fills it; no caller passes it. It does not report the module variable `rates` removed in step 3; `tools/public_names.py` does |
+| seniority's change check | from step 2: `convert gained required parameter 'rates'; existing callers break`. FastAPI fills it; no caller passes it. From step 3 also `rates was removed or renamed`: real for a test that patches `app.main.rates`, which step 3's search moved to `app.dependency_overrides[get_rates]`. The answer names both findings and why each is safe |
 
 ## What the checks said (lab)
 
@@ -137,9 +137,9 @@ L9   2. Take the rates through Depends(get_rates) in convert
       names lost or changed app.main.convert | openapi same | change check FAIL public-signature; app/main.py: convert gained required parameter 'rates'; existing callers break
 L9   3. Build RateRepository per request in get_rates
       tests 1 passed | ruff same | mypy same | import-all 2 ok, 0 failed, 0 skipped
-      names lost or changed app.main.convert, app.main.rates | openapi same | change check FAIL public-signature; app/main.py: convert gained required parameter 'rates'; existing callers break
+      names lost or changed app.main.convert, app.main.rates | openapi same | change check FAIL public-signature; app/main.py: rates was removed or renamed; app/main.py: convert gained required parameter 'rates'; existing callers break
 L9   4. Test convert with a fake behind get_rates
       tests 2 passed | ruff same | mypy same | import-all 2 ok, 0 failed, 0 skipped
-      names lost or changed app.main.convert, app.main.rates | openapi same | change check FAIL public-signature; app/main.py: convert gained required parameter 'rates'; existing callers break
+      names lost or changed app.main.convert, app.main.rates | openapi same | change check FAIL public-signature; app/main.py: rates was removed or renamed; app/main.py: convert gained required parameter 'rates'; existing callers break
 L9   end    identical to the shape's after (3 files)
 ```

@@ -185,9 +185,12 @@ def change_check(harness: Path | None, start: Path, root: Path) -> str:
     if harness is None:
         return ""
     proc = run(
-        [sys.executable, str(harness), "--before", str(start), "--after", str(root)],
+        [sys.executable, str(harness.resolve()), "--before", str(start), "--after", str(root)],
         root,
     )
+    if proc.returncode not in (0, 1):  # an argument error or a crash, not a finding
+        tail = (proc.stderr or proc.stdout).strip().splitlines()[-1:] or ["no output"]
+        return f"ERROR exit {proc.returncode}: {tail[0]}"
     fails = re.findall(r"^FAIL (\S+)", proc.stdout, re.MULTILINE)
     examples = [
         line.strip()[2:]
