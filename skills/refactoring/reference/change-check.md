@@ -15,8 +15,8 @@ cases, a matrix of shim shapes, and every step of the eleven recipes.
 A third widening (its fixture is
 `harness/seniority-checks/fixtures/move3/`) treats a public
 module-level value as part of the API and lets a star shim re-export
-only what the target's `__all__` lists; both rows below were rerun on
-it.
+only what the target's `__all__` lists; the last two rows of the next
+table were rerun on it, with every recipe.
 
 ## What it reads correctly
 
@@ -25,13 +25,13 @@ it.
 | function or class moved, old module re-exports it (`from pkg.core import parse`, with or without `as parse`, absolute or relative) | pass; a changed default in the new place is still reported: `parse default of 'strict' changed` |
 | rename kept as an alias, `get_user = fetch_user` | pass; a changed default behind the alias is reported |
 | method alias in a class, `open = unlock` | pass |
-| attribute shim `parse = core.parse`, star shim `from pkg.core import *` | pass |
+| attribute shim `parse = core.parse`, star shim `from pkg.core import *` (the name in the target's `__all__`, or no `__all__`) | pass |
 | module split into a package (`util.py` to `util/__init__.py` re-exporting from submodules) | pass: `app/reports.py became the package app/reports/__init__.py` |
 | `src` layout, and a package under `packages/<name>/src/` | pass, and a changed default is reported with absolute or relative re-exports |
 | a function moved into a module that existed before, with its `except` that does not re-raise | pass: the handler keeps its old count (the `move-util` move) |
 | a re-export from a module of the project that does not exist (`from pkg.cores import parse`) | fail: every name `removed or renamed`. Real: the import breaks |
 | a provider or a method removed (recipes L3 `get_session`, L7 `Member.to_out`) | fail: `removed or renamed`. Real; name the removal and the search that found no caller |
-| a public module constant or variable removed (recipe L2 `TIERS`, L9 `rates`) | fail: `TIERS was removed or renamed`. Real: `from shop import TIERS` breaks. A private one (`_cache`) is not compared |
+| a public module constant or variable removed (recipe L2 `TIERS`, L9 `rates`) | fail: `app/main.py: TIERS was removed or renamed`. Real: an importer of `app.main.TIERS` breaks; re-export it, or name the removal and the search that found no importer. A private one (`_cache`) is not compared |
 | a star shim whose target leaves the name out of `__all__` | fail: `save was removed or renamed`. Real: `from pkg.util import save` raises `ImportError: cannot import name 'save'`. List the names in the shim, or add the name to the target's `__all__` |
 
 ## What it reports although the refactoring is correct
