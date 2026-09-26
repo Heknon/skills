@@ -433,6 +433,10 @@ Part 2, the recipes:
   `core/checks.md` now says to show the behaviour unchanged with the
   probe, report the finding, and never silence it; the recipes declare
   both findings and `run_recipes.py` checks that nothing else is new.
+- **The shapes were then fixed to end clean.** Architecture's L3 after
+  keeps `get_session` and narrows the missing user with a `raise` that
+  keeps the 500; L6's types the raw data first (a new step 1). No recipe
+  declares a new finding any more; `run_recipes: all green`.
 - **The HTTP contract held where it was expected to move.** The OpenAPI
   document stayed identical when `response_model=` became a return
   annotation, when a route gained or changed a dependency parameter,
@@ -446,15 +450,9 @@ Part 2, the recipes:
 
 ### For other skills and the roadmap
 
-- **architecture**: the L3 and L6 afters add mypy findings
-  (`union-attr` on `User | None`; `arg-type` on `dict[str, object]`
-  rows); a later version could type the stand-in rows and name the
-  missing-user case beside the shape. L3's after replaces `get_session`
-  with a provider that opens its own session, while its
-  `core/wiring.md` chains providers; chaining `get_users` on
-  `get_session` in the shape would keep a test's override working. Each
-  shape's last line could name the recipe's path,
-  `skills/refactoring/recipes/L<n>-*.md`.
+- **architecture**: done. The L3 and L6 afters are mypy-clean, L3
+  chains `get_users` on `get_session`, and each shape's last line names
+  its recipe's path.
 - **seniority** (harness): the remaining RF4 gaps above: route
   parameters, a narrowed `except`, assert lines that only renamed the
   call, removed public module constants and variables, star shims past

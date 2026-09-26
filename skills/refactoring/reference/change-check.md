@@ -25,7 +25,7 @@ cases, a matrix of shim shapes, and every step of the eleven recipes.
 | `src` layout, and a package under `packages/<name>/src/` | pass, and a changed default is reported with absolute or relative re-exports |
 | a function moved into a module that existed before, with its `except` that does not re-raise | pass: the handler keeps its old count (the `move-util` move) |
 | a re-export from a module of the project that does not exist (`from pkg.cores import parse`) | fail: every name `removed or renamed`. Real: the import breaks |
-| a provider or a method removed (recipes L3 `get_session`, L7 `Member.to_out`) | fail: `removed or renamed`. Real; name the removal and the search that found no caller |
+| a method removed (recipe L7 `Member.to_out`) | fail: `removed or renamed`. Real; name the removal and the search that found no caller |
 
 ## What it reports although the refactoring is correct
 
