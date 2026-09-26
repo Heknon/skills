@@ -1,6 +1,13 @@
 # Plan: the refactoring skill
 
-Status: draft for decision. Nothing is built yet.
+Status: part 1 built (core, steps, legacy); recipes wait for architecture.
+Built on branch `claude/skill-refactoring` as `skills/refactoring/`:
+`SKILL.md`, `glossary.md`, `core/` (9), `steps/` (12), `legacy/` (4),
+`tools/` (two scripts and their pages), `reference/` (2), `examples/`
+(4), and `evals/` with 11 scenarios. The Reshape row of the router says
+the recipes arrive with the architecture skill; `recipes/` and the
+`service-from-router` eval are part 2. Sections 10 to 12 record what was
+decided, verified and changed.
 
 ## 1. What it is
 
@@ -222,3 +229,136 @@ catalogue step. Squashing is the person's choice; never push.
 `test_characterize_*`; a pinned oddity carries a comment naming the
 finding, so a later fix changes that test on purpose. Python only, as
 the built navigation skill is; TypeScript later, if asked.
+
+## 10. Decisions taken as defaults
+
+- **RF1. Two parts.** Part 1 (core, steps, legacy, tools, reference,
+  examples, evals) is built; `recipes/` and the `service-from-router`
+  eval wait for the architecture skill. SKILL.md's Reshape row says so
+  and, until then, sends a reshape through Plan and Step.
+- **RF2. Shims.** Every caller changed only when all are in the
+  repository and nothing outside names the old path; otherwise, or when
+  unsure, a shim (`core/public-surface.md`), written as an explicit
+  re-export (`from new import name as name`) because the lab showed
+  ruff `--fix` deletes a plain one. No `DeprecationWarning` unless asked.
+- **RF3. Search and edit only.** No rope or libcst (not assumed on the
+  mirror). `ruff check --fix` only for imports, never on a module whose
+  unused import is a shim. Two standard-library scripts replace what an
+  IDE would check: `tools/import_all.py` and `tools/public_names.py`.
+- **RF4. The harness.** Not changed in this build: roadmap R7 had
+  already changed `check_change.py`. The lab confirmed what the change
+  covers and recorded what it still misreads
+  (`reference/change-check.md`, section 12); the gaps are reported to
+  seniority's owner, not fixed here.
+- **RF5. Commits.** One local commit per green step, named after the
+  step; a red step is undone with a whole-tree stash; never a push.
+- **RF6. Characterization tests** live with the other tests, named
+  `test_characterize_*`, with a comment on each pinned oddity. Python
+  only.
+
+## 11. How it was verified
+
+Python 3.12.14, pytest 9.1.1, ruff 0.16.9, mypy 2.3.1, pyright 1.1.414
+(`pyright[nodejs]`), pydantic 2.13.5, PyYAML 6.0.3, git 2.43.0 and uv
+0.8.17 (0.12.19, pinned for packaging, was not installed in this lab;
+nothing here depends on the difference). PowerShell forms were run in
+PowerShell 7.5.3 on Linux; nothing was run on Windows, and Windows-only
+facts are marked `not run on Windows` or taken from CPython's source.
+
+- Every eval's bait was reproduced and its intended fix run on a fresh
+  copy of its sandbox: the naive rename (tests failed only on the patch
+  string, ruff found only `__all__`, the `getattr` and YAML misses were
+  silent), the move without a shim (only import-all found the script and
+  the entry point), the split (the `CENT` loss, the patch-target red
+  step, the circular import), the extraction with the off-by-one, the
+  untested report, the handlers kept alive by a registry and a YAML
+  route, the response field (JSON kept only by `alias` with
+  `serialize_by_alias`), the red extract-class step, the mixed diff
+  (5.0 against 4.99), and the tidy (probe identical, yet a dict lookup
+  raised for an unhashable code).
+- The steps were run on those sandboxes and on small scratch modules:
+  rename (with and without an alias), move function, move module (with a
+  `__main__` shim and `git log --follow`), split module (six commits,
+  checked with `git rebase --exec`), extract function, variable and
+  class, inline, introduce parameter object, change signature, replace
+  conditional and magic value. Each trap in the `steps/` files is a
+  recorded result.
+- Which check sees which miss (`core/checks.md`) was measured on one
+  package with every kind of broken reference, under ruff, mypy (with
+  and without `--check-untyped-defs`) and pyright.
+- `tools/import_all.py` ran on flat and `src` layouts, installed and not,
+  with config files, scripts with and without a guard, and a `__main__`
+  module; `tools/public_names.py` on every split step. Both pass ruff and
+  `mypy --strict`.
+- Seniority's `check_change.py` (RF4) ran on the lab's rename, move and
+  split, and on a matrix of shim shapes and layouts.
+- The four examples were replayed from fresh sandboxes, commands in
+  PowerShell, and their output copied.
+
+## 12. What the lab changed
+
+Findings that corrected the plan or a common belief, each now in the
+skill:
+
+- **The harness after R7** (RF4). It passes a move re-exported with
+  `from x import name` (absolute at the root or in `src/`, or relative),
+  a class moved and re-exported, and a module split into a package; it
+  still reports a changed default in the new place. It still reports as
+  removed: a rename kept as an alias (`old = new`), a method alias in a
+  class, a star re-export, an attribute shim (`f = mod.f`) and a module
+  `__getattr__`. It reports a moved function's `except` without re-raise
+  as a new swallowed error when the destination module existed before,
+  and an assert line that only renamed the call as a changed
+  expectation. It passes, wrongly, a re-export from a module that does
+  not exist (treated as outside the working directory) and an absolute
+  re-export in a package below `packages/<name>/src/`, even with a
+  changed default. Reported for seniority's owner; the skill's
+  `reference/change-check.md` says what to write in the answer.
+- The plan expected ruff F821, F822 and F401 and pyright's unresolved
+  import to catch broken renames and moves. They do, for their rows only:
+  mypy says nothing about a stale `__all__`, and mypy without
+  `check_untyped_defs` skips the bodies of unannotated functions, where
+  pyright reports the same call. No checker sees `getattr` strings,
+  dotted paths in config, entry points, patch targets or a circular
+  import; import-all and the probe had to be added to every step.
+- `__all__` is not the public surface: a public constant outside it was
+  dropped by a split while every check was green.
+- A shim written as a plain import is `F401 [*]` in a module (a safe fix
+  that deletes it) but `F401` with no fix in an `__init__.py`.
+- An alias keeps imports and calls working, not patches: a test that
+  patched the old name no longer reached the code, and a subclass
+  overriding the old method name was no longer called.
+- Undoing a step with `git stash push -- <paths>` after a `git mv` saved
+  a stash and then failed (`fatal: pathspec ... did not match any
+  files`), leaving the change in both places. The skill stashes the
+  whole tree and keeps the probe in an excluded `.ledger/`.
+- A break-and-restore within one second, with the same file size, kept
+  running the stale `.pyc` of the break; `PYTHONDONTWRITEBYTECODE=1` with
+  no `__pycache__` made the loop reliable.
+- A probe run as `python .ledger/probe.py` cannot import a flat project
+  that is not installed; two lines at its top (`sys.path[:0] = ["",
+  "src"]`) fix both layouts.
+- An edited entry point is not seen by `uv run --no-sync` until the
+  project is reinstalled (`uv sync`).
+- A golden master over 53 dates caught a break (a threshold of 61 days
+  instead of 60) that three characterization tests passed.
+- Fixing the off-by-one in the extraction sandbox made ten items cost
+  more (52.40 against 50.00), because shipping then applied: a reason,
+  beyond reviewability, to keep a fix out of the refactoring and ask.
+
+### For other skills and the roadmap
+
+- **seniority** (harness): the RF4 gaps above. Also, read in the source
+  and not run: `check_finish.py`'s `run_probe` runs the probe with the
+  harness's own Python and `PYTHONPATH` set to the tree, so a probe of a
+  `src` layout, or of code that needs the project's installed packages,
+  may fail there although it runs under `uv run`.
+- **navigation**: `core/search-patterns.md` could add the module form
+  `from app import users` to its import pattern, which
+  `^\s*(from|import)\s+[\w.]*\bbilling\b` does not match.
+- **pytest**: `core/write-test.md` step 5 (make it fail) could mention the
+  stale-bytecode trap for quick break-and-restore loops.
+- **roadmap**: section 3's row for refactoring already lists navigation
+  and seniority's harness; the boundary rows proposed in section 6 are
+  in section 5. Nothing further.
+
