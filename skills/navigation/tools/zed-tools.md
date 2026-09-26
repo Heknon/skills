@@ -17,6 +17,9 @@ agent with these tools.
 If Sourcegraph's tools are connected, they are listed among your tools
 too: `tools/sourcegraph.md`.
 
+Which checker a `diagnostics` finding comes from, and whether CI agrees,
+is the linting skill's `core/zed.md`.
+
 ## PowerShell, when you need the terminal for searching
 
 The built-in `grep` is better. When you must search from the terminal:

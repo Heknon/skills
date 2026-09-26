@@ -28,9 +28,9 @@ only read; none changes the repository.
 - A shallow clone (`git rev-parse --is-shallow-repository` prints `true`)
   may not have the commit you need. Say so, and use Sourcegraph's
   `commit_search` or `diff_search` if it is available.
-- Output longer than a screen may open a pager in some terminals. Add
-  `--no-pager` right after `git` if the command seems to hang:
-  `git --no-pager log ...`.
+- A pager makes a command wait on a terminal. Set `GIT_PAGER=cat`
+  before any git command; what else to set is in the git skill's
+  `reference/non-interactive.md`.
 
 ## Why a change was made
 

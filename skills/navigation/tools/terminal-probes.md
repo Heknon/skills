@@ -11,6 +11,12 @@ inside double quotes and use only single quotes within it. Run from the
 project folder the program is normally run from, because the current
 folder is on the search path.
 
+To try another Python version, use `uv run --isolated --python 3.13`: it
+uses a temporary environment. Without `--isolated`, uv rebuilt `.venv`
+for 3.13 and later plain `uv run` kept using it (lab, uv 0.12.19; the
+debugging skill's `core/differ.md`). If a 3.13 or later traceback shows
+codes such as `[31m`, set `PYTHON_COLORS=0` for the command.
+
 **Importing runs a module's top-level code.** Most modules only define
 things, but some connect to databases, read files or start work when
 imported. Prefer the probes marked *no import* when you do not know the
@@ -65,6 +71,8 @@ uv run --no-sync python -c "import importlib.metadata as md; print([e for e in m
 ```
 
 The last one shows which function a command such as `mytool` runs.
+What an installed third-party package accepts or does is a lookup for
+the offline-docs skill (`skills/offline-docs/SKILL.md`), not a probe.
 
 ## Never
 

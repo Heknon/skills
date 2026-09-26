@@ -68,6 +68,9 @@ Copy the whole line into the answer.
 To see which environment Pyright used, add `--verbose`: it prints
 `Search paths:`. ty prints its Python version with `-v`.
 
+These flags answer one probe. Settings that fix missing imports for good
+are the linting skill's (`mypy/stubs.md`, `pyright/config.md`).
+
 ## Unannotated functions
 
 For the return type of a function with no annotations, use Pyright: it
