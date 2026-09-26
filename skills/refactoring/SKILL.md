@@ -55,7 +55,7 @@ After every step, `core/checks.md`. A bug found on the way:
 | `recipes/` | one per layering violation L1 to L11 of the architecture skill: the steps from its shape's before to its after, each diff, commit and check, and the traps seen; `run_recipes.py` replays them |
 | `tools/` | `import_all.py` (imports every module, resolves dotted paths in config, imports scripts) and `public_names.py` (public names and signatures, to compare before and after), with a page each |
 | `reference/` | `change-check.md` (what seniority's harness reports on a correct refactoring, and what it misses), `windows.md` |
-| `examples/` | a rename proven complete (`rename-everywhere.md`), a move with a shim (`move-with-shim.md`), a red step undone (`red-step-undone.md`), a function pinned before restructuring (`pinned-function.md`) |
+| `examples/` | a rename proven complete (`rename-everywhere.md`), a move with a shim (`move-with-shim.md`), a red step undone (`red-step-undone.md`), a function pinned before restructuring (`pinned-function.md`), logic moved out of a route into a service (`service-from-router.md`) |
 
 `glossary.md` fixes the words. The tools run with `uv run --no-sync
 python <skill>/tools/<name>.py` from the project's root folder.
