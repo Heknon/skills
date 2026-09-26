@@ -42,9 +42,17 @@ for a moment when it arrives, and no others.
 | **Start** | a task arrives | `core/scope.md`, `core/assumptions.md`, `core/first-step.md` |
 | **Choose** | you must pick a tool, a skill, or between two ways forward | `core/choosing-a-tool.md`, `core/trade-offs.md` |
 | **Challenge** | before acting on a plan, before anything irreversible, before accepting an idea or reporting a conclusion | `core/challenge.md`, and `core/pushback.md` if the idea is the person's and the evidence disagrees |
-| **Investigate** | something is wrong and you do not know why | `core/reading-errors.md`, `core/hypothesis-loop.md` |
+| **Investigate** | something is wrong and you do not know why | `core/reading-errors.md`, `core/hypothesis-loop.md`, and the skill whose description names the error |
 | **Stuck** | a loop rule fired | `core/loop-breaker.md` |
 | **Finish** | you are about to say you are done, or you must stop | `core/done.md`, and `core/asking.md` if a person must decide |
+
+**Find the skill for the task, at Start and again at Investigate.** List
+the skills this environment offers and read their descriptions. Load the
+one whose description names a noun of the task: an error's type or
+message, a library, a tool, a file type, the kind of work. Follow its
+router to the file for your task; its facts outrank your memory. If none
+names it, go on with this skill alone. `core/choosing-a-tool.md` says how
+to match.
 
 `core/evidence-levels.md` applies everywhere: read it once at Start.
 `examples/` holds three finished tasks: a failing job (`failing-job.md`), a

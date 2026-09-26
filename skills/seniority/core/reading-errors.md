@@ -18,14 +18,23 @@ what is wrong; the mistake is reading the wrong one, or reading it loosely.
    first one is the one to read.
 2. **What is the exact message?** Copy it into your notes, character for
    character. Do not paraphrase it.
-3. **Where was it raised?** In a traceback, find the deepest frame that is
+3. **Does a skill explain this error?** Read the descriptions of the
+   skills this environment offers. If one names the error's type, its
+   message, the language, the library or the tool that raised it, load it
+   now and follow its router to the file that reads errors (a traceback, an
+   exception's meaning, a failing test, a failed job). Its tables of what
+   an error means, and what to print for it, come before the categories
+   below and before your memory. `core/choosing-a-tool.md` says how to
+   match.
+4. **Where was it raised?** In a traceback, find the deepest frame that is
    in this project's code, not in a library. That line is where your code
    met the problem. The library frames below it say how.
-4. **Which category is it?** Use the table.
-5. **What changed since it last worked?** A dependency, a config, the
+5. **Which category is it?** Use the table, when no skill had a closer
+   answer.
+6. **What changed since it last worked?** A dependency, a config, the
    environment, the input, the code. If nothing you know of changed, the
    input or the environment did.
-6. **Is it about the input or about the code?** A validation error names
+7. **Is it about the input or about the code?** A validation error names
    the input. A type error or a missing attribute names the code.
 
 ## Categories and the first check
