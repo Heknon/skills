@@ -1,7 +1,7 @@
 # Scope
 
-**Verdict you produce:** the four header lines of your notes: `goal`,
-`done when`, `budget` and `scope out`.
+**Verdict you produce:** the header lines of your notes: `goal`,
+`kind`, `done when`, `budget`, `scope out` and `skill`.
 
 Most wasted work is work on the wrong thing: a fix when an answer was
 asked, a rewrite when a line was asked, a polished result for a question
@@ -68,6 +68,14 @@ Stuck and at Finish.
    even if the person asked for it. `done when` for such an ask is the challenge shown
    to the person and their answer recorded; the risky action itself joins
    `done when` only after they answer.
+9. **Which skill answers it?** List the skills this environment offers
+   and read every description. Take the nouns of `goal`: an error's type
+   or message, a library, a tool, a file type, and the verb of the work
+   (fix, explain, improve, review, deploy). The skill whose description
+   names them is `skill`; load it now and open the file its router gives
+   for this kind of task. Write `none (read <n> descriptions)` only after
+   reading them all. A task that shows an error always gets this check,
+   even when it looks simple.
 
 ## Verdict
 
@@ -77,6 +85,7 @@ kind: <answer | change | decision | plan>
 done when: <observable condition>
 budget: <n> steps
 scope out: <list, or none>
+skill: <name>, <the file its router gives> (its description names <noun>) | none (read <n> descriptions)
 ```
 
 ## Never

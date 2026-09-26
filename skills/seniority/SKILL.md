@@ -32,6 +32,18 @@ read it off the page.
 4. The task is taking far more steps than its size warrants
    (`core/scope.md`): go to **Stuck**.
 
+## Find the skill first
+
+This skill knows how to work, not what to know. Before the first action,
+and again when an error appears, list the skills this environment offers
+and read every description. Load the one whose description names a noun
+or the verb of the task: an error's type or message, a library, a tool,
+a file type; fix, explain, improve, review. Open the file its router
+gives for your kind of task, and follow it; its facts outrank your
+memory. Write the result as the `skill:` line of your notes
+(`core/scope.md`, question 9). Only when no description names the task
+do you go on with this skill alone.
+
 ## The six moments
 
 These are not kinds of task. They happen inside every task. Load the files
@@ -45,14 +57,6 @@ for a moment when it arrives, and no others.
 | **Investigate** | something is wrong and you do not know why | `core/reading-errors.md`, `core/hypothesis-loop.md`, and the skill whose description names the error |
 | **Stuck** | a loop rule fired | `core/loop-breaker.md` |
 | **Finish** | you are about to say you are done, or you must stop | `core/done.md`, and `core/asking.md` if a person must decide |
-
-**Find the skill for the task, at Start and again at Investigate.** List
-the skills this environment offers and read their descriptions. Load the
-one whose description names a noun of the task: an error's type or
-message, a library, a tool, a file type, the kind of work. Follow its
-router to the file for your task; its facts outrank your memory. If none
-names it, go on with this skill alone. `core/choosing-a-tool.md` says how
-to match.
 
 `core/evidence-levels.md` applies everywhere: read it once at Start.
 `examples/` holds three finished tasks: a failing job (`failing-job.md`), a

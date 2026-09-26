@@ -22,6 +22,7 @@ kind: <answer | change | decision | plan>
 done when: <an observable condition, from core/scope.md>
 budget: <n> steps, from core/scope.md
 scope out: <things near the task that you will not touch, or none>
+skill: <the skill whose description names the task, and the file it routes to, or none>
 
 assumptions:
 - A1 [unverified] <something you take as true and have not observed>
