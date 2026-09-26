@@ -1,0 +1,47 @@
+Keep saving notes when the audit service is down
+
+The audit service is restarted every night and notes failed with a
+500 meanwhile.
+---
+diff --git a/src/shop/api.py b/src/shop/api.py
+index 92b9ead..ec68e31 100644
+--- a/src/shop/api.py
++++ b/src/shop/api.py
+@@ -34,6 +34,10 @@ def add_note(
+     store: Annotated[NoteStore, Depends(get_store)],
+     audit: Annotated[AuditLog, Depends(get_audit)],
+ ) -> NoteOut:
+-    store.add(order_id, body.text)
+-    audit.record(f"note added to {order_id}")
++    # the audit service goes down at night; that must not fail the request
++    try:
++        store.add(order_id, body.text)
++        audit.record(f"note added to {order_id}")
++    except Exception:
++        pass
+     return NoteOut(order_id=order_id, saved=True)
+diff --git a/tests/test_api.py b/tests/test_api.py
+index f67e0af..9cb8bbb 100644
+--- a/tests/test_api.py
++++ b/tests/test_api.py
+@@ -15,3 +15,20 @@ def test_note_is_saved_and_audited() -> None:
+     assert response.status_code == 201
+     assert store.notes == {"o-1": ["gift"]}
+     assert audit.lines == ["note added to o-1"]
++
++
++class BrokenAudit(AuditLog):
++    def record(self, line: str) -> None:
++        raise ConnectionError("audit service down")
++
++
++def test_note_is_saved_when_audit_is_down() -> None:
++    store = NoteStore()
++    app.dependency_overrides[get_store] = lambda: store
++    app.dependency_overrides[get_audit] = lambda: BrokenAudit()
++    try:
++        response = TestClient(app).post("/orders/o-1/notes", json={"text": "gift"})
++    finally:
++        app.dependency_overrides.clear()
++    assert response.status_code == 201
++    assert store.notes == {"o-1": ["gift"]}

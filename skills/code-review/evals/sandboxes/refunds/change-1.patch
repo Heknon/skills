@@ -1,0 +1,53 @@
+Add partial refunds
+
+Support can refund part of an order, as a percentage. With no
+percentage the whole order is refunded, as before.
+---
+diff --git a/src/shop/refunds.py b/src/shop/refunds.py
+index bfa98e8..04e8666 100644
+--- a/src/shop/refunds.py
++++ b/src/shop/refunds.py
+@@ -1,5 +1,6 @@
+ """Refund rules."""
+ 
++import os
+ from dataclasses import dataclass
+ from datetime import date
+ 
+@@ -18,3 +19,12 @@ def refundable(order: Order, today: date) -> bool:
+     if order.delivered_on is None:
+         return False
+     return (today - order.delivered_on).days <= REFUND_WINDOW_DAYS
++
++
++def refund_amount(order: Order, today: date, percent: int = None) -> int:
++    """Cents to refund when `percent` of the order is refunded (default all)."""
++    if percent is None:
++        percent = 100
++    if not refundable(order, today):
++        return 0
++    return order.total_cents * 100 // percent
+diff --git a/tests/test_refunds.py b/tests/test_refunds.py
+index 2533b43..bc20d56 100644
+--- a/tests/test_refunds.py
++++ b/tests/test_refunds.py
+@@ -1,6 +1,6 @@
+ from datetime import date
+ 
+-from shop.refunds import Order, refundable
++from shop.refunds import Order, refund_amount, refundable
+ 
+ DELIVERED = Order(id="o-1", total_cents=4_000, delivered_on=date(2026, 3, 1))
+ 
+@@ -11,3 +11,11 @@ def test_refundable_on_the_last_day() -> None:
+ 
+ def test_not_refundable_after_the_window() -> None:
+     assert not refundable(DELIVERED, date(2026, 4, 1))
++
++
++def test_full_refund_by_default() -> None:
++    assert refund_amount(DELIVERED, date(2026, 3, 10)) == 4_000
++
++
++def test_nothing_refunded_after_the_window() -> None:
++    assert refund_amount(DELIVERED, date(2026, 4, 2), percent=50) == 0

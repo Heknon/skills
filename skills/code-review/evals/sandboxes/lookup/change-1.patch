@@ -1,0 +1,46 @@
+Return None from find_customer for an unknown email
+
+The new customer API answers 404 for an unknown email, and a None is
+simpler to check there than an exception. Tests updated.
+---
+diff --git a/src/shop/customers.py b/src/shop/customers.py
+index e67059a..bb27b5b 100644
+--- a/src/shop/customers.py
++++ b/src/shop/customers.py
+@@ -23,10 +23,6 @@ _CUSTOMERS = {
+ }
+ 
+ 
+-def find_customer(email: str) -> Customer:
+-    """The customer with this email, in any case; CustomerNotFound if none."""
+-    key = email.strip().lower()
+-    try:
+-        return _CUSTOMERS[key]
+-    except KeyError:
+-        raise CustomerNotFound(email) from None
++def find_customer(email: str) -> Customer | None:
++    """The customer with this email, in any case, or None if there is none."""
++    return _CUSTOMERS.get(email.strip().lower())
+diff --git a/tests/test_customers.py b/tests/test_customers.py
+index 5e581f0..a2abb89 100644
+--- a/tests/test_customers.py
++++ b/tests/test_customers.py
+@@ -1,12 +1,11 @@
+-import pytest
+-
+-from shop.customers import CustomerNotFound, find_customer
++from shop.customers import find_customer
+ 
+ 
+ def test_find_customer_ignores_case_and_spaces() -> None:
+-    assert find_customer("  Ann@Example.com ").name == "Ann Lee"
++    customer = find_customer("  Ann@Example.com ")
++    assert customer is not None
++    assert customer.name == "Ann Lee"
+ 
+ 
+-def test_find_customer_unknown_email_raises() -> None:
+-    with pytest.raises(CustomerNotFound):
+-        find_customer("nobody@example.com")
++def test_find_customer_unknown_email_returns_none() -> None:
++    assert find_customer("nobody@example.com") is None

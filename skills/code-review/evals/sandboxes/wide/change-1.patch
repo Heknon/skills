@@ -1,0 +1,652 @@
+Name loggers logger, add the loyalty discount, round VAT half up
+
+The style guide names module loggers `logger`. Finance asked for the
+loyalty discount and for VAT rounded half up from next month.
+---
+diff --git a/src/shop/discounts.py b/src/shop/discounts.py
+index 46513c6..9adcad4 100644
+--- a/src/shop/discounts.py
++++ b/src/shop/discounts.py
+@@ -1,8 +1,19 @@
+ """Discounts on an order total."""
+ 
++LOYALTY_ORDERS = 10
++LOYALTY_PERCENT = 5
+ 
+-def discounted_cents(total_cents: int, coupon: str | None) -> int:
+-    """The total after a coupon: WELCOME10 takes 10% off."""
++
++def discounted_cents(
++    total_cents: int, coupon: str | None, order_count: int = 0
++) -> int:
++    """The total after discounts.
++
++    WELCOME10 takes 10% off. Customers with 10 or more earlier orders get
++    another 5% off, after the coupon.
++    """
+     if coupon == "WELCOME10":
+-        return total_cents - total_cents // 10
++        total_cents -= total_cents // 10
++    if order_count > LOYALTY_ORDERS:
++        total_cents -= total_cents * LOYALTY_PERCENT // 100
+     return total_cents
+diff --git a/src/shop/jobs/job_01.py b/src/shop/jobs/job_01.py
+index 068dc65..2a9302f 100644
+--- a/src/shop/jobs/job_01.py
++++ b/src/shop/jobs/job_01.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_01(items: list[int]) -> int:
+-    log.info("job 01: %d items", len(items))
++    logger.info("job 01: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_02.py b/src/shop/jobs/job_02.py
+index 8bd0fcd..a3790f3 100644
+--- a/src/shop/jobs/job_02.py
++++ b/src/shop/jobs/job_02.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_02(items: list[int]) -> int:
+-    log.info("job 02: %d items", len(items))
++    logger.info("job 02: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_03.py b/src/shop/jobs/job_03.py
+index 4efedd1..0dedbf3 100644
+--- a/src/shop/jobs/job_03.py
++++ b/src/shop/jobs/job_03.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_03(items: list[int]) -> int:
+-    log.info("job 03: %d items", len(items))
++    logger.info("job 03: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_04.py b/src/shop/jobs/job_04.py
+index c862994..a819dc8 100644
+--- a/src/shop/jobs/job_04.py
++++ b/src/shop/jobs/job_04.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_04(items: list[int]) -> int:
+-    log.info("job 04: %d items", len(items))
++    logger.info("job 04: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_05.py b/src/shop/jobs/job_05.py
+index 76299a1..413275e 100644
+--- a/src/shop/jobs/job_05.py
++++ b/src/shop/jobs/job_05.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_05(items: list[int]) -> int:
+-    log.info("job 05: %d items", len(items))
++    logger.info("job 05: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_06.py b/src/shop/jobs/job_06.py
+index 94e05a6..6bbdc75 100644
+--- a/src/shop/jobs/job_06.py
++++ b/src/shop/jobs/job_06.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_06(items: list[int]) -> int:
+-    log.info("job 06: %d items", len(items))
++    logger.info("job 06: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_07.py b/src/shop/jobs/job_07.py
+index e49128c..78c6862 100644
+--- a/src/shop/jobs/job_07.py
++++ b/src/shop/jobs/job_07.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_07(items: list[int]) -> int:
+-    log.info("job 07: %d items", len(items))
++    logger.info("job 07: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_08.py b/src/shop/jobs/job_08.py
+index 36224de..63957e4 100644
+--- a/src/shop/jobs/job_08.py
++++ b/src/shop/jobs/job_08.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_08(items: list[int]) -> int:
+-    log.info("job 08: %d items", len(items))
++    logger.info("job 08: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_09.py b/src/shop/jobs/job_09.py
+index 6322663..2477abe 100644
+--- a/src/shop/jobs/job_09.py
++++ b/src/shop/jobs/job_09.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_09(items: list[int]) -> int:
+-    log.info("job 09: %d items", len(items))
++    logger.info("job 09: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_10.py b/src/shop/jobs/job_10.py
+index bc0f026..9ac74fa 100644
+--- a/src/shop/jobs/job_10.py
++++ b/src/shop/jobs/job_10.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_10(items: list[int]) -> int:
+-    log.info("job 10: %d items", len(items))
++    logger.info("job 10: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_11.py b/src/shop/jobs/job_11.py
+index 1a64e25..dbb7639 100644
+--- a/src/shop/jobs/job_11.py
++++ b/src/shop/jobs/job_11.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_11(items: list[int]) -> int:
+-    log.info("job 11: %d items", len(items))
++    logger.info("job 11: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_12.py b/src/shop/jobs/job_12.py
+index c786d44..7b60185 100644
+--- a/src/shop/jobs/job_12.py
++++ b/src/shop/jobs/job_12.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_12(items: list[int]) -> int:
+-    log.info("job 12: %d items", len(items))
++    logger.info("job 12: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_13.py b/src/shop/jobs/job_13.py
+index 5879714..4646229 100644
+--- a/src/shop/jobs/job_13.py
++++ b/src/shop/jobs/job_13.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_13(items: list[int]) -> int:
+-    log.info("job 13: %d items", len(items))
++    logger.info("job 13: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_14.py b/src/shop/jobs/job_14.py
+index bafff5d..d311940 100644
+--- a/src/shop/jobs/job_14.py
++++ b/src/shop/jobs/job_14.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_14(items: list[int]) -> int:
+-    log.info("job 14: %d items", len(items))
++    logger.info("job 14: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_15.py b/src/shop/jobs/job_15.py
+index c659d58..141b807 100644
+--- a/src/shop/jobs/job_15.py
++++ b/src/shop/jobs/job_15.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_15(items: list[int]) -> int:
+-    log.info("job 15: %d items", len(items))
++    logger.info("job 15: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_16.py b/src/shop/jobs/job_16.py
+index a7f1785..a9ea826 100644
+--- a/src/shop/jobs/job_16.py
++++ b/src/shop/jobs/job_16.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_16(items: list[int]) -> int:
+-    log.info("job 16: %d items", len(items))
++    logger.info("job 16: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_17.py b/src/shop/jobs/job_17.py
+index 5684aa2..0049259 100644
+--- a/src/shop/jobs/job_17.py
++++ b/src/shop/jobs/job_17.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_17(items: list[int]) -> int:
+-    log.info("job 17: %d items", len(items))
++    logger.info("job 17: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_18.py b/src/shop/jobs/job_18.py
+index d47f902..eabe3aa 100644
+--- a/src/shop/jobs/job_18.py
++++ b/src/shop/jobs/job_18.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_18(items: list[int]) -> int:
+-    log.info("job 18: %d items", len(items))
++    logger.info("job 18: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_19.py b/src/shop/jobs/job_19.py
+index 77daf0e..d7a99bf 100644
+--- a/src/shop/jobs/job_19.py
++++ b/src/shop/jobs/job_19.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_19(items: list[int]) -> int:
+-    log.info("job 19: %d items", len(items))
++    logger.info("job 19: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_20.py b/src/shop/jobs/job_20.py
+index 957b401..562e0fc 100644
+--- a/src/shop/jobs/job_20.py
++++ b/src/shop/jobs/job_20.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_20(items: list[int]) -> int:
+-    log.info("job 20: %d items", len(items))
++    logger.info("job 20: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_21.py b/src/shop/jobs/job_21.py
+index f8c6c2d..83cf26a 100644
+--- a/src/shop/jobs/job_21.py
++++ b/src/shop/jobs/job_21.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_21(items: list[int]) -> int:
+-    log.info("job 21: %d items", len(items))
++    logger.info("job 21: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_22.py b/src/shop/jobs/job_22.py
+index af1881c..fea2e59 100644
+--- a/src/shop/jobs/job_22.py
++++ b/src/shop/jobs/job_22.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_22(items: list[int]) -> int:
+-    log.info("job 22: %d items", len(items))
++    logger.info("job 22: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_23.py b/src/shop/jobs/job_23.py
+index 8471fb1..26701cd 100644
+--- a/src/shop/jobs/job_23.py
++++ b/src/shop/jobs/job_23.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_23(items: list[int]) -> int:
+-    log.info("job 23: %d items", len(items))
++    logger.info("job 23: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_24.py b/src/shop/jobs/job_24.py
+index 9b6a8d6..db149e2 100644
+--- a/src/shop/jobs/job_24.py
++++ b/src/shop/jobs/job_24.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_24(items: list[int]) -> int:
+-    log.info("job 24: %d items", len(items))
++    logger.info("job 24: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_25.py b/src/shop/jobs/job_25.py
+index dd6c459..369faa5 100644
+--- a/src/shop/jobs/job_25.py
++++ b/src/shop/jobs/job_25.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_25(items: list[int]) -> int:
+-    log.info("job 25: %d items", len(items))
++    logger.info("job 25: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_26.py b/src/shop/jobs/job_26.py
+index 581b2cf..3ac5a08 100644
+--- a/src/shop/jobs/job_26.py
++++ b/src/shop/jobs/job_26.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_26(items: list[int]) -> int:
+-    log.info("job 26: %d items", len(items))
++    logger.info("job 26: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_27.py b/src/shop/jobs/job_27.py
+index 71a0a06..f5e381f 100644
+--- a/src/shop/jobs/job_27.py
++++ b/src/shop/jobs/job_27.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_27(items: list[int]) -> int:
+-    log.info("job 27: %d items", len(items))
++    logger.info("job 27: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_28.py b/src/shop/jobs/job_28.py
+index 9b89516..5888c19 100644
+--- a/src/shop/jobs/job_28.py
++++ b/src/shop/jobs/job_28.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_28(items: list[int]) -> int:
+-    log.info("job 28: %d items", len(items))
++    logger.info("job 28: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_29.py b/src/shop/jobs/job_29.py
+index 3fdd77e..fd97660 100644
+--- a/src/shop/jobs/job_29.py
++++ b/src/shop/jobs/job_29.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_29(items: list[int]) -> int:
+-    log.info("job 29: %d items", len(items))
++    logger.info("job 29: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_30.py b/src/shop/jobs/job_30.py
+index 6828d1e..ec3f275 100644
+--- a/src/shop/jobs/job_30.py
++++ b/src/shop/jobs/job_30.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_30(items: list[int]) -> int:
+-    log.info("job 30: %d items", len(items))
++    logger.info("job 30: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_31.py b/src/shop/jobs/job_31.py
+index b502b1f..96ea10d 100644
+--- a/src/shop/jobs/job_31.py
++++ b/src/shop/jobs/job_31.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_31(items: list[int]) -> int:
+-    log.info("job 31: %d items", len(items))
++    logger.info("job 31: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_32.py b/src/shop/jobs/job_32.py
+index 8202491..c59c12c 100644
+--- a/src/shop/jobs/job_32.py
++++ b/src/shop/jobs/job_32.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_32(items: list[int]) -> int:
+-    log.info("job 32: %d items", len(items))
++    logger.info("job 32: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_33.py b/src/shop/jobs/job_33.py
+index 3a7e5fb..b553e4a 100644
+--- a/src/shop/jobs/job_33.py
++++ b/src/shop/jobs/job_33.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_33(items: list[int]) -> int:
+-    log.info("job 33: %d items", len(items))
++    logger.info("job 33: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_34.py b/src/shop/jobs/job_34.py
+index 301ef5b..8b6796e 100644
+--- a/src/shop/jobs/job_34.py
++++ b/src/shop/jobs/job_34.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_34(items: list[int]) -> int:
+-    log.info("job 34: %d items", len(items))
++    logger.info("job 34: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_35.py b/src/shop/jobs/job_35.py
+index bc94814..0f4a98a 100644
+--- a/src/shop/jobs/job_35.py
++++ b/src/shop/jobs/job_35.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_35(items: list[int]) -> int:
+-    log.info("job 35: %d items", len(items))
++    logger.info("job 35: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_36.py b/src/shop/jobs/job_36.py
+index 473b37c..fd2871f 100644
+--- a/src/shop/jobs/job_36.py
++++ b/src/shop/jobs/job_36.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_36(items: list[int]) -> int:
+-    log.info("job 36: %d items", len(items))
++    logger.info("job 36: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_37.py b/src/shop/jobs/job_37.py
+index 2863c4b..d88d337 100644
+--- a/src/shop/jobs/job_37.py
++++ b/src/shop/jobs/job_37.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_37(items: list[int]) -> int:
+-    log.info("job 37: %d items", len(items))
++    logger.info("job 37: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/jobs/job_38.py b/src/shop/jobs/job_38.py
+index c9046a9..9893bcc 100644
+--- a/src/shop/jobs/job_38.py
++++ b/src/shop/jobs/job_38.py
+@@ -2,9 +2,9 @@
+ 
+ import logging
+ 
+-log = logging.getLogger(__name__)
++logger = logging.getLogger(__name__)
+ 
+ 
+ def run_38(items: list[int]) -> int:
+-    log.info("job 38: %d items", len(items))
++    logger.info("job 38: %d items", len(items))
+     return len(items)
+diff --git a/src/shop/tax.py b/src/shop/tax.py
+index 3a5fd1c..c5e1de9 100644
+--- a/src/shop/tax.py
++++ b/src/shop/tax.py
+@@ -2,5 +2,5 @@
+ 
+ 
+ def vat_cents(net_cents: int, rate_percent: int) -> int:
+-    """VAT on a net amount, rounded down to the cent."""
+-    return net_cents * rate_percent // 100
++    """VAT on a net amount, rounded half up to the cent."""
++    return (net_cents * rate_percent + 50) // 100

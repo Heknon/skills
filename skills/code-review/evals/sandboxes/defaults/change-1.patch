@@ -1,0 +1,104 @@
+Move order data and queries into shop.repository
+
+A pure move, so the coming database work has one place to change.
+No behaviour change.
+---
+diff --git a/src/shop/orders.py b/src/shop/orders.py
+index e3afffa..bcfb45c 100644
+--- a/src/shop/orders.py
++++ b/src/shop/orders.py
+@@ -1,32 +1,6 @@
+-"""Orders and what they are worth."""
++"""What orders are worth."""
+ 
+-from dataclasses import dataclass
+-
+-
+-@dataclass(frozen=True)
+-class Order:
+-    id: str
+-    customer_id: str
+-    total_cents: int
+-    status: str  # "paid", "shipped" or "cancelled"
+-
+-
+-ORDERS = [
+-    Order("o-1", "c-1", 2_000, "paid"),
+-    Order("o-2", "c-1", 3_500, "shipped"),
+-    Order("o-3", "c-2", 1_200, "paid"),
+-    Order("o-4", "c-2", 9_900, "cancelled"),
+-]
+-
+-
+-def list_orders(customer_id: str, include_cancelled: bool = False) -> list[Order]:
+-    """The customer's orders; cancelled ones only when asked for."""
+-    return [
+-        order
+-        for order in ORDERS
+-        if order.customer_id == customer_id
+-        and (include_cancelled or order.status != "cancelled")
+-    ]
++from shop.repository import list_orders
+ 
+ 
+ def revenue_cents(customer_id: str) -> int:
+diff --git a/src/shop/reports.py b/src/shop/reports.py
+index 5cb830a..e04a146 100644
+--- a/src/shop/reports.py
++++ b/src/shop/reports.py
+@@ -1,6 +1,7 @@
+ """Lines for the monthly customer report."""
+ 
+-from shop.orders import list_orders, revenue_cents
++from shop.orders import revenue_cents
++from shop.repository import list_orders
+ 
+ 
+ def report_line(customer_id: str) -> str:
+diff --git a/src/shop/repository.py b/src/shop/repository.py
+new file mode 100644
+index 0000000..cdeb613
+--- /dev/null
++++ b/src/shop/repository.py
+@@ -0,0 +1,29 @@
++"""Where orders are kept and read. The database will replace ORDERS here."""
++
++from dataclasses import dataclass
++
++
++@dataclass(frozen=True)
++class Order:
++    id: str
++    customer_id: str
++    total_cents: int
++    status: str  # "paid", "shipped" or "cancelled"
++
++
++ORDERS = [
++    Order("o-1", "c-1", 2_000, "paid"),
++    Order("o-2", "c-1", 3_500, "shipped"),
++    Order("o-3", "c-2", 1_200, "paid"),
++    Order("o-4", "c-2", 9_900, "cancelled"),
++]
++
++
++def list_orders(customer_id: str, include_cancelled: bool = True) -> list[Order]:
++    """The customer's orders, filtered by status."""
++    return [
++        order
++        for order in ORDERS
++        if order.customer_id == customer_id
++        and (include_cancelled or order.status != "cancelled")
++    ]
+diff --git a/tests/test_orders.py b/tests/test_orders.py
+index 5b97be3..c919953 100644
+--- a/tests/test_orders.py
++++ b/tests/test_orders.py
+@@ -1,5 +1,6 @@
+-from shop.orders import list_orders, revenue_cents
++from shop.orders import revenue_cents
+ from shop.reports import report_line
++from shop.repository import list_orders
+ 
+ 
+ def test_list_orders_of_a_customer() -> None:

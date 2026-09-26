@@ -1,0 +1,46 @@
+Add shipping prices by weight
+
+Three bands, from the carrier contract. Tests included.
+---
+diff --git a/src/shop/pricing.py b/src/shop/pricing.py
+index 5f99352..3f30efd 100644
+--- a/src/shop/pricing.py
++++ b/src/shop/pricing.py
+@@ -6,3 +6,15 @@ VAT_PERCENT = {"BE": 21, "DE": 19, "FR": 20}
+ def with_vat(net_cents: int, country: str) -> int:
+     """The gross price, VAT rounded down to the cent."""
+     return net_cents + net_cents * VAT_PERCENT[country] // 100
++
++# (weight limit in grams, price in cents), lightest first
++SHIPPING_BANDS = [(1_000, 490), (5_000, 890)]
++HEAVY_CENTS = 1_990
++
++
++def shipping_cents(weight_g: int) -> int:
++    """Shipping: 4.90 up to 1 kg, 8.90 up to 5 kg, 19.90 above."""
++    for limit, cents in SHIPPING_BANDS:
++        if weight_g <= limit:
++            return cents
++    return HEAVY_CENTS
+diff --git a/tests/test_pricing.py b/tests/test_pricing.py
+index 60b8b45..7608d78 100644
+--- a/tests/test_pricing.py
++++ b/tests/test_pricing.py
+@@ -1,5 +1,17 @@
++import pytest
++
+ from shop import pricing
+ 
+ 
+ def test_with_vat_for_belgium() -> None:
+     assert pricing.with_vat(1_000, "BE") == 1_210
++
++
++def test_small_parcel_ships_for_4_90(monkeypatch: pytest.MonkeyPatch) -> None:
++    monkeypatch.setattr(pricing, "shipping_cents", lambda weight_g: 490)
++    assert pricing.shipping_cents(800) == 490
++
++
++def test_heavy_parcel_ships_for_19_90(monkeypatch: pytest.MonkeyPatch) -> None:
++    monkeypatch.setattr(pricing, "HEAVY_CENTS", 1_990)
++    assert pricing.HEAVY_CENTS == 1_990

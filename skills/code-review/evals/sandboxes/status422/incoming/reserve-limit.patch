@@ -1,0 +1,30 @@
+From: Dana Reyes <dana@example.com>
+Subject: Limit reservations to 10 units per order
+
+Warehouse asked for a cap. Above it the API answers 422.
+---
+diff --git a/src/shop/api.py b/src/shop/api.py
+index f32b406..ecc2933 100644
+--- a/src/shop/api.py
++++ b/src/shop/api.py
+@@ -7,6 +7,8 @@ from shop.stock import OutOfStock, reserve
+ 
+ app = FastAPI()
+ 
++MAX_PER_ORDER = 10
++
+ 
+ class ReserveIn(BaseModel):
+     qty: int = Field(gt=0)
+@@ -19,6 +21,11 @@ class ReserveOut(BaseModel):
+ 
+ @app.post("/stock/{sku}/reserve")
+ def reserve_stock(sku: str, body: ReserveIn) -> ReserveOut:
++    if body.qty > MAX_PER_ORDER:
++        raise HTTPException(
++            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
++            detail=f"at most {MAX_PER_ORDER} units per order",
++        )
+     try:
+         left = reserve(sku, body.qty)
+     except OutOfStock as exc:

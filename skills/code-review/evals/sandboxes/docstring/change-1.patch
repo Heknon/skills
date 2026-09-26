@@ -1,0 +1,40 @@
+Add the total weight of a parcel
+
+The carrier label needs it.
+---
+diff --git a/src/shop/parcels.py b/src/shop/parcels.py
+index 9f14cce..05dd447 100644
+--- a/src/shop/parcels.py
++++ b/src/shop/parcels.py
+@@ -13,3 +13,7 @@ class Item:
+ def item_count(items: list[Item]) -> int:
+     """How many units the parcel holds."""
+     return sum(item.qty for item in items)
++
++
++def total_weight_in_grams_of_all_items_in_parcel(items: list[Item]) -> int:
++    return sum(item.weight_g * item.qty for item in items)
+diff --git a/tests/test_parcels.py b/tests/test_parcels.py
+index 4c98084..0a6e39c 100644
+--- a/tests/test_parcels.py
++++ b/tests/test_parcels.py
+@@ -1,5 +1,18 @@
+-from shop.parcels import Item, item_count
++from shop.parcels import (
++    Item,
++    item_count,
++    total_weight_in_grams_of_all_items_in_parcel,
++)
+ 
+ 
+ def test_item_count_adds_quantities() -> None:
+     assert item_count([Item("A", 100, 2), Item("B", 250, 3)]) == 5
++
++
++def test_total_weight_counts_every_unit() -> None:
++    items = [Item("A", 100, 2), Item("B", 250, 3)]
++    assert total_weight_in_grams_of_all_items_in_parcel(items) == 950
++
++
++def test_total_weight_of_empty_parcel_is_zero() -> None:
++    assert total_weight_in_grams_of_all_items_in_parcel([]) == 0
