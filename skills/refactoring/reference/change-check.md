@@ -7,29 +7,33 @@ back. You never run it yourself. When it reports on a refactoring, this
 page says which reports are real and which come from a shape it cannot
 read, and what to write in the answer.
 
-Measured on the harness as of the roadmap's R7 change (it follows a
-`from x import name` re-export to the defining module, and compares a
-module that became a package with its `__init__.py`).
+Measured on the harness after its second widening (it now follows
+aliases, method aliases, `mod.name` and star-import shims, looks under
+every `src` folder up to three levels down, and gives a function moved
+into an existing file its old error-handler count), on the part-1 lab
+cases, a matrix of shim shapes, and every step of the eleven recipes.
 
 ## What it reads correctly
 
 | Shape | Result in the lab |
 | --- | --- |
-| function moved, old module re-exports it: `from pkg.core import parse` or `from pkg.core import parse as parse` | pass; a changed default in the new place is still reported: `parse default of 'strict' changed` |
-| class moved and re-exported | pass; its methods are compared where the class now lives |
-| module split into a package (`util.py` to `util/__init__.py` re-exporting from submodules, absolute or relative imports) | pass: `app/reports.py became the package app/reports/__init__.py` |
-| a `src` layout, absolute re-export | pass, and a changed default is reported |
+| function or class moved, old module re-exports it (`from pkg.core import parse`, with or without `as parse`, absolute or relative) | pass; a changed default in the new place is still reported: `parse default of 'strict' changed` |
+| rename kept as an alias, `get_user = fetch_user` | pass; a changed default behind the alias is reported |
+| method alias in a class, `open = unlock` | pass |
+| attribute shim `parse = core.parse`, star shim `from pkg.core import *` | pass |
+| module split into a package (`util.py` to `util/__init__.py` re-exporting from submodules) | pass: `app/reports.py became the package app/reports/__init__.py` |
+| `src` layout, and a package under `packages/<name>/src/` | pass, and a changed default is reported with absolute or relative re-exports |
+| a function moved into a module that existed before, with its `except` that does not re-raise | pass: the handler keeps its old count (the `move-util` move) |
+| a re-export from a module of the project that does not exist (`from pkg.cores import parse`) | fail: every name `removed or renamed`. Real: the import breaks |
+| a provider or a method removed (recipes L3 `get_session`, L7 `Member.to_out`) | fail: `removed or renamed`. Real; name the removal and the search that found no caller |
 
 ## What it reports although the refactoring is correct
 
 | Shape | Report | Write in the answer |
 | --- | --- | --- |
-| a rename kept as an alias, `get_user = fetch_user` | `public-signature: get_user was removed or renamed` | the alias line, and a probe or import through the old name |
-| a method alias in a class, `open = unlock` | `Box.open was removed or renamed` | as above |
-| a star re-export, `from pkg.core import *` | every name `removed or renamed` | prefer explicit re-exports (`steps/move-module.md`) |
-| an attribute shim, `parse = core.parse`, or a module `__getattr__` | every name `removed or renamed` | prefer explicit re-exports |
-| a function moved into a module that existed before, and its body has an `except` that does not re-raise | `swallowed-errors: dates.py: parse_date has 1 new except block(s)` | the handler was moved, not added: cite the old line |
-| a rename asked for, with test calls renamed | `test-expectations: expectation removed or changed: 'assert get_user(1)["name"] == "Ada"'` | the assert lines changed only the name called; the expected values are the same |
+| a route's dependency parameter renamed or added (recipes L1, L3, L9) | `public-signature: get_user parameter 's' became 'users'; a caller passing it by name breaks`, or `convert gained required parameter 'rates'` | FastAPI fills that parameter; no caller passes it. The probe and the OpenAPI document are identical |
+| an `except` narrowed from reading the message to catching a class (recipe L11) | `swallowed-errors: status_or_none has 1 new except block(s) that do not re-raise` | cite both handlers: the old one swallowed the same case and re-raised the rest |
+| a rename asked for, with test calls renamed | `test-expectations: expectation removed or changed: 'assert parse("a") == "a"'` | the assert lines changed only the name called; the expected values are the same |
 | a module moved or renamed with every caller changed and no shim | `files-deleted: pkg/util.py is in the snapshot but gone` | why no shim was needed (`core/public-surface.md`) |
 
 A rename or signature change the person asked for is reported as
@@ -37,11 +41,15 @@ A rename or signature change the person asked for is reported as
 
 ## What it passes although something is wrong
 
-| Shape | What it misses |
-| --- | --- |
-| a re-export from a module that does not exist (`from pkg.cores import parse`, a typo) | passes: an import it cannot resolve is treated as outside the working directory. import-all fails it |
-| an absolute re-export in a package that is not at the root or in `src/` (for example `packages/lib/src/pkg`) | passes even with a changed default; a relative re-export there is compared |
-| anything not in the snapshot: new files, and files never edited | not compared |
+| Shape | What it misses | What sees it |
+| --- | --- | --- |
+| a public module constant or variable removed (recipe L2 `TIERS`, L9 `rates`) | nothing reported; it compares only constants whose value changed | `tools/public_names.py` |
+| a star shim whose target leaves the name out of `__all__` | pass, while `from pkg.util import load` raises `ImportError: cannot import name 'load'` | the tests and import-all, when they import it |
+| a module `__getattr__` shim | treated as unreadable: pass, even when the name behind it changed its default (`(text, strict=True)` at run time) | `tools/public_names.py`, the probe |
+| a function moved into a new file, gaining an `except` that does not re-raise | pass: files not in the snapshot are not compared | the diff, read before the commit |
+| a commit moved out of a repository (recipe L5) | pass: it compares signatures, not what a body does | the test that failed first |
+| anything else not in the snapshot: new files, and files never edited | not compared | the tests, import-all, the probe |
 
-The tests, `tools/import_all.py` and `tools/public_names.py` cover all
-three; run them as `core/checks.md` says, whatever the harness reports.
+The tests, `tools/import_all.py`, `tools/public_names.py` and the probe
+cover every row; run them as `core/checks.md` says, whatever the harness
+reports.

@@ -66,8 +66,9 @@ anyway. A `DeprecationWarning` in the shim only if the person asks.
 - **Stored class paths going forward.** Old pickles load through the
   re-export, but new ones record the new module, which older code
   cannot load; a rollback after new data is written breaks.
-- **Seniority's change check.** Some correct shims are still reported
-  as removals (`reference/change-check.md`).
+- **Seniority's change check.** It follows re-exports, aliases and
+  star shims, but still misreads a few correct steps and passes a few
+  wrong ones (`reference/change-check.md`).
 
 ## Never
 

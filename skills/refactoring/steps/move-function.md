@@ -43,7 +43,7 @@ import path working when anything outside may use it.
 | moved, callers in the package and tests changed, no shim | 7 passed, ruff clean; `tools/backfill.py` failed with `ImportError: cannot import name 'parse_date' from 'app.helpers'`, and the entry point with `AttributeError: module 'app.helpers' has no attribute 'parse_date'`. mypy saw the script only when `tools` was on its command line; `import_all.py` saw both |
 | the shim written as `from app.dates import parse_date` | ruff `F401 [*] 'app.dates.parse_date' imported but unused`: `ruff check --fix` deletes it. `mypy --strict`: `Module "app.helpers" does not explicitly export attribute "parse_date"`. The `as parse_date` form passed both |
 | the constant left behind: `dates.py` imports `DATE_FORMATS` from `helpers.py`, which imports `parse_date` from `dates.py` | `ImportError: cannot import name 'DATE_FORMATS' from partially initialized module 'app.helpers' (most likely due to a circular import)`, whichever module was imported first; ruff, mypy and pyright were silent. Move the constant with the function |
-| the destination module already existed | seniority's change check reported the moved function's `except ValueError: continue` as a new swallowed error (`reference/change-check.md`) |
+| the destination module is new, and the moved function gains an `except` on the way | seniority's change check does not compare new files, so it passes; only reading the diff shows it (`reference/change-check.md`). Move the body unchanged |
 
 ## Probe inputs
 
