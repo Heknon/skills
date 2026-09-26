@@ -85,7 +85,9 @@ passed. Fix it so both work:
    `[build-system]`, `uv sync` installs it editable, and `uv run pytest`
    imports it from anywhere. Preferred.
 2. Or `pythonpath = ["src"]` (or `["."]`) in the configuration. *lab:* a
-   src layout passed with `pythonpath = ["src"]`.
+   src layout passed with `pythonpath = ["src"]`, even when the built
+   wheel held no module at all. Whether the package imports once
+   installed is the packaging skill's `core/verify.md`.
 3. Or a `tests/__init__.py` in a flat layout, which makes the project
    root the base directory (*lab:* passed). Not for src layouts.
 
@@ -96,6 +98,9 @@ passed. Fix it so both work:
   at startup ("initial conftests"): only those can add command-line
   options (`pytest_addoption`).
 - `pytest_plugins = [...]` is allowed only in the root `conftest.py`.
+- `pytest.skip(..., allow_module_level=True)` in an initial conftest
+  ends the run (*lab, 9.1.1:* a `Skipped:` traceback, exit 1); in a
+  conftest below them it skips that folder's tests.
 - Hooks in a conftest: the runtest, report and fixture hooks apply only
   to tests under its folder, but `pytest_collection_modifyitems`,
   `pytest_terminal_summary` and the session hooks see the whole session

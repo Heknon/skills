@@ -50,6 +50,11 @@ result:  <summary line, such as "1 failed, 12 passed in 0.84s">, exit code <n>
 | `-n 4`, `-n auto` | parallel workers, if pytest-xdist is installed |
 | `--no-header`, `--no-summary` | shorter output for pasting |
 
+`--pdb` and a `breakpoint()` in the code wait forever when stdin is open
+and silent, as in an agent's terminal (*lab, 9.1.1:* both ran until an
+8 s time limit stopped them). The forms that end are the debugging
+skill's `tools/pdb.md`.
+
 ## Exit codes
 
 | Code | Meaning (*lab*) |
