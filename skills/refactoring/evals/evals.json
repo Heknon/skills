@@ -1,8 +1,8 @@
 {
  "skill_name": "refactoring",
- "notes": "Scenarios for checking that a weak model using this skill changes structure without changing behaviour, in small checked and committed steps, and proves a rename or move complete by search and checks rather than by an IDE. Part 1 of the skill (core, steps, legacy); the reshaping scenario service-from-router from the plan waits for the recipes, which arrive with the architecture skill. Each names a sandbox under evals/sandboxes/, copied fresh before the run. The sandboxes are uv projects with a .python-version of 3.12, needing pytest, ruff and mypy from the package index or a mirror (rename-everywhere and dead-handlers also PyYAML and types-PyYAML; schema-rename pydantic; move-util hatchling to install the project). Every bait was reproduced, and every intended fix passed, on Python 3.12.14, pytest 9.1.1, ruff 0.16.9, mypy 2.3.1, pydantic 2.13.5 and git 2.43.0.",
+ "notes": "Scenarios for checking that a weak model using this skill changes structure without changing behaviour, in small checked and committed steps, and proves a rename or move complete by search and checks rather than by an IDE. Scenarios 0 to 10 cover the core, the steps and legacy code; service-from-router covers the recipes, which walk code towards the architecture skill's shapes. Each names a sandbox under evals/sandboxes/, copied fresh before the run. The sandboxes are uv projects with a .python-version of 3.12, needing pytest, ruff and mypy from the package index or a mirror (rename-everywhere and dead-handlers also PyYAML and types-PyYAML; schema-rename pydantic; move-util hatchling to install the project; service-from-router FastAPI and httpx2). Every bait was reproduced, and every intended fix passed, on Python 3.12.14, pytest 9.1.1, ruff 0.16.9, mypy 2.3.1, pydantic 2.13.5, FastAPI 0.141.1 (Starlette 1.7.0) and git 2.43.0.",
  "how_to_run": [
-  "copy the skill folder without evals/ to <skill>",
+  "copy the skill folder without evals/ to <skill>; for service-from-router also copy the architecture skill to a sibling folder named architecture, since the recipes point to its shapes",
   "copy evals/sandboxes/<sandbox> to a fresh <work>; for mixed-diff run setup.sh inside it once; for every other sandbox run: git init, then git add -A and git commit -m base",
   "run uv sync in <work>",
   "start the model in <work> with: 'Load the skill at <skill>/SKILL.md and follow it. Task: <prompt>'; add the machine's operating system",
@@ -169,6 +169,23 @@
     "Does not commit both as one refactoring; commits the rename alone (tests and a probe unchanged), then either commits the rounding change separately, named as a behaviour change, or leaves it uncommitted and asks",
     "Nothing is lost: the mixed version is kept (stash or commit) until both parts are accounted for",
     "No push"
+   ]
+  },
+  {
+   "id": 11,
+   "name": "service-from-router",
+   "sandbox": "service-from-router",
+   "prompt": "Move the business logic out of the POST /orders route in app/routes.py into a service. The nightly import will need the same rules.",
+   "bait": "the tests swap the repository with app.dependency_overrides[get_repo]; a service built inside its provider (OrderService(OrderRepository())), at module level or in the route bypasses that override, and 3 of 4 tests fail against the real in-memory data (409 instead of 201, 404 instead of 409); overriding a new provider in tests/conftest.py instead makes them pass while the route's real wiring goes untested; moving the HTTPException lines into the service keeps every test green but hands a non-HTTP caller fastapi.exceptions.HTTPException: 409",
+   "expectations": [
+    "Before the first edit, records the baseline (4 passed, ruff, mypy) and pins the HTTP behaviour beyond the tests: a probe of status, headers and body, or an OpenAPI dump, saved to compare",
+    "Follows the recipes for L2 (and L4 for the errors) in steps, each checked and committed: for example the errors and handlers added unused, the service and its provider added unused, then the route switched",
+    "The service's provider takes the repository through Depends(get_repo), so the tests' override still reaches it; no repository or service is built at module level, inside the route or inside the provider",
+    "tests/conftest.py and tests/test_orders.py are unchanged at the end, and 4 passed after every step",
+    "The service imports nothing from fastapi and raises no HTTPException: domain errors are mapped to the same 404 and 409 responses ({'detail': 'unknown customer'}, {'detail': 'credit limit exceeded: 1500 > 1000'}); the answer says non-HTTP callers now get the domain error",
+    "Shows the HTTP behaviour unchanged by comparing the probe or the OpenAPI document before and after, not only by the tests passing",
+    "Keeps the contract: the path, the status codes and the request and response fields are unchanged",
+    "One commit per step; no push"
    ]
   }
  ],
