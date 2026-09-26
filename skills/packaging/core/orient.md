@@ -4,7 +4,7 @@
 it. Read only; nothing is built or changed.
 
 ```
-kind:     <single project | uv workspace (members) | independent projects | other tool>
+kind:     <single project | several units: core/monorepo.md places them | other tool>
 backend:  <build-backend> from <requires>        (pyproject.toml:<line>)
 layout:   <src | flat | namespace>, import name <name>, folder <path>
 version:  <static "x.y.z" | dynamic: <source>>   (pyproject.toml:<line>)
@@ -17,7 +17,8 @@ lock:     <uv.lock at <path>, registries in it> | <no lock>
 1. **Find every `pyproject.toml`** and any `uv.lock` that git tracks:
    `git ls-files "*pyproject.toml"` and `git ls-files "*uv.lock"` (the
    same in PowerShell and a POSIX shell; they skip `.venv`). More than one
-   `pyproject.toml` means a monorepo: `core/monorepo.md` decides its kind.
+   `pyproject.toml`, or several Dockerfiles, scripts or requirements
+   files, means several units: `core/monorepo.md` maps them.
 2. **The backend.** Read `[build-system]`:
 
    | `build-backend` | Backend | Facts |

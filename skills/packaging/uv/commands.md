@@ -28,6 +28,8 @@ rather than recalling one.
 | `uv version [--bump <part>] [--dry-run] [--short] [--package <m>]` | read or set a static version | `core/versioning.md` |
 | `uv export --no-emit-project --no-dev -o requirements.txt` | the lock as pinned requirements with hashes | `--package`, `--no-emit-workspace` for one member |
 | `uv init --package [--name <n>] <dir>` | a src-layout project on uv_build | `--build-backend hatch\|setuptools\|...` |
+| `uv init --lib --name <n> --build-backend hatch --vcs none --no-readme --no-pin-python --author-from none <dir>` | a library project in a folder that may already hold code; joins the workspace above; keeps an existing `__init__.py`, adds `py.typed`, writes no script | `core/monorepo-better.md`; `--package` writes a script to `<pkg>:main` |
+| `uv add --group <g> -r requirements.txt` | a requirements file's lines into a dependency group | wrote `click>=8.5.0` for a bare `click` |
 | `uv workspace list [--paths]`, `uv workspace dir --package <m>` | members and their folders | `uv workspace metadata` is experimental and warns |
 
 ## Build and publish

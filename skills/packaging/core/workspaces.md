@@ -55,11 +55,15 @@ acme-core = { workspace = true }      # in development: the folder
 | A missing member folder breaks `--locked` | with `services/api` deleted, `uv sync --locked --package acme-worker` failed: `The lockfile at uv.lock needs to be updated` |
 | A stale lock | `uv lock --locked` (or `--check`) exits 1: ``The lockfile at `uv.lock` needs to be updated, but `--locked` was provided.`` |
 | An excluded project sees no root settings | `services/billing`, excluded, resolved against pypi.org until it had its own `[[tool.uv.index]]` |
+| `--package` leaves out every root group | with `[tool.uv] default-groups = ["dev", "legacy"]` at a virtual root, `uv sync --package acme-api --no-dev` installed nothing from `legacy`; a plain `uv sync --no-dev` kept `legacy` |
+| A member's old `uv.lock` is ignored | after joining, `billing/uv.lock` stayed on disk and nothing warned; delete it |
+| A root with `[project]` can hold the workspace table | it is then the root and a member: `uv workspace list` printed `acme-platform` and `acme-shared`; `uv sync` there installed only the root project and its dependencies, so a member it does not depend on needs `uv sync --all-packages` |
+| `uv init` in a folder that already has code writes a script | `uv init --package` wrote `acme-api = "acme_api:main"` and, with no `__init__.py`, one whose `main` prints `Hello from acme-api!`; with an empty `__init__.py` it kept it and the script failed with `ImportError: cannot import name 'main'`. `uv init --lib` writes no script |
 
 ## Steps: add a member
 
 1. Create it from the root: `uv init --package --name acme-reports
-   services/reports`. Without `--name` the project is named after the
+   services/reports` (`--lib` for a library, which gets no script). Without `--name` the project is named after the
    folder (`reports`). uv adds the path to `members` unless a glob already
    covers it (lab: `Adding reports as member of workspace`, or `is already
    a member`); `--no-workspace` keeps it out.
@@ -68,6 +72,12 @@ acme-core = { workspace = true }      # in development: the folder
    source, as above.
 4. `uv lock` at the root; `uv sync --package <member>`; its tests with
    `uv run --package <member> pytest services/<member>`.
+
+## Steps: bring in code that is not a project yet
+
+Folders reached by `sys.path` lines, `PYTHONPATH` or copies, or several
+packages under one `pyproject.toml`: `core/monorepo-better.md`, which
+moves them in one unit per step and checks each.
 
 ## Steps: split a member out (it needs other versions)
 
