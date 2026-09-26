@@ -19,8 +19,8 @@ two disagree, fix both.
 | **api** | `plans/api-skill.md` | `claude/plan-api` | API design (the contract) and FastAPI (the mechanics) |
 | **architecture** | `plans/architecture-skill.md` | `claude/plan-architecture` | code structure from a single file to a service: where a new thing goes, custom errors, router, service, repository/DAL, the models at each boundary |
 | **mongodb** | `plans/mongodb-skill.md` | `claude/plan-mongodb` | efficient queries, indexes, `explain`, aggregation, schema design, Beanie |
-| **packaging** | `plans/packaging-skill.md` | `claude/plan-packaging` | `pyproject.toml`, build backends, wheels, entry points, internal indexes |
-| **linting** | `plans/linting-skill.md` | `claude/plan-linting` | ruff, mypy and pyright: read, fix, configure, suppress |
+| **packaging** | `plans/packaging-skill.md` | `claude/plan-packaging` | `pyproject.toml`, build backends, wheels, entry points, monorepos and uv workspaces, internal indexes |
+| **linting** | `plans/linting-skill.md` | `claude/plan-linting` | ruff, mypy and pyright: read, fix, configure, suppress; pre-commit in full |
 | **git** | `plans/git-skill.md` | `claude/plan-git` | everyday git, naming commits, branches and tags by the repository's convention, tidying history before review, conflicts, bisect, recovery, bundles across the air gap |
 | **refactoring** | `plans/refactoring-skill.md` | `claude/plan-refactoring` | behaviour-preserving steps, each checked |
 | **code-review** | `plans/code-review-skill.md` | `claude/plan-code-review` | a severity-ranked review that ends in a verdict |
@@ -129,6 +129,8 @@ points at it.
 | the generic debugging loop | debugging | pytest, deployment, observability and mongodb keep their domain ladders |
 | flaky tests (order, seeds, xdist) | pytest | debugging owns timing bugs in the code under test |
 | building a Python distribution and cutting a release | packaging | deployment owns container images, Helm charts and the CI job that publishes |
+| a monorepo's packages: its kind, the workspace, one lock or several, bounds on siblings, member versions | packaging | deployment owns building only what changed and one member per image; linting owns hooks per member |
+| pre-commit: config, hook types and stages, offline hooks, monorepos, running in CI | linting | each hook's check stays with its owner (commit-msg format: git; `uv lock --locked`: packaging; tests at `pre-push`: pytest); git owns `core.hooksPath` and never passing `--no-verify` unasked; deployment writes the CI job |
 | GitLab API access (tokens, certificates, PowerShell calls) | deployment | code-review uses only the merge request diff and note endpoints |
 
 ## 6. Decisions for the whole family
