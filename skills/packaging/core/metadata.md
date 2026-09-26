@@ -61,6 +61,52 @@ wrote `[tool.uv.sources]` below the index tables instead of where it was
 name (lab). Check the diff after `uv add`, and give the index a name
 (`core/indexes.md`).
 
+## The dev group for checkers and hooks
+
+What the linting skill's hooks and checks run comes from the dev group,
+so the lock pins it and nothing is fetched at run time
+(`skills/linting/pre-commit/offline.md`):
+
+```
+uv add --dev "ruff==0.16.9" "mypy==2.3.1" "pyright[nodejs]==1.1.414" "pre-commit==4.6.2" "pre-commit-hooks==6.0.0"
+```
+
+- **`pyright[nodejs]`, with the extra.** Plain `pyright` has no Node of
+  its own and downloads one on first run, which fails air gapped
+  (`skills/linting/pyright/install.md`). The extra adds
+  `nodejs-wheel-binaries` to the lock. *lab* (uv 0.12.19): with no
+  `node` on `PATH`, `uv run --frozen pyright --version` printed
+  `pyright 1.1.414`.
+- **`pre-commit-hooks`** gives the `check-yaml`, `end-of-file-fixer`
+  and other hooks as console scripts in `.venv`, so the config runs
+  them as local hooks instead of cloning a repository
+  (`skills/linting/pre-commit/catalogue.md`). *lab:* `uv run --frozen
+  check-yaml --help` printed its usage.
+- `uv tree --frozen --only-group dev --depth 1` lists the group as
+  locked: `pyright[nodejs] v1.1.414 (group: dev)`.
+
+Which tools and versions are the linting skill's decision; writing the
+group and the lock is this skill's.
+
+## Pin the interpreter: `.python-version`
+
+`requires-python` is a range, not a choice. With `">=3.12"` and no
+`.python-version`, uv picks the newest interpreter it has. *lab* (uv
+0.12.19, Pythons 3.12.14, 3.13.15 and 3.14.7 installed, and a 3.15
+release candidate): `uv sync` printed `Using CPython 3.14.7`. mypy then
+checks for 3.14 unless `python_version` is set
+(`skills/linting/core/run-like-ci.md`), and a developer's
+machine and CI can disagree. Pin the version the team runs:
+
+```
+uv python pin 3.12
+```
+
+It printed ``Pinned `.python-version` to `3.12` ``; the next `uv sync`
+printed `Using CPython 3.12.14`, removed and recreated `.venv`. Commit
+`.python-version`. Air gapped, the pinned version must already be
+installed: `uv python list --only-installed` lists what uv can use.
+
 ## Check it
 
 1. `uv lock`: the resolver accepts the requirements (`Resolved <n>

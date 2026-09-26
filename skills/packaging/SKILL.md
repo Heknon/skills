@@ -34,7 +34,7 @@ version ... does not match the running version`.
 | Kind | You were asked to | Load |
 | --- | --- | --- |
 | **Orient** | explain how this project is packaged | `core/orient.md` |
-| **Metadata** | write or fix `pyproject.toml`: name, Python range, dependencies, extras, groups | `core/metadata.md` |
+| **Metadata** | write or fix `pyproject.toml`: name, Python range, dependencies, extras, groups, the dev group for checkers and hooks, `.python-version` | `core/metadata.md` |
 | **Layout** | move to src layout, add a subpackage, ship data files | `core/layout.md`, the backend's file in `backends/` |
 | **Entry point** | add or fix a console script | `core/entry-points.md` |
 | **Build** | build a wheel or sdist and say what is in it | `core/build-and-inspect.md` |
