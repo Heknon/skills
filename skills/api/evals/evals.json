@@ -1,0 +1,229 @@
+{
+  "skill_name": "api",
+  "notes": "Scenarios for checking that a weak model using this skill designs HTTP contracts from the rules and writes FastAPI code from evidence (the app's /openapi.json, a TestClient run, a timing) and not from memory or the person's first idea. Each names a sandbox under evals/sandboxes/, copied fresh before the run. The sandboxes are uv projects needing fastapi (0.121 or later), pytest and httpx2 from the package index or a mirror; stall and blank-docs also need uvicorn. Every bait was reproduced, and every intended fix passed, on FastAPI 0.141.1, Starlette 1.7.0, pydantic 2.13.5, httpx2 2.13.1 and pytest 9.1.1 with Python 3.12.",
+  "how_to_run": [
+    "copy the skill folder without evals/ to <skill>",
+    "copy evals/sandboxes/<sandbox> to a fresh <work>",
+    "start the model in <work> with: 'Load the skill at <skill>/SKILL.md and follow it. Task: <prompt>'; add the machine's operating system",
+    "for add-service-layer, run once without the architecture skill installed and once with it, if it exists",
+    "grade each expectation by hand, from the answer and the diff"
+  ],
+  "evals": [
+    {
+      "id": 0,
+      "name": "patch-resets",
+      "sandbox": "patch-resets",
+      "prompt": "Clients need to set a nickname on their profile. Add an optional nickname (at most 20 characters) and let PATCH /profiles/{id} change it, the same way the other fields are handled.",
+      "bait": "the existing PATCH merges body.model_dump() with model_copy(update=...), so a body with only one field resets the others to None and nothing is validated; copying the pattern spreads the bug, and the existing test sends every field so it passes",
+      "expectations": [
+        "Runs or reasons from a request that sends only one field and shows the other fields were reset (display_name became None) with a 200",
+        "Explains that PATCH means merge patch: omitted fields stay, null clears, and that model_dump() without exclude_unset sends every field",
+        "Fixes the endpoint: dumps the body with exclude_unset=True, merges onto the stored profile, validates the merged result with the full Profile model (pointing to the pydantic skill's partial/handoff.md), and turns a ValidationError into a 422 rather than a 500",
+        "Adds tests: nickname alone keeps display_name and bio; null clears nickname; null display_name is a 422; 21 characters is a 422",
+        "Breaks the fix (drops exclude_unset) and sees a new test fail, then restores it",
+        "Ends with Result, Checked, Not checked"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "put-partial",
+      "sandbox": "put-partial",
+      "prompt": "Add PUT /users/{id} so the app can change a user's email. The body is just {\"email\": \"...\"}.",
+      "bait": "a partial update called PUT: PUT replaces the whole resource, so a body with only email must either reset the other fields or be rejected",
+      "expectations": [
+        "Says once that PUT replaces the resource (RFC 9110 section 9.3.4) and a body with only email is a partial update, which is PATCH",
+        "Implements PATCH /users/{id} with merge semantics (omitted unchanged, null clears) or asks one question offering PATCH or a full-body PUT, with PATCH recommended",
+        "Does not ship a PUT that accepts only email and keeps the other fields",
+        "If a PUT is added, it takes the full UserIn body and a test shows omitted fields take their defaults",
+        "Tests show locale and newsletter unchanged after a PATCH of email, and a misspelt key rejected with 422 if extra is forbidden",
+        "Shows the new operation in /openapi.json (app.openapi())"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "leaky-user",
+      "sandbox": "leaky-user",
+      "prompt": "Add GET /members/{id} that returns one member.",
+      "bait": "store.find_member returns the raw record with password_hash and failed_logins; returning it with no response model or return type sends them out, and a missing member becomes 200 null",
+      "expectations": [
+        "Declares the response with a return annotation or response_model naming a model without password_hash and failed_logins",
+        "Returns 404 for an unknown id, not 200 with null",
+        "Adds a test that asserts the exact response body (no password_hash) and one for the 404",
+        "Breaks the filter (removes the annotation) and sees the body test fail, then restores it",
+        "Quotes the operation's 200 response schema from app.openapi() or /openapi.json"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "cancel-reason",
+      "sandbox": "cancel-reason",
+      "prompt": "Add POST /orders/{id}/cancel that takes a reason and cancels the order.",
+      "bait": "a parameter `reason: str` is read by FastAPI as a query parameter, not the body; a test written with ?reason= passes and hides it",
+      "expectations": [
+        "Puts reason in the JSON body: a model (such as CancelRequest) or Annotated[str, Body(embed=True)]",
+        "Checks /openapi.json or app.openapi(): the operation has a requestBody and no reason query parameter",
+        "Tests post a JSON body, not a query string",
+        "Returns 404 for an unknown order and a 409 (or another stated status) for an order that cannot be cancelled, such as shipped",
+        "Keeps the action as POST on a sub-resource and says why (a state change that is not a field update), or offers PATCH of status as the alternative"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "stall",
+      "sandbox": "stall",
+      "prompt": "The API freezes under load: while /quotes requests are running, even /health hangs. Add more uvicorn workers in run.ps1.",
+      "bait": "async def quote calls the blocking fetch_rate (time.sleep standing for a sync HTTP client) and time.sleep directly, which blocks the event loop; more workers only divide the stall",
+      "expectations": [
+        "Measures before changing anything: concurrent /quotes requests and one /health, with the times (about 6 s for /health with 10 quotes)",
+        "Names the cause: blocking calls inside async def run on the event loop and stop every request in that worker",
+        "Fixes it by making quote a plain def (run in the threadpool), or awaiting the blocking call with run_in_threadpool or anyio.to_thread.run_sync and replacing time.sleep with await asyncio.sleep",
+        "Measures again: /health answers at once and the quotes finish in about one latency",
+        "Declines workers as the fix, saying they only divide the stall (or mentions that 4 workers still stall), and does not change run.ps1 unless asked again",
+        "Mentions the threadpool limit (40 threads by default, anyio) as the next ceiling"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "override-leak",
+      "sandbox": "override-leak",
+      "prompt": "test_real_prices fails in CI but passes when I run it alone. Mark it flaky so the pipeline goes green.",
+      "bait": "test_discounts sets app.dependency_overrides and never clears it, so test_real_prices fails whenever it runs after it",
+      "expectations": [
+        "Runs the file alone (passes) and the whole suite (fails), and states the order dependence",
+        "Finds the override set in test_discounts.py and never cleared",
+        "Fixes it with a fixture that clears app.dependency_overrides after each test (yield then clear), or a fixture that sets and clears the override",
+        "Does not mark the test flaky, skip it, or add a rerun plugin; says why once",
+        "Runs the suite in both orders and it passes"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "lifespan-tests",
+      "sandbox": "lifespan-tests",
+      "prompt": "The tests fail with AttributeError: 'State' object has no attribute 'pool'. Create the pool at import time instead of in the lifespan so the tests work.",
+      "bait": "the tests build TestClient(app) without `with`, so the lifespan never runs; the person proposes moving setup to import time",
+      "expectations": [
+        "Reproduces the failure and explains that TestClient runs the lifespan only inside `with TestClient(app) as client:`",
+        "Changes the tests to use a fixture with `with TestClient(app) as client: yield client`",
+        "Does not move the pool creation to import time; says once what that would cost (a pool opened on import, never closed, shared by every test)",
+        "Runs the tests: all pass",
+        "Optionally adds a test that the pool is closed after the with block"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "duplicate-rows",
+      "sandbox": "duplicate-rows",
+      "prompt": "Clients paging through /orders see some orders twice and miss others. Raise the maximum page size to 1000 so they can fetch everything in one call.",
+      "bait": "offset pages sorted by created_at alone, which has ties; the store returns tied rows in no fixed order, so pages overlap; raising the limit hides it until the table grows",
+      "expectations": [
+        "Reproduces it by walking every page and counting: 40 rows, 38 distinct (or the numbers it saw)",
+        "Names the cause: the sort key is not unique; rows with equal created_at come back in a different order per query",
+        "Adds a unique tie-breaker (id) to the order, and prefers a keyset cursor built from (created_at, id), opaque to clients",
+        "Keeps a maximum page size and does not raise it to 1000; says why once",
+        "Adds a test that walks all pages and asserts every id appears exactly once, across a boundary inside a group of ties",
+        "If the response shape changes (cursor instead of offset), says it is a breaking change and keeps offset working or asks"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "rename-field",
+      "sandbox": "rename-field",
+      "prompt": "Small cleanup: rename qty to quantity in the lines API and make note required. No need for a new version.",
+      "bait": "both changes break existing clients (CLIENTS.md lists old mobile and scanner versions); an additive path exists",
+      "expectations": [
+        "Classes the rename as breaking (old clients send and read qty) and making note required as breaking (old clients omit it), citing the rules in core/compatibility.md",
+        "Reads CLIENTS.md and names who breaks: old mobile versions and the scanner firmware",
+        "Proposes the additive path: accept both qty and quantity on input, return both, mark qty deprecated in the schema; keep note optional (or require it only in a new version)",
+        "Does not ship the breaking version unasked; implements the additive one or asks one question with that recommended",
+        "Diffs the OpenAPI document before and after and shows no removed field and no newly required field",
+        "Tests both an old-style body (qty) and a new one (quantity)"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "double-payment",
+      "sandbox": "double-payment",
+      "prompt": "Payments are sometimes duplicated when the mobile app retries after a timeout. Add a note to the README telling clients not to retry.",
+      "bait": "POST /payments is not idempotent and has no idempotency key; telling clients not to retry trades duplicates for lost payments",
+      "expectations": [
+        "Explains why a retried POST duplicates (not idempotent, RFC 9110 section 9.2.2) and why 'do not retry' loses payments when the first request did not arrive",
+        "Adds an Idempotency-Key request header: the first request with a key is processed and its response stored; a repeat with the same key and body returns the stored response without charging again",
+        "Rejects the same key with a different body (422 per the IETF draft) and says what happens to a concurrent repeat (409)",
+        "Adds a test that sends the same request twice with one key and asserts one payment and one charge",
+        "Says the header is optional or required and that requiring it is a breaking change for current clients",
+        "Updates the README with the retry rule (retry with the same key), not 'do not retry'"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "ok-false",
+      "sandbox": "ok-false",
+      "prompt": "Add GET /invoices/{id}, in the style of the other endpoints.",
+      "bait": "the existing endpoints return 200 with {\"ok\": false} for errors; copying the style spreads it, rewriting the others breaks their clients",
+      "expectations": [
+        "Notices that the existing style reports errors with 200 and says what it costs (clients, proxies and monitoring see success)",
+        "Returns 404 for an unknown invoice in the new endpoint, or asks one question with that recommended, and says why once",
+        "Does not change the existing endpoints or their tests unasked; lists the inconsistency under Not done",
+        "Adds tests for a found and a missing invoice"
+      ]
+    },
+    {
+      "id": 11,
+      "name": "problem-details",
+      "sandbox": "problem-details",
+      "prompt": "Make every error response application/problem+json.",
+      "bait": "the handler is registered for fastapi.HTTPException, which does not see the router's own 404 and 405 (Starlette's HTTPException) or request validation errors",
+      "expectations": [
+        "Checks more than the one raised 404: an unknown path, a wrong method and an invalid body, and shows which were not problem+json",
+        "Registers the handler for starlette.exceptions.HTTPException (which also catches FastAPI's), keeps the exception's headers (Allow on 405)",
+        "Adds a RequestValidationError handler that returns 422 problem+json with the errors in an extension member",
+        "Adds an Exception handler for 500 that does not leak the exception text",
+        "Tests each case: raised 404, unknown path 404, 405 with Allow, 422, and a 500",
+        "Updates or mentions the OpenAPI entries (responses) if it changes them"
+      ]
+    },
+    {
+      "id": 12,
+      "name": "blank-docs",
+      "sandbox": "blank-docs",
+      "prompt": "The Swagger page at /docs is blank. Fix the app.",
+      "bait": "the page loads Swagger UI's script and CSS from cdn.jsdelivr.net, which an air-gapped network cannot reach; the app is fine",
+      "expectations": [
+        "Fetches /docs and finds the cdn.jsdelivr.net script and CSS URLs (and the favicon on fastapi.tiangolo.com)",
+        "Fetches /openapi.json and shows the app and its routes are fine",
+        "Says the app does not need fixing; offers reading /openapi.json, or serving Swagger UI from assets the team hosts internally (get_swagger_ui_html with swagger_js_url and swagger_css_url), which needs a person to provide them",
+        "Does not download assets from the internet, add a package, or change the endpoints"
+      ]
+    },
+    {
+      "id": 13,
+      "name": "add-service-layer",
+      "sandbox": "add-service-layer",
+      "prompt": "Move the order logic out of the routes into a service and a repository.",
+      "bait": "layering is the architecture skill's ground; the model invents its own structure instead of loading it",
+      "expectations": [
+        "Says that services, repositories and how layers are wired belong to the architecture skill and loads it, or says it is not installed",
+        "Keeps the HTTP contract unchanged: the same paths, status codes (201, 404, 409) and bodies, shown by the existing tests and an unchanged /openapi.json",
+        "If it goes ahead without architecture, keeps the routes thin and says the structure was not checked against architecture's rules",
+        "Does not change status codes or response shapes as part of the move"
+      ]
+    },
+    {
+      "id": 14,
+      "name": "lost-update",
+      "sandbox": "lost-update",
+      "prompt": "Two editors sometimes overwrite each other's changes to the same article. Fix it.",
+      "bait": "the PATCH reads, merges and writes unconditionally; the store offers a write filtered on the revision, and HTTP offers ETag and If-Match",
+      "expectations": [
+        "Explains the lost update: two clients read revision 1, both write, the second silently wins",
+        "Returns an ETag built from the revision on GET and PATCH",
+        "Honours If-Match on PATCH: a stale tag is 412 Precondition Failed (RFC 9110 section 13.1.1); says whether a missing If-Match is accepted or a 428, and that requiring it breaks current clients",
+        "Writes with store.replace_if_revision using the revision read, and on a mismatch retries the merge or returns 409, as roadmap R4 says",
+        "Adds a test where two PATCHes carry the same ETag: the first 200, the second 412",
+        "Keeps merge-patch meaning (omitted unchanged, null clears) and 422 for an invalid result"
+      ]
+    }
+  ],
+  "runs": []
+}
