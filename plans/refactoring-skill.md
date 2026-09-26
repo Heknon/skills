@@ -1,13 +1,14 @@
 # Plan: the refactoring skill
 
-Status: part 1 built (core, steps, legacy); recipes wait for architecture.
-Built on branch `claude/skill-refactoring` as `skills/refactoring/`:
-`SKILL.md`, `glossary.md`, `core/` (9), `steps/` (12), `legacy/` (4),
-`tools/` (two scripts and their pages), `reference/` (2), `examples/`
-(4), and `evals/` with 11 scenarios. The Reshape row of the router says
-the recipes arrive with the architecture skill; `recipes/` and the
-`service-from-router` eval are part 2. Sections 10 to 12 record what was
-decided, verified and changed.
+Status: built, in two parts (RF1). Built on branch
+`claude/skill-refactoring` as `skills/refactoring/`: `SKILL.md`,
+`glossary.md`, `core/` (9), `steps/` (12), `legacy/` (4), `tools/` (two
+scripts and their pages), `reference/` (2), `recipes/` (a README, one
+recipe per checklist ID L1 to L11, `run_recipes.py` and its
+`pyproject.toml`), `examples/` (5), and `evals/` with 12 scenarios. Part
+2 added the recipes, the `service-from-router` eval and example, and
+restated what seniority's widened change check reports. Sections 10 to
+12 record what was decided, verified and changed.
 
 ## 1. What it is
 
@@ -84,11 +85,12 @@ skills/refactoring/
     inline-function.md  extract-variable.md  extract-class.md
     introduce-parameter-object.md  move-function.md  move-module.md
     split-module.md  replace-conditional.md  replace-magic-value.md
-  recipes/               before and after trees, one commit per step, ran
-    service-from-router/   logic out of a FastAPI route into a service
-    introduce-repository/  data access behind a swappable repository
-    split-model-schema/    DB model and API schema as separate classes
-    layers-to-features/    layer folders to one folder per feature
+  recipes/               one per checklist ID, named by it (as built):
+    README.md              which recipe, pins, shared rules, how they ran
+    L1-query-in-route.md ... L11-unhandleable-exception.md
+                           steps as diffs from the shape's before, each
+                           with its commit, checks and traps
+    run_recipes.py         replays each recipe to the shape's after
   legacy/
     characterization.md  pin what the code does now, odd parts included
     golden-master.md     many outputs to a file, compared after each step
@@ -163,7 +165,9 @@ The lab, on the versions agreed under roadmap R2, must run:
   each step, and each trap reproduced: the missed `mock.patch` string,
   `__all__` entry and entry point.
 - Every recipe from before tree to after tree, tests and linters green at
-  every commit (`git rebase --exec` or a loop; to verify which).
+  every commit (`git rebase --exec` or a loop; to verify which). As
+  built: a replay script, since the before and after trees are the
+  architecture skill's shapes.
 - Which findings catch a broken move or rename on the pinned versions
   (expected: ruff F821, F822, F401; pyright's unresolved import; to
   verify in the lab). The import-all script on src and flat layouts.
@@ -233,9 +237,14 @@ the built navigation skill is; TypeScript later, if asked.
 ## 10. Decisions taken as defaults
 
 - **RF1. Two parts.** Part 1 (core, steps, legacy, tools, reference,
-  examples, evals) is built; `recipes/` and the `service-from-router`
-  eval wait for the architecture skill. SKILL.md's Reshape row says so
-  and, until then, sends a reshape through Plan and Step.
+  examples, evals) was built first; part 2 (`recipes/`, the
+  `service-from-router` eval and example) after the architecture skill.
+  The recipes are named by architecture's checklist IDs, one per ID,
+  not by the four names drafted in section 5: code-review and
+  architecture cite the IDs, and the shapes are the before and after
+  trees. `layers-to-features` has no ID and was dropped: architecture
+  follows the codebase's layout and never migrates it unasked; a person
+  who asks gets a **Plan** of `steps/move-module.md` steps.
 - **RF2. Shims.** Every caller changed only when all are in the
   repository and nothing outside names the old path; otherwise, or when
   unsure, a shim (`core/public-surface.md`), written as an explicit
@@ -245,11 +254,15 @@ the built navigation skill is; TypeScript later, if asked.
   mirror). `ruff check --fix` only for imports, never on a module whose
   unused import is a shim. Two standard-library scripts replace what an
   IDE would check: `tools/import_all.py` and `tools/public_names.py`.
-- **RF4. The harness.** Not changed in this build: roadmap R7 had
-  already changed `check_change.py`. The lab confirmed what the change
-  covers and recorded what it still misreads
-  (`reference/change-check.md`, section 12); the gaps are reported to
-  seniority's owner, not fixed here.
+- **RF4. The harness.** Not changed by this skill's build. Roadmap R7
+  had changed `check_change.py` to follow a `from x import name`
+  re-export; part 1's lab found what it still misread, and the harness's
+  owner then widened it (aliases, method aliases, `mod.name` and star
+  shims, every `src` folder up to three levels down, `__getattr__` as
+  unreadable, a shim to a missing module of the project failed, a moved
+  function's old handler count; `fixtures/move2/`). Part 2 reran part
+  1's cases and every recipe step against it; `reference/change-check.md`
+  states what it does now, and section 12 what remains.
 - **RF5. Commits.** One local commit per green step, named after the
   step; a red step is undone with a whole-tree stash; never a push.
 - **RF6. Characterization tests** live with the other tests, named
@@ -295,25 +308,62 @@ facts are marked `not run on Windows` or taken from CPython's source.
 - The four examples were replayed from fresh sandboxes, commands in
   PowerShell, and their output copied.
 
+Part 2 added FastAPI 0.141.1 (Starlette 1.7.0), SQLAlchemy 2.1.1,
+aiosqlite 0.22.1 and httpx2, the pins of the architecture skill's
+shapes; its `check_shapes.py` passed all 22 runs in this lab first.
+
+- **Every recipe replayed** from its shape's before to its after with
+  `recipes/run_recipes.py`: 33 steps over the 11 IDs, each applied as a
+  diff and followed by pytest, ruff (`E4,E7,E9,F,B,PLC0415,TRY002`),
+  mypy, `import_all.py`, `public_names.py`, the OpenAPI document and
+  seniority's change check, then committed; every step green (two
+  declared mypy findings, section 12), every final tree identical byte
+  for byte to the shape's after, and L5's behaviour step shown failing
+  before its change. The replay also ran through `uv run` from the
+  recipes folder's own `pyproject.toml` in a fresh copy.
+- **Each recipe's traps** were run as variants of its steps: the wrong
+  order (a raise before its handler, a translation before its handler,
+  a method removed before its caller, a repository changed before its
+  caller), a repository built at import, overrides of a provider a step
+  replaced, patches of a global a step moved, a nested commit inside a
+  transaction, a write outside the unit of work, a class without
+  `__str__`, a pickle across a move, and a worker catching
+  `HTTPException`.
+- **The service-from-router eval**: bait reproduced on a fresh copy (a
+  service built inside its provider, 3 of 4 tests failed; the override
+  moved in `conftest.py`, 4 passed with the wiring untested; the
+  `HTTPException` moved, every test green and a worker got an HTTP
+  error); the intended three steps kept the tests unchanged and the
+  probe of status, headers and body and the OpenAPI document identical.
+  Replayed in PowerShell 7.5 as `examples/service-from-router.md`.
+- **Seniority's widened change check** was rerun on part 1's cases (the
+  rename with an alias, the move into an existing module, the split,
+  and the shim matrix), on new cases for what might remain, and on
+  every recipe step.
+- `run_recipes.py` passes ruff 0.16.9 with its default rules and
+  `mypy --strict`.
+
 ## 12. What the lab changed
 
 Findings that corrected the plan or a common belief, each now in the
 skill:
 
-- **The harness after R7** (RF4). It passes a move re-exported with
-  `from x import name` (absolute at the root or in `src/`, or relative),
-  a class moved and re-exported, and a module split into a package; it
-  still reports a changed default in the new place. It still reports as
-  removed: a rename kept as an alias (`old = new`), a method alias in a
-  class, a star re-export, an attribute shim (`f = mod.f`) and a module
-  `__getattr__`. It reports a moved function's `except` without re-raise
-  as a new swallowed error when the destination module existed before,
-  and an assert line that only renamed the call as a changed
-  expectation. It passes, wrongly, a re-export from a module that does
-  not exist (treated as outside the working directory) and an absolute
-  re-export in a package below `packages/<name>/src/`, even with a
-  changed default. Reported for seniority's owner; the skill's
-  `reference/change-check.md` says what to write in the answer.
+- **The harness** (RF4). Part 1 found that the check after R7 reported
+  correct shims as removals (an alias, a method alias, a star, an
+  attribute shim, a module `__getattr__`), counted a moved `except` as
+  new when the destination existed, and passed a shim to a missing
+  module and an absolute re-export under `packages/<name>/src/`. After
+  the owner's widening, all of those read correctly: every shim passes,
+  a changed default behind any of them is reported, the moved handler
+  keeps its count, and the missing module fails. What remains, measured
+  in part 2 (`reference/change-check.md`): a route's dependency
+  parameter renamed or added is reported as a broken signature (recipes
+  L1, L3, L9, and the eval), a narrowed `except` as a new swallowed
+  error (L11), and an assert line that only renamed the call as a
+  changed expectation; a removed public module constant or variable
+  (`TIERS`, `rates`), a star shim whose target leaves the name out of
+  `__all__`, a module `__getattr__` in front of a changed default, and a
+  handler added to a function moved into a new file all pass.
 - The plan expected ruff F821, F822 and F401 and pyright's unresolved
   import to catch broken renames and moves. They do, for their rows only:
   mypy says nothing about a stale `__all__`, and mypy without
@@ -346,9 +396,69 @@ skill:
   more (52.40 against 50.00), because shipping then applied: a reason,
   beyond reviewability, to keep a fix out of the refactoring and ask.
 
+Part 2, the recipes:
+
+- **Only one order stays green.** Add the new place unused, switch the
+  callers, remove the old last; register a handler before anything
+  raises its error. Raising first made the shape's test fail with
+  `app.errors.OutOfStockError: only 1 of apple left` (L4) and
+  `app.main.DuplicateEmailError` (L8), a 500 to a client; removing a
+  method before its caller moved gave `AttributeError: 'Member' object
+  has no attribute 'to_out'`.
+- **An override of a replaced provider is dropped without a word.** L3:
+  once the route used a new provider that opened its own session, a
+  test's override of `get_session` did nothing and the route read the
+  app's database (`'ada@example.com'` against `'test@example.com'`);
+  written to take `Depends(get_session)`, 2 passed. The eval: a service
+  built inside its provider bypassed the override of `get_repo`, and 3
+  of 4 tests failed.
+- **A re-export does not keep a patch of a moved global.** L2: with
+  `TIERS` re-exported, `monkeypatch.setattr(main, "TIERS", ...)`
+  replaced only `app.main`'s name, and the rule, reading
+  `app.pricing.TIERS`, gave 10000 instead of 9000, silently; `setitem`
+  on the shared dict still worked. L9: a patch
+  of `rates` kept working while the provider returned the global, and
+  failed only when the global went.
+- **Moving the commit is a behaviour change, and two ways to do it go
+  wrong.** Keeping the repository's commit inside `transaction()`
+  raised `InvalidRequestError: Can't operate on closed transaction
+  inside context manager`; removing it lost the write of a script that
+  called the repository outside a unit of work (balance 105, then 100,
+  no error). So L5's last step is its own commit, test first.
+- **Typing code can show a bug it always had.** L3's after makes mypy
+  report `union-attr` for the missing user, a 500 before and after (a
+  `ResponseValidationError` inside before, an `AttributeError` after);
+  L6's after reports `arg-type` where raw `dict[str, object]` rows meet
+  the model. The rule "no new finding" needed an exception:
+  `core/checks.md` now says to show the behaviour unchanged with the
+  probe, report the finding, and never silence it; the recipes declare
+  both findings and `run_recipes.py` checks that nothing else is new.
+- **The HTTP contract held where it was expected to move.** The OpenAPI
+  document stayed identical when `response_model=` became a return
+  annotation, when a route gained or changed a dependency parameter,
+  and when `HTTPException` gave way to a domain error and a handler
+  (status, headers with `content-length`, and body identical). It
+  changed only when a response annotation named a schema (L6: items
+  from an open object to `$ref` a schema with both fields `required`).
+- **An exception class changes more than its type.** L11: the message
+  stayed, but `e.args` went from `('order 7 not found',)` to `(7,)`;
+  without `__str__`, the message became `'7'`.
+
 ### For other skills and the roadmap
 
-- **seniority** (harness): the RF4 gaps above. Also, read in the source
+- **architecture**: the L3 and L6 afters add mypy findings
+  (`union-attr` on `User | None`; `arg-type` on `dict[str, object]`
+  rows); a later version could type the stand-in rows and name the
+  missing-user case beside the shape. L3's after replaces `get_session`
+  with a provider that opens its own session, while its
+  `core/wiring.md` chains providers; chaining `get_users` on
+  `get_session` in the shape would keep a test's override working. Each
+  shape's last line could name the recipe's path,
+  `skills/refactoring/recipes/L<n>-*.md`.
+- **seniority** (harness): the remaining RF4 gaps above: route
+  parameters, a narrowed `except`, assert lines that only renamed the
+  call, removed public module constants and variables, star shims past
+  `__all__`, `__getattr__` shims, and new files. Also, read in the source
   and not run: `check_finish.py`'s `run_probe` runs the probe with the
   harness's own Python and `PYTHONPATH` set to the tree, so a probe of a
   `src` layout, or of code that needs the project's installed packages,
