@@ -21,7 +21,7 @@ two disagree, fix both.
 | **mongodb** | `plans/mongodb-skill.md` | `claude/plan-mongodb` | efficient queries, indexes, `explain`, aggregation, schema design, Beanie |
 | **packaging** | `plans/packaging-skill.md` | `claude/plan-packaging` | `pyproject.toml`, build backends, wheels, entry points, internal indexes |
 | **linting** | `plans/linting-skill.md` | `claude/plan-linting` | ruff, mypy and pyright: read, fix, configure, suppress |
-| **git** | `plans/git-skill.md` | `claude/plan-git` | everyday git, conflicts, bisect, recovery, bundles across the air gap |
+| **git** | `plans/git-skill.md` | `claude/plan-git` | everyday git, naming commits, branches and tags by the repository's convention, tidying history before review, conflicts, bisect, recovery, bundles across the air gap |
 | **refactoring** | `plans/refactoring-skill.md` | `claude/plan-refactoring` | behaviour-preserving steps, each checked |
 | **code-review** | `plans/code-review-skill.md` | `claude/plan-code-review` | a severity-ranked review that ends in a verdict |
 
@@ -119,6 +119,7 @@ points at it.
 | `reveal_type` and reading an inferred type | navigation | linting owns what a checker error means |
 | `pyproject.toml` | packaging owns `[project]`, `[build-system]`, dependency groups and `[tool.uv]`, including `[[tool.uv.index]]` | each tool's own table belongs to its skill (ruff, mypy, pyright: linting; pytest: pytest); deployment's `gitlab/python.md` points to packaging for index settings |
 | a formatting-only commit, `.git-blame-ignore-revs` | linting decides | git performs |
+| commit message, branch and tag conventions; tidying unpushed history | git | deployment owns GitLab push rules and squash-on-merge settings, read through the API; packaging owns the version a tag carries; code-review may comment on commits but never rewrites them |
 | the step-by-step change procedure | refactoring | code-review may suggest a refactoring; it does not perform one |
 | proving every reference to a name was found | navigation owns the searches | refactoring owns deciding a rename is complete |
 | a bug found during a refactoring | debugging | refactoring stops the step; it never fixes and restructures in one step |
