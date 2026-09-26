@@ -39,6 +39,10 @@ expect 1 check_change.py --before fixtures/change/missing --after fixtures/chang
 # a move that changes a default or drops a method still fails
 expect 0 check_change.py --before fixtures/move/before --after fixtures/move/after_good
 expect 1 check_change.py --before fixtures/move/before --after fixtures/move/after_bad
+# aliases, method aliases, attribute, star and __getattr__ shims, src layouts, a function moved into an
+# existing file with its except block; a changed default behind a re-export and a shim to a missing module fail
+expect 0 check_change.py --before fixtures/move2/before --after fixtures/move2/after_good
+expect 1 check_change.py --before fixtures/move2/before --after fixtures/move2/after_bad
 
 expect 0 check_finish.py --dir fixtures/finish/good
 expect 1 check_finish.py --dir fixtures/finish/bad_behaviour

@@ -222,7 +222,12 @@ the module that defines the name and compares its signature there, and
 compares a module that became a package with its `__init__.py`. The
 `fixtures/move/` pair (a correct move and split, and a move that changed
 a default and dropped a method) is in `run_fixtures.sh`; the harness
-passes.
+passes. After the refactoring lab, it also follows aliases (`old = new`),
+method aliases, `mod.name` and star-import shims, looks under every
+`src` folder up to three levels down, treats a module-level
+`__getattr__` as unreadable rather than removed, fails a shim that
+points at a missing module of the project, and gives a function moved
+into an existing file its old error-handler count (`fixtures/move2/`).
 
 ## 7. What the plans changed in this roadmap
 
