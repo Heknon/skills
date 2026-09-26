@@ -1,6 +1,9 @@
 # Plan: the architecture skill
 
-Status: draft for decision. Nothing is built yet.
+Status: built on `claude/skill-architecture` (`skills/architecture/`).
+The decisions below were taken as their recommended defaults (section
+10); sections 11 and 12 record how it was verified and what the lab
+changed.
 
 ## 1. What it is
 
@@ -413,3 +416,135 @@ today?
 *Recommended, with no precedent:* `errors.py`, one per feature, with the
 base and categories in the package's shared `errors.py`. With a
 precedent, the precedent, including `exceptions.py` or one central file.
+
+## 10. Decisions taken as defaults
+
+- **AR1.** One skill; folders `beanie/` and `sqlalchemy/`.
+- **AR2.** By feature for a new service (`core/design.md`), with a
+  smaller flat layout when the requirements allow; by layer taught for
+  recognising; hexagonal only for a port with two adapters.
+- **AR3.** Domain models as frozen pydantic models apart from the
+  schemas in new code; a codebase that uses the `Document` or row as its
+  domain model is a card exception, and the hard rule stays (L3).
+- **AR4.** The service owns the transaction through a unit of work;
+  commit-after-yield accepted where the card shows it, with
+  `scope="function"` (the lab showed why, section 12).
+- **AR5.** Verified on SQLAlchemy 2.1.1; the SQL recipe also passed on
+  2.0.54. SQLModel gets a reading note (`sqlalchemy/sqlmodel.md`).
+- **AR6.** PostgreSQL with asyncpg for the recipes, aiosqlite for the
+  evals. No PostgreSQL server could be run in the lab (section 11), so
+  the recipes ran on aiosqlite and every PostgreSQL fact is read in
+  source and marked *not run on PostgreSQL*. The team's PostgreSQL
+  version is still open.
+- **AR7.** Each checklist item suggests a severity on code-review's
+  scale (blocker, major, minor, nit, from its plan's CR1); the searches
+  are the default check; import-linter contracts appear in the recipes
+  as optional.
+- **AR8.** Placement lives here; the description says "from one new
+  file to a FastAPI service".
+- **AR9.** Positional fields passed to `super().__init__(*fields)`, the
+  message in `__str__`, an optional class-level `code`; keyword-only
+  with `__reduce__` and `@dataclass` exceptions taught for reading. The
+  team's current form is still open.
+- **AR10.** `errors.py`, one per feature, base and categories in the
+  package's shared `errors.py`; the precedent wins where one exists.
+
+## 11. How it was verified
+
+- **Versions.** Python 3.12.14 (exception probes also on 3.11.15;
+  3.10.20 to confirm `StrEnum` and `add_note` are missing there),
+  FastAPI 0.141.1 with Starlette 1.7.0, pydantic 2.13.5, pytest 9.1.1,
+  Beanie 2.2.0 on PyMongo 4.18.2, SQLAlchemy 2.1.1 (and 2.0.54) with
+  greenlet 3.5.6, aiosqlite 0.22.1, asyncpg 0.31.0 (installed, source
+  read), ruff 0.16.9, import-linter 2.15, SQLModel 0.0.47 on SQLAlchemy
+  2.0.54, httpx2 2.13.1. All installed with uv from the public index.
+- **Servers.** MongoDB 8.0.32 as a single-node replica set on its own
+  port and dbpath. PostgreSQL 16 packages were present, but the
+  container's `/dev/null` is a regular file owned by root, so `initdb`
+  run as the `postgres` user failed (`sh: 1: cannot create /dev/null:
+  Permission denied`); repairing `/dev/null` or running PostgreSQL in a
+  private mount namespace was refused by the session's permission
+  policy. Nothing was run on PostgreSQL.
+- **Recipes.** Both run in fresh copies: SQL 13 passed (SQLite); Beanie
+  15 passed with the replica set, 9 passed and 6 skipped without it.
+  Mutants (translation removed, a secret field in the response schema, a
+  commit in the repository, the transaction removed from the service,
+  from the unit of work, `session=` removed) each failed a test; two
+  equivalent mutants are recorded in `recipes/README.md`. ruff (E, F, I,
+  B, UP, N, TRY, EM, BLE, PLC0415) and `ruff format --check` clean;
+  `lint-imports` 2 contracts kept, and broken as expected when a
+  service imported `fastapi` or a repository imported a schema.
+- **Shapes.** `shapes/check_shapes.py` ran all eleven: 22 of 22 sides
+  passed; the after-only tests of L5 and L7 fail on their befores.
+- **Checklist and placement searches.** Run with ripgrep (the same regex
+  engine as Zed's `grep`) over both recipes and all fifteen sandboxes,
+  and over baited copies of three sandboxes: the recipes had no hits
+  except the Beanie unit of work's own `start_session(` (allowed); each
+  bait line was hit; what each search misses is in
+  `checklist/finding.md` and `placement/place-a-thing.md`.
+- **Evals.** 16 scenarios over 15 sandboxes, written before the
+  procedures. Each bait was reproduced and each intended fix passed
+  (review-diff and new-service are judged from the answer: their baits
+  were checked through the searches and the recipes' layout).
+- **Not run.** PostgreSQL; Windows and PowerShell (commands written in
+  PowerShell form are marked *not run on Windows*); Zed's own `grep`
+  tool (the multiline route search ran with ripgrep `-U` only).
+
+## 12. What the lab changed
+
+Findings that corrected the plan or a common belief, each now in the
+skill:
+
+- **An `__init__` without `super().__init__` does not leave `str(e)`
+  empty** when it takes positional arguments: `BaseException.__new__`
+  stores them, so `str(e)` is `'7'` or `'(7, 100)'`, not the message.
+  It is empty only with keyword-only fields. The plan's section 5a said
+  otherwise (`placement/custom-errors.md`).
+- **An unpicklable error does not just raise `TypeError`**: through
+  `ProcessPoolExecutor` the caller got `BrokenProcessPool` and the real
+  error was lost; through `multiprocessing.Pool.apply` the call never
+  returned. Passing positional fields but only a formatted message to
+  `super().__init__` fails too (`missing 1 required positional
+  argument`).
+- **A Beanie 2.2.0 `Document` cannot be built before `init_beanie`**
+  (`CollectionWasNotInitialized`), so the plan's "most sandboxes need no
+  database" does not hold for Beanie models: users-beanie needs a server,
+  and fakes return domain models, which is the practical case for AR3.
+- **A returned `Document` sends `_id`, and a missing one is `200
+  null`**; a `Document` body lets a client set `_id` as well as
+  `is_admin`.
+- **`MissingGreenlet` arrives wrapped**: `StatementError` around it,
+  and in a route a pydantic `get_attribute_error` inside
+  `ValidationError` or `ResponseValidationError`, so `except
+  MissingGreenlet` would not even catch it.
+- **SQL writes need the unit of work even for one row**: without
+  `transaction()` the insert was never committed; `begin()` after any
+  read fails (`A transaction is already begun on this Session.`).
+- **Commit-after-yield with the default scope answered 201 for a row
+  that was not stored**, rerun with SQLAlchemy (the api skill's timing
+  finding, applied to AR4).
+- **A Mongo single-document use case should not open a transaction**,
+  so the two recipes' services differ in which use cases call
+  `transaction()`; the plan assumed one service shape for both.
+- **A Beanie call without `session=` escapes the transaction**, while
+  PyMongo 4.17's `AsyncClientSession.bind()` makes calls without it
+  join; Beanie keeps a find's session for the chained update.
+- **Handler choice**: a handler for a base class catches subclasses and
+  the nearest class in the MRO wins regardless of registration order
+  (Starlette 1.7.0), confirming "one handler per category".
+- **ruff's `TRY003` and `EM101`/`EM102` fire on built-in exceptions
+  too**: style rules, not a reason for a custom class.
+- **SQLModel 0.0.47 cannot be installed with SQLAlchemy 2.1** (it pins
+  `<2.1.0`), and a table model as body and response leaked
+  `password_hash` and accepted `is_admin`.
+- **import-linter's layer order matters**: with `schemas` listed below
+  `repository`, a repository importing a schema passed; `"schemas |
+  dependencies"` as the second layer caught it.
+- **`pytest.skip(allow_module_level=True)` in a tests `conftest.py`
+  aborts the run** (exit 1) on pytest 9.1.1; the Mongo skip moved into a
+  fixture.
+- **uv picked CPython 3.14.7** for a project with `requires-python =
+  ">=3.12"`; both recipes passed there too.
+- **The checklist grew no IDs**: L1 to L11 held for every bait; L10 and
+  L11 are found partly by the placement searches and by reading.
+

@@ -12,9 +12,9 @@ raised in:  <path>   caught or translated in: <path or the category handler>
 tests:      <status or behaviour per class, run line>
 ```
 
-Every behaviour quoted here was rerun on Python 3.12.14 in the lab
-(`python exc_probe.py`); the plan's first draft, checked on 3.11 and
-3.12.3, was wrong in one place, corrected below.
+Every behaviour quoted here was rerun in the lab on Python 3.12.14, and
+the same probe printed the same lines on 3.11.15. The plan's first
+draft was wrong in one place, corrected below.
 
 ## 1. When to define one
 
@@ -100,7 +100,7 @@ A custom error carries structured attributes for what a handler needs
 (`order_id`, `limit`) and a readable `str(e)` for logs. How the class
 stores them decides whether it survives `pickle` (multiprocessing,
 `ProcessPoolExecutor`, task queues) and `copy.deepcopy`. The probes,
-*lab,* Python 3.12.14:
+*lab,* Python 3.12.14 and 3.11.15:
 
 | Class | `str(e)` | `e.args` | pickle and deepcopy |
 | --- | --- | --- | --- |
@@ -174,7 +174,7 @@ class InsufficientFundsError(ConflictError):
 - Catch the narrowest class; `except Exception` only at the outermost
   edge (ruff `BLE001`: `Do not catch blind exception: Exception`).
 - Add context without a new class: `e.add_note("while importing row
-  12")` (3.11 and later).
+  12")` (3.11 and later; *lab:* missing on 3.10.20).
 - Never make a caller parse `str(e)` or `e.args[0]` to tell two cases
   apart: that is a missing class (L11).
 

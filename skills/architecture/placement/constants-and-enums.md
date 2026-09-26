@@ -38,7 +38,8 @@ constant. Wrong: editing the constant, a second constant chosen by
 
 ## Enums
 
-Use `StrEnum` (Python 3.11 and later) for a value that crosses the wire
+Use `StrEnum` (Python 3.11 and later; *lab:* `cannot import name
+'StrEnum'` on 3.10.20) for a value that crosses the wire
 or is stored as text. *lab,* Python 3.12.14, pydantic 2.13.5, FastAPI
 0.141.1, `class Status(StrEnum): OPEN = "open"` against a plain
 `Enum`:
