@@ -1,0 +1,26 @@
+[project]
+name = "acme-billing"
+version = "3.1.0"
+description = "Billing service, on pydantic 1 until its migration."
+requires-python = ">=3.12"
+dependencies = [
+    # The bound is what the published wheel requires. uv's lock drops it
+    # while the path source is in use, so check it by hand when core moves.
+    "acme-core>=1.2,<2",
+    "pydantic<2",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.4"]
+
+[build-system]
+requires = ["hatchling==1.32.4"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+acme-core = { path = "../core", editable = true }
+
+[[tool.uv.index]]
+name = "mirror"
+url = "https://pypi-mirror.example.com/simple"
+default = true

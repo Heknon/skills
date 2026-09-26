@@ -27,16 +27,20 @@ tag:        <member>-v<version> (or the repository's convention), made by <the p
    whose features it needs, `<` the next major), rebuild, read again
    (lab: `Requires-Dist: acme-core<2,>=1.2`).
 4. **The siblings must be installable too.** A published acme-api needs
-   a published acme-core inside its bound. Check both together, the way
-   an installer will see them:
+   a published acme-core inside its bound. Install the new wheel by its
+   path into a scratch venv, dry run, with the internal index named on
+   the command line, the way a consumer will resolve it:
    ```
-   uv build --all-packages
    uv venv $env:TEMP\release-check --clear
-   uv pip install --python $env:TEMP\release-check\Scripts\python.exe --dry-run --find-links dist acme-api
+   uv pip install --python $env:TEMP\release-check\Scripts\python.exe --dry-run --index internal=<internal index url> dist\acme_api-0.5.0-py3-none-any.whl
    ```
-   (lab on Linux, `bin/python`: `+ acme-api==0.4.0`, `+ acme-core==1.2.0`
-   ... ). If the sibling's version is not on the internal index yet, it
-   is released first.
+   Lab (Linux paths): before acme-core was published, ``Because acme-core
+   was not found in the package registry and all versions of acme-api
+   depend on acme-core>=1.2,<2``; after, `+ acme-core==1.2.0`. So the
+   sibling is released first. (Without `--index` on the command line the
+   explicit internal index from `pyproject.toml` was not searched, and
+   the same error came back.) To check members against each other
+   instead, `uv build --all-packages` and use `--find-links dist`.
 5. **Tag** in the repository's convention: the git skill owns the naming
    (such as `api-v0.4.0`); a tag per member keeps each member's release
    apart. Create it only when asked.

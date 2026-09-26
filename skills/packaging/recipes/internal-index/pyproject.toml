@@ -1,0 +1,37 @@
+# Recipe: the mirror as the default index, the internal index explicit,
+# internal packages pinned to it by name, and a publish URL. Locked,
+# installed and published (to a local test index, never a public one) on
+# uv 0.12.19, Python 3.12. Credentials never go here: set
+# UV_INDEX_INTERNAL_USERNAME and UV_INDEX_INTERNAL_PASSWORD, or use a
+# netrc file or `uv auth login`. Change: the two URLs, the publish URL,
+# the names under [tool.uv.sources].
+[project]
+name = "acme-orders"
+version = "0.2.0"
+description = "Order keys and totals."
+requires-python = ">=3.12"
+dependencies = [
+    "acme-report>=1.0",   # internal: from the internal index only
+    "click>=8.1",         # public: from the mirror
+]
+
+[build-system]
+requires = ["hatchling==1.32.4"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+# Every internal package is named here. Without the line, uv looks for it
+# on the mirror, where anyone can publish the same name.
+acme-report = { index = "internal" }
+
+[[tool.uv.index]]
+name = "internal"
+url = "https://gitlab.example.com/api/v4/groups/12/-/packages/pypi/simple"
+publish-url = "https://gitlab.example.com/api/v4/projects/34/packages/pypi"
+# explicit: used only for packages named in [tool.uv.sources].
+explicit = true
+
+[[tool.uv.index]]
+name = "mirror"
+url = "https://pypi-mirror.example.com/simple"
+default = true

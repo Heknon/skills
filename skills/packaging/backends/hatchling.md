@@ -46,6 +46,11 @@ it reaches both.
 **The silent mistake:** `packages = ["report"]` while the code is in
 `src/report/` built a wheel of four `.dist-info` files and no error.
 
+**`force-include` reaches the wheel, not the editable install:** a file
+mapped to `notifier/defaults.toml` was in the wheel, but `uv run pytest`
+read `src/notifier/` and failed with `FileNotFoundError`. Keep data
+inside the package folder when the code reads it through the package.
+
 ## Version
 
 | Source | Configuration | Error when it cannot |
