@@ -31,7 +31,8 @@ is. Real shapes, from the lab, are in `python/tracebacks.md`.
 
 2. **Take the first exception**: the top block of a chain, or every
    numbered sub-exception of a group. The last line of the output is the
-   last exception, which is often only a consequence.
+   last exception, which is often only a consequence. What its type
+   means, and which value to print for it: `core/understand-error.md`.
 3. **In that block, read the last frame**: the raising frame. Whose file
    is it? A path under the project, under `site-packages` or `.venv`, or
    under the interpreter's `lib` folder (the standard library).
@@ -68,6 +69,7 @@ is. Real shapes, from the lab, are in `python/tracebacks.md`.
 | `Fatal Python error: Segmentation fault` and `Current thread ...` | a crash dump from `faulthandler` | `core/crash.md` |
 | `Timeout (0:00:10)!` and `Thread 0x...` | a stack dump from `dump_traceback_later` | `core/hang.md` |
 | `[Previous line repeated 996 more times]` then `RecursionError` | the same call recursing without end | the repeated frame's arguments: they never approach the stop condition |
+| a log line such as `ERROR crm.import: record 3 failed: 'NoneType' object has no attribute 'strip'` and no traceback | an exception caught and logged with `str(e)` | `core/understand-error.md`, step 7 |
 
 ## Never
 

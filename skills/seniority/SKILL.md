@@ -13,6 +13,17 @@ or never.
 Load one procedure at a time, at the moment it names. Each procedure ends
 in a **verdict**, a decision with its reason, or in **stop and ask**.
 
+## Find the skill first
+
+Before the first action, and again when an error appears, list the
+skills this environment offers and read every description. Load the one whose description names a noun
+or the verb of the task: an error's type or message, a library, a tool,
+a file type; fix, explain, improve, review. Open the file its router
+gives for your kind of task, and follow it; its facts outrank your
+memory. Write the result as the `skill:` line of your notes
+(`core/scope.md`, question 9). Only when no description names the task
+do you go on with this skill alone.
+
 ## Keep notes
 
 Keep short working notes from the first step: the goal in the person's
@@ -39,10 +50,10 @@ for a moment when it arrives, and no others.
 
 | Moment | When | Load |
 | --- | --- | --- |
-| **Start** | a task arrives | `core/scope.md`, `core/assumptions.md`, `core/first-step.md` |
+| **Start** | a task arrives | the skill whose description names the task (below), `core/scope.md`, `core/assumptions.md`, `core/first-step.md` |
 | **Choose** | you must pick a tool, a skill, or between two ways forward | `core/choosing-a-tool.md`, `core/trade-offs.md` |
 | **Challenge** | before acting on a plan, before anything irreversible, before accepting an idea or reporting a conclusion | `core/challenge.md`, and `core/pushback.md` if the idea is the person's and the evidence disagrees |
-| **Investigate** | something is wrong and you do not know why | `core/reading-errors.md`, `core/hypothesis-loop.md` |
+| **Investigate** | something is wrong and you do not know why | `core/reading-errors.md`, `core/hypothesis-loop.md`, and the skill whose description names the error |
 | **Stuck** | a loop rule fired | `core/loop-breaker.md` |
 | **Finish** | you are about to say you are done, or you must stop | `core/done.md`, and `core/asking.md` if a person must decide |
 
@@ -104,6 +115,10 @@ may add rules for its domain, but it does not remove these.
     task, not predicted. A change is observed by running something, not by
     rereading it. Describe what you changed from the files, not from
     memory of what you meant to write.
+12. **A skill that names the task comes before memory.** Read every
+    skill description before the first action. When one names the
+    task's error, library, tool or verb, load it and open the file its
+    router gives, before you explain, plan or change anything.
 
 ## Conventions of this team
 

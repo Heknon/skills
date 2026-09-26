@@ -58,6 +58,8 @@ the domain is known at Start, load its skill at Start.
 | which version is installed | its version command | the version in a lock file, which may not be what is installed |
 | does this work | run it | reading it and deciding |
 | why was it written this way | the history of that line, then its commit message | inventing a reason |
+| what does this error mean, what should I print | the skill whose description names the error's type, its language or its tool; then the code that raised it | memory, or a generic list of categories |
+| make this error, message or log better | the skill whose description names improving errors, before editing | changing the error's type or message from memory |
 | what does the person want | ask | guessing twice |
 
 ## Never

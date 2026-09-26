@@ -392,3 +392,115 @@ Not made here; listed for their owners.
 - **navigation** (`tools/terminal-probes.md`): `uv run --python <v>`
   replaces `.venv`; `--isolated` does not. 3.13+ may print colour codes
   when `PYTHON_COLORS=1`; `PYTHON_COLORS=0` turns them off.
+
+## 14. Understand and Improve (added later)
+
+A review found the skill strong on reading a traceback's shape and thin
+on two things: what an error's message means, and making the error
+better once the bug is fixed. Added:
+
+- **Understand**, part of the Read kind: `core/understand-error.md` (from
+  the last line to the value behind it and where it came from, with a
+  verdict) and `python/exceptions.md` (per exception: what it usually
+  means, which value to print, where to search; messages that change
+  between versions; messages that hide the cause; Windows file errors;
+  client connection errors; the shapes of pydantic's, httpx's,
+  SQLAlchemy's and PyMongo's errors and what each leaks; errors with no
+  traceback). Domain meaning stays with pydantic, api, mongodb and
+  architecture; a library's behaviour is settled by offline-docs.
+- **Improve**, a new kind: `core/improve-the-error.md`, entered from
+  `core/loop.md` step 7 after the proof. A message naming the value, its
+  source and what was expected; `raise ... from exc` at a boundary; a
+  note; a check at the boundary; `logger.exception`. Guard rails, each
+  from a lab failure: keep the type callers catch, no secret in the
+  text, a new class by architecture's `placement/custom-errors.md`, its
+  own commit after the fix, the reproduction rerun, a test of the type
+  and the value named.
+- `SKILL.md`: the Read row gains both files, a new Improve row,
+  invariants 9 (match by type, never by words) and 10 (an improved
+  error keeps its type, carries no secret, lands in its own commit).
+  Two worked examples, `examples/understand-an-error.md` and
+  `examples/improve-the-error.md`. `python/versions.md` gains the
+  message rows below. Five evals (14 to 18) with four sandboxes:
+  `shape-change`, `caught-by-type`, `token-in-url`, `lost-traceback`.
+
+### How it was verified
+
+Python 3.12.14, 3.13.15 and 3.14.7 installed with uv 0.12.19; pytest
+9.1.1; git 2.43.0; pydantic 2.13.5, httpx 0.28.1, SQLAlchemy 2.1.1 with
+the standard `sqlite3` driver, PyMongo 4.18.2 against a MongoDB 8.0.32
+`mongod` started in the lab. One probe script raised about sixty
+standard exceptions on all three versions and the outputs were diffed.
+Windows facts were read in CPython 3.12.14's source (`PC/errmap.h`,
+`Objects/exceptions.c`, `Modules/_io/fileio.c`,
+`Modules/posixmodule.c`, `Lib/test/test_fileio.py`). All five baits
+were reproduced; every intended fix or improvement passed, and its test
+failed with it reverted. The evals were not run with the weak model.
+
+### What the lab found
+
+- **Messages that changed between versions**: a JSON trailing comma
+  (3.13 says `Illegal trailing comma`), `too many values to unpack` gains
+  `got 3` on 3.14, and 3.14's `list.index` no longer names the value.
+  The earlier notes on circular imports (3.13+ blames the file name for
+  top-level scripts; a package says circular on all three) and on a
+  local `json.py` (3.13+ says to rename it) were confirmed.
+- **`str(e)` loses the most**: for a `KeyError` it is only the key
+  (`'price'`), so a log line of `str(e)` hides the type; notes added with
+  `add_note` are not in `str(e)` either. `logger.exception` outside an
+  `except` logs `NoneType: None`.
+- **Libraries put secrets and personal data in their messages**: httpx's
+  `HTTPStatusError` prints the whole URL with its query string; SQLAlchemy
+  prints the row's parameters (`hide_parameters=True` removes them);
+  PyMongo's `DuplicateKeyError` prints the duplicated value; pydantic
+  prints `input_value` (`hide_input_in_errors=True` removes it).
+  Wrapping one with `raise ... from exc` still prints the token in the
+  chain.
+- **Catching by the built-in class misses library classes**: httpx's
+  `ConnectError` is not a `ConnectionError` or an `OSError`, and its
+  `ReadTimeout` is not a `TimeoutError`; `decimal.InvalidOperation` is
+  an `ArithmeticError`, not a `ValueError`.
+- **Changing an error's type broke its caller** (eval
+  keep-the-caught-type): a new `AmountError(ValueError)` escaped
+  `except InvalidOperation`, and the import crashed on the line it used
+  to set aside.
+- **A mixed commit is a trap**: reverting a fix-and-message commit to
+  back out the message brought the bug back; with two commits, the same
+  revert kept the fix.
+- **A caught error can exit 0**: the lost-traceback import logged a
+  failed record and exited 0.
+- **Windows (source, not run)**: `open()` reports `[Errno n]` from the C
+  runtime; `os.remove` and `os.rename` report `[WinError n]` with
+  Windows' own text; 2 and 3 become `FileNotFoundError`, 5, 32 and 33
+  `PermissionError`; opening a directory gives `[Errno 13]`, where Linux
+  gives `IsADirectoryError`; a refused connection is `WSAECONNREFUSED`,
+  10061, still `ConnectionRefusedError`.
+
+### Can seniority find it? (routing lab)
+
+Seniority loads on every task and names no skill by design, so the new
+files are only useful if a model starting from seniority reaches them.
+Measured with a weaker model standing in for MiniMax, given seniority
+and the other skills as a list of descriptions (as Zed lists them), on
+four read-only tasks from the new sandboxes: a `KeyError`, a log line
+with no traceback, a `decimal.InvalidOperation`, and "plan a better
+error message". The files each run opened were taken from its tool
+calls, not from its own report.
+
+| Round | Change before it | Reached the target file |
+| --- | --- | --- |
+| 1 | none | 0 of 4; no run opened the debugging skill |
+| 2 | seniority: `reading-errors.md` question 3 and the Investigate row point at a skill that names the error | 1 of 4; two stopped at debugging's router |
+| 3 | debugging: "an error in front of you" above the router; seniority's Start row names the match | 3 of 8; 4 never left seniority; both improve runs planned a `ValueError` |
+| 4 | seniority: "Find the skill" section, `scope.md` question 9 and a `skill:` notes line; debugging's description opens with explaining and improving errors | 6 of 8; both improve runs kept the caught type |
+| 5 | seniority: the section moved to the top of `SKILL.md`, invariant 12 | 6 of 8; every run reached debugging; improve 2 of 2 |
+| 6 | debugging's description names the three files | 5 of 6 on the three understand tasks |
+
+What it found: one pointer two files deep (`first-step.md` to
+`choosing-a-tool.md`) was never followed; rules in prose under a table
+were skipped, while a table row, a notes field and an invariant were
+used; a model that opened a router often answered from it, until the
+description itself named the file. Without the skill, the improve task
+planned exactly the type change that `core/improve-the-error.md`
+forbids, in 4 of 4 runs. Seniority evals 12 and 13 now test this route.
+Not measured: MiniMax itself, and Zed's own skill listing.

@@ -1,0 +1,3 @@
+# A made-up token for this exercise; it opens nothing.
+base_url = "http://127.0.0.1:9"
+api_token = "rpt-7f3a9c2e41d84b6f"

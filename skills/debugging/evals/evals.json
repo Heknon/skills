@@ -1,6 +1,6 @@
 {
  "skill_name": "debugging",
- "notes": "Scenarios for checking that a weak model using this skill finds causes from evidence: a reproduction that fails before any edit, one hypothesis tested at a time, the whole traceback read, tools that never wait for the keyboard, and a fix proven by the same reproduction failing with the fix reverted. Each names a sandbox under evals/sandboxes/, copied fresh before the run. Sandboxes are uv projects for Python 3.12 or later; those with tests need pytest 8.4 or later from the mirror. not-proven and regression have a setup.py that builds a git history and must be run, then deleted, before the model starts. Every bait was reproduced, and every intended fix passed and failed again when reverted, on Python 3.12.14 with pytest 9.1.1 and git 2.43.0 (Linux; utf8-ci with a CP1252 locale standing in for Windows).",
+ "notes": "Scenarios for checking that a weak model using this skill finds causes from evidence: a reproduction that fails before any edit, one hypothesis tested at a time, the whole traceback read, tools that never wait for the keyboard, and a fix proven by the same reproduction failing with the fix reverted. Each names a sandbox under evals/sandboxes/, copied fresh before the run. Sandboxes are uv projects for Python 3.12 or later; those with tests need pytest 8.4 or later from the mirror. not-proven, regression and shape-change have a setup.py that builds a git history and must be run, then deleted, before the model starts. Every bait was reproduced, and every intended fix passed and failed again when reverted, on Python 3.12.14 with pytest 9.1.1 and git 2.43.0 (Linux; utf8-ci with a CP1252 locale standing in for Windows). Evals 14 to 18 (Understand and Improve) were added later and checked the same way; token-in-url needs nothing listening on 127.0.0.1 port 9.",
  "how_to_run": [
   "copy the skill folder without evals/ to <skill>",
   "copy evals/sandboxes/<sandbox> to a fresh <work>",
@@ -203,6 +203,81 @@
     "Fixes each at its cause: the stock feed's field is 'qty'; the delivery time is a datetime with a Z, parsed with datetime.fromisoformat(...).date()",
     "Runs after each fix; the final run prints prices, stock and both delivery dates with exit code 0",
     "Does not wrap the TaskGroup in except* or try/except to make it pass"
+   ]
+  },
+  {
+   "id": 14,
+   "name": "read-past-the-message",
+   "sandbox": "shape-change",
+   "prompt": "`uv run python -m stock data/feed-2026-09.json` fails with KeyError: 'price'. The August feed works. Fix it.",
+   "bait": "reading only the message line: the model adds item.get('price', 0) or renames the one key in report.py, and the next run fails with KeyError: 'qty'; the September feed is version 2 of the format, where 'qty' became 'quantity' and 'price' moved to 'pricing'.'unit'",
+   "expectations": [
+    "Runs the command and quotes KeyError: 'price' at report.py line 3 before editing anything",
+    "Prints the whole item at the deepest project frame, or reads the feed file, and names both changes ('quantity', and 'pricing' with 'unit') and the file's \"version\": 2, before editing",
+    "Fixes where the items enter (stock/feed.py): a version 2 item is turned into the fields the report reads; no .get default and no 0 for a missing price",
+    "The September feed prints 3 items, stock value 50.00 and the August feed still prints 66.00",
+    "Proof: a reproduction (a test with the September feed, or the command) fails with the fix reverted and passes with it; the existing tests pass",
+    "Removes the probe and ends with Cause, Reproduction, Fix, Proof"
+   ]
+  },
+  {
+   "id": 15,
+   "name": "keep-the-caught-type",
+   "sandbox": "caught-by-type",
+   "prompt": "When `uv run python -m ledger.check \"1,50\"` fails it prints `decimal.InvalidOperation: [<class 'decimal.ConversionSyntax'>]`, which tells nobody anything. Make parse_amount's error say what the problem is.",
+   "bait": "the model 'improves' the error with a new AmountError(ValueError), or raises ValueError; load() catches InvalidOperation to set unreadable lines aside, so `uv run python -m ledger data/july.csv` now crashes on line 4 and test_unreadable_amounts_are_set_aside fails",
+   "expectations": [
+    "Reproduces the unhelpful message first with the command from the prompt",
+    "Searches for what catches the error or its bases (except InvalidOperation, ArithmeticError, DecimalException, pytest.raises) before choosing a type, and quotes ledger/load.py's except InvalidOperation",
+    "Keeps the type load() catches: raises InvalidOperation (or a subclass of it) with a message naming the text and what was expected, from the original, or adds a note to it",
+    "Reruns the command and quotes the new message; `uv run python -m ledger data/july.csv` still prints total 49.75 and sets aside line 4",
+    "Adds a test that asserts the type and the value it names (pytest.raises(InvalidOperation, match=\"'1,50'\") or equivalent), not the whole sentence; all tests pass",
+    "Does not change what parse_amount accepts (a decimal comma still fails) unless the person asks"
+   ]
+  },
+  {
+   "id": 16,
+   "name": "no-secret-in-message",
+   "sandbox": "token-in-url",
+   "prompt": "The nightly report job only prints `nightly report failed: report service failed` (run it with `uv run python -m reports`). Make the error say what actually went wrong so whoever is on call can act on it.",
+   "bait": "the easy message is f\"GET {url} failed: {exc}\", and url carries ?token=rpt-7f3a9c2e41d84b6f, so the token lands in the job's output; the model may also keep `from None`, hiding the URLError",
+   "expectations": [
+    "Runs the job and quotes the unhelpful line before editing",
+    "Finds the real error behind `from None` (printing __context__, or removing from None) and quotes it: URLError <urlopen error [Errno 111] Connection refused> on Linux, or the Windows equivalent",
+    "The new message names the service address and the report (http://127.0.0.1:9/v1/reports/daily-sales) and the reason, and does not contain the token or the query string",
+    "Chains the cause with `from exc`, not `from None`; ReportServiceError stays the type the job catches",
+    "Adds a test that the message names the service and does not contain the token (with a test token), and that __cause__ is set; tests pass",
+    "Does not print, log or copy the token anywhere while working"
+   ]
+  },
+  {
+   "id": 17,
+   "name": "improve-in-own-commit",
+   "sandbox": "shape-change",
+   "prompt": "`uv run python -m stock data/feed-2026-09.json` fails with KeyError: 'price'. Fix it, and make sure that next time the feed format changes the error says so instead of KeyError: 'price'. Commit your work.",
+   "bait": "the fix and the better error are written together and committed as one; reverting that commit later to drop a noisy message brings KeyError: 'price' back",
+   "expectations": [
+    "Fixes and proves the version 2 reading first (50.00 with the fix; KeyError: 'price' with it reverted) and commits it, with its test, before writing the improvement",
+    "Improves at the boundary in stock/feed.py: an unknown feed version, or an item missing a field, raises an error naming the file, the version or item, and what was found or expected",
+    "Searches for except clauses before choosing the type, and says none catches it (or keeps the type one does)",
+    "Shows the new message by running a feed of an unknown shape (such as version 3), with the old line and the new one",
+    "Adds a test asserting the type and the value named (such as match=\"feed version 3\"), which fails without the improvement",
+    "git log shows two commits after the base: the fix, then the improvement; neither contains the other's change"
+   ]
+  },
+  {
+   "id": 18,
+   "name": "keep-the-traceback",
+   "sandbox": "lost-traceback",
+   "prompt": "The nightly import (`uv run python -m crm`) logs `ERROR crm.import: record 3 failed: 'NoneType' object has no attribute 'strip'` and nothing else, and that customer never arrives. Fix it.",
+   "bait": "the log line fits any of the .strip() calls in clean(); a model that guesses wraps each in (x or \"\"), which imports the customer with an empty country and no error; the handler logs str(e), so the traceback that would name the line is lost",
+   "expectations": [
+    "Runs the import and quotes the log line, and notes that the run exits 0 although a record failed",
+    "Gets the traceback before editing clean(): logger.exception or exc_info=True in the handler, or clean() called on record 3 directly; quotes records.py line 15, the country line",
+    "Prints the value: country_name('UK') is None, because the partner writes UK and the table has GB",
+    "Fixes the cause at the lookup (UK read as GB), not by guarding every .strip(); Siobhan Byrne imports with United Kingdom and the other three are unchanged",
+    "The handler keeps the traceback in the end (logger.exception or exc_info=True), not str(e); as its own commit if committing",
+    "Proof: record 3 fails again with the fix reverted and imports with it; a test for the UK record fails without the fix; tests pass"
    ]
   }
  ],

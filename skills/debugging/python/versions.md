@@ -11,6 +11,11 @@ where a row says otherwise.
 | a frame whose whole line failed | markers shown | no marker line (*lab:* `log = open(...)` had none) | as 3.13 |
 | coloured tracebacks | never | on a terminal; `PYTHON_COLORS=1` forces escape codes even into a pipe, and wins over `NO_COLOR` (*lab*); `PYTHON_COLORS=0` turns them off | as 3.13 |
 | `100 // 0` message | `integer division or modulo by zero` | `integer division or modulo by zero` | `division by zero` |
+| JSON with a trailing comma | `Expecting property name enclosed in double quotes` | `Illegal trailing comma before end of object` | as 3.13 |
+| `a, b = [1, 2, 3]` | `too many values to unpack (expected 2)` | as 3.12 | `... (expected 2, got 3)` |
+| `[1].index(2)` | `2 is not in list` | as 3.12 | `list.index(x): x not in list` |
+| a circular import between two top-level scripts | `... from partially initialized module 'a' (most likely due to a circular import)` | `... from 'a' (consider renaming '.../a.py' if it has the same name as a library you intended to import)`; inside a package, all three say circular | as 3.13 |
+| a local file shadows a standard library module | `module 'json' has no attribute 'loads'` | adds `(consider renaming '.../json.py' since it has the same name as the standard library module named 'json' ...)` | as 3.13 |
 | `breakpoint()` stops at | the line **after** it (`bp.py(5)`) | the `breakpoint()` line itself (`bp.py(4)`) | as 3.13 |
 | end of input at a `(Pdb)` prompt from `breakpoint()` | `bdb.BdbQuit` traceback, exit 1 | same | prints `Quitting pdb will kill the process. Quit anyway? [y/n]`, then exit 1 |
 | `quit` in post-mortem under `python -m pdb` | restarts the program (`Post mortem debugger finished. The ... will be restarted`) and waits at its first line | exits | exits |

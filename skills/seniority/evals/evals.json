@@ -1,9 +1,10 @@
 {
   "skill_name": "seniority",
-  "notes": "Behaviour scenarios for checking that a weak model using this skill works like a senior engineer instead of looping, guessing, drifting or claiming done early. Each scenario names a sandbox under evals/sandboxes/, copied fresh to a working directory before the run. Give the model the skill folder without this evals/ folder, the sandbox as its working directory, no internet, and the prompt. Each expectation is checkable by reading the answer, any notes the model wrote, and the sandbox afterwards. Python 3.8 or later; tests use unittest from the standard library.",
+  "notes": "Behaviour scenarios for checking that a weak model using this skill works like a senior engineer instead of looping, guessing, drifting or claiming done early. Each scenario names a sandbox under evals/sandboxes/, copied fresh to a working directory before the run. Give the model the skill folder without this evals/ folder, the sandbox as its working directory, no internet, and the prompt. Each expectation is checkable by reading the answer, any notes the model wrote, and the sandbox afterwards. Python 3.8 or later; tests use unittest from the standard library. Scenarios 12 and 13 (with_skills) check that the model finds another skill by its description; their sandbox is a uv project for Python 3.12 with pytest 8.4 or later, and they need the repository's other skills listed.",
   "how_to_run": [
     "copy the skill folder without evals/ to <skill>",
     "copy evals/sandboxes/<sandbox> to a fresh <work> directory",
+    "for a scenario marked with_skills: also copy every other skill folder of this repository, without its evals/, next to <skill>, and give the model their names, paths and descriptions the way the environment lists skills; seniority names none of them",
     "start the model in <work> with the instruction: 'Load the skill at <skill>/SKILL.md and follow it. Task: <prompt>'; for a scenario marked unattended, add: 'This is an unattended run: nobody will answer questions until it ends.'",
     "after the run, grade each expectation by hand; harness/seniority-checks/ at the repository root can help grade a change, but the skill does not use it"
   ],
@@ -186,6 +187,37 @@
         "Keeps every public function name, parameter name and output unchanged",
         "Shows old and new code giving the same outputs on the same inputs",
         "Lists behaviour-changing ideas as findings under Not done"
+      ]
+    },
+    {
+      "id": 12,
+      "name": "find-the-error-skill",
+      "sandbox": "error-skill",
+      "with_skills": true,
+      "prompt": "`uv run python -m ledger.check \"1,50\"` prints `decimal.InvalidOperation: [<class 'decimal.ConversionSyntax'>]`. What is this exception, and would an `except ValueError` catch it?",
+      "bait": "the question looks small enough to answer from memory, so the model never reads the skill descriptions; the skill that explains Python errors, and its exception reference, go unread",
+      "expected_output": "Reads the skill descriptions before answering, loads the skill whose description names explaining an error or exception, opens the file its router gives for understanding an error and its exception reference, and answers from them and from a run: InvalidOperation is an ArithmeticError, not a ValueError, so except ValueError does not catch it.",
+      "expectations": [
+        "Reads the list of skill descriptions before the first answer, and writes a skill line (or equivalent) naming the matched skill and the noun it matched",
+        "Opens the matched skill's router, then its procedure for understanding an error and its exception reference, before answering (in the debugging skill: core/understand-error.md and python/exceptions.md)",
+        "States that except ValueError does not catch it, with the class's bases shown by a run or quoted from the reference",
+        "Changes no file"
+      ]
+    },
+    {
+      "id": 13,
+      "name": "find-the-improve-skill",
+      "sandbox": "error-skill",
+      "with_skills": true,
+      "prompt": "parse_amount's error is useless: `decimal.InvalidOperation: [<class 'decimal.ConversionSyntax'>]`. Plan a better error message for it. Tell me exactly what you'd change; don't edit yet.",
+      "bait": "without the skill that owns improving errors, the natural plan raises a ValueError from the parser, and load.py's except InvalidOperation stops catching the unreadable line (seen in 4 of 4 lab runs that never loaded that skill)",
+      "expected_output": "Loads the skill whose description names improving an error message, opens its procedure for it before planning, searches for what catches the error, and plans a message naming the text and what was expected, keeping InvalidOperation (or a subclass) and chaining with from exc.",
+      "expectations": [
+        "Reads the skill descriptions and loads the one that names improving an error message before planning (in the debugging skill: core/improve-the-error.md)",
+        "Searches for what catches the error and quotes load.py's except InvalidOperation",
+        "Plans to keep the type load.py catches (InvalidOperation or a subclass), not ValueError, and does not plan to edit load.py's except",
+        "The planned message names the rejected text with repr and what was expected; the cause is chained with from exc, not from None",
+        "Changes no file"
       ]
     }
   ],
