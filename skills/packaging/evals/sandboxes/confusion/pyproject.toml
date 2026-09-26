@@ -1,0 +1,24 @@
+[project]
+name = "orders"
+version = "0.9.0"
+description = "Order intake service."
+requires-python = ">=3.12"
+dependencies = ["acme-utils>=1.3"]
+
+[tool.uv]
+package = false
+# Added so uv looks at both indexes and takes the newest version.
+index-strategy = "unsafe-best-match"
+
+[[tool.uv.index]]
+# Internal packages, published by our CI. In this sandbox a local folder.
+name = "internal"
+url = "indexes/internal"
+format = "flat"
+
+[[tool.uv.index]]
+# The mirror of the public index. In this sandbox a local folder.
+name = "mirror"
+url = "indexes/mirror"
+format = "flat"
+default = true

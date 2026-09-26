@@ -1,0 +1,13 @@
+[project]
+name = "rates"
+version = "2.0.0"
+description = "Currency conversion rates for the billing services."
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["hatchling>=1.32"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = ["pytest>=8.4"]

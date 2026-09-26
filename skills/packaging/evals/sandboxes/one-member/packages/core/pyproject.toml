@@ -1,0 +1,13 @@
+[project]
+name = "acme-core"
+version = "1.2.0"
+requires-python = ">=3.12"
+dependencies = [
+]
+
+[build-system]
+requires = ["hatchling>=1.32"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = ["pytest>=8.4"]

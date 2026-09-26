@@ -1,0 +1,21 @@
+[project]
+name = "acme-worker"
+version = "0.3.0"
+requires-python = ">=3.12"
+dependencies = [
+    "acme-core>=1.2,<2",
+    "click>=8.1",
+]
+
+[project.scripts]
+acme-worker = "acme_worker.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.32"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = ["pytest>=8.4"]
+
+[tool.uv.sources]
+acme-core = { workspace = true }
