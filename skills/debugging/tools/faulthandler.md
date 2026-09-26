@@ -11,7 +11,7 @@ Windows.
 | --- | --- |
 | `uv run python -X faulthandler app.py` | dump on a fatal error: segfault, abort, bus error, illegal instruction, floating-point exception |
 | `$env:PYTHONFAULTHANDLER = "1"` | the same, for every Python started from this shell |
-| `uv run python -X dev app.py` | development mode: faulthandler on, asyncio debug on, more warnings (*lab:* `faulthandler.is_enabled()` was `True`) |
+| `uv run python -X dev app.py` | development mode, which turns faulthandler and asyncio debug mode on among other checks (*lab:* `faulthandler.is_enabled()` was `True`, and the slow-step line appeared) |
 | `faulthandler.enable()` in code | the same, from that point |
 
 *lab:* a segfault with it on printed `Fatal Python error: Segmentation
