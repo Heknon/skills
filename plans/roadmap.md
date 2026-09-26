@@ -227,7 +227,14 @@ method aliases, `mod.name` and star-import shims, looks under every
 `src` folder up to three levels down, treats a module-level
 `__getattr__` as unreadable rather than removed, fails a shim that
 points at a missing module of the project, and gives a function moved
-into an existing file its old error-handler count (`fixtures/move2/`).
+into an existing file its old error-handler count (`fixtures/move2/`). After
+refactoring's recipes, it also treats a public module-level value
+(`rates`, `TIERS`) as part of the API, and a star shim re-exports only
+what the target's `__all__` lists (`fixtures/move3/`). Still not caught,
+by design, since they need judgement: a renamed parameter that FastAPI
+fills, an `except` narrowed to a class, a `__getattr__` shim over a
+changed default, and an `except` added in a new file outside the
+snapshot.
 
 ## 7. What the plans changed in this roadmap
 

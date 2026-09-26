@@ -78,6 +78,7 @@ class Signature:
     params: List[Tuple[str, str]]  # (kind, name)
     defaults: Dict[str, str]
     handlers_without_raise: int
+    variable: bool = False  # a module-level value, not a callable: only its presence is compared
 
 
 def default_text(node: ast.AST) -> str:
@@ -116,6 +117,15 @@ def public_api(source: str) -> Optional[Dict[str, Signature]]:
         return None
     api: Dict[str, Signature] = {}
     for node in tree.body:
+        targets = []
+        if isinstance(node, ast.Assign) and not isinstance(node.value, (ast.Name, ast.Attribute)):
+            targets = [target.id for target in node.targets if isinstance(target, ast.Name)]
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.value is not None \
+                and not isinstance(node.value, (ast.Name, ast.Attribute)):
+            targets = [node.target.id]
+        for target in targets:  # aliases (`old = new`) are resolved by find_signature instead
+            if target != "__all__":
+                api[target] = Signature([], {}, 0, variable=True)
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             api[node.name] = signature_of(node)
         elif isinstance(node, ast.ClassDef):
@@ -196,6 +206,17 @@ def aliases(source: str) -> Dict[str, str]:
                         and isinstance(item.value, ast.Name):
                     found[f"{node.name}.{item.targets[0].id}"] = f"{node.name}.{item.value.id}"
     return found
+
+
+def dunder_all(source: str) -> Optional[List[str]]:
+    """A module's literal `__all__`, or None when it has none (or builds it dynamically)."""
+    tree = module_tree(source)
+    for node in tree.body if tree else []:
+        if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "__all__" for t in node.targets) \
+                and isinstance(node.value, (ast.List, ast.Tuple)):
+            return [element.value for element in node.value.elts
+                    if isinstance(element, ast.Constant) and isinstance(element.value, str)]
+    return None
 
 
 def has_module_getattr(source: str) -> bool:
@@ -284,6 +305,11 @@ def find_signature(after: str, path: str, source: str, name: str, depth: int = 0
         module, level = bound[head]
         return follow(module, level, rest)
     for module, level in star_imports(source):
+        target, _ = resolve_module(after, path, module, level)
+        text = read(target) if target else None
+        exported = dunder_all(text) if text is not None else None
+        if exported is not None and head not in exported:
+            continue  # `import *` only brings names listed in the target's __all__
         signature, resolved = follow(module, level, name)
         if signature is not None:
             return signature, True
@@ -344,6 +370,8 @@ def compare_python(path: str, old: str, new: str, api: List[str], errors: List[s
         if after is None:
             api.append(f"{path}: {name} was removed or renamed")
             continue
+        if before.variable or after.variable:
+            continue  # a value that still exists; module-constants reports a changed constant
         old_names = [param for param in before.params]
         new_names = [param for param in after.params]
         common = min(len(old_names), len(new_names))

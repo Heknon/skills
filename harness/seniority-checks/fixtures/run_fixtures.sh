@@ -43,6 +43,9 @@ expect 1 check_change.py --before fixtures/move/before --after fixtures/move/aft
 # existing file with its except block; a changed default behind a re-export and a shim to a missing module fail
 expect 0 check_change.py --before fixtures/move2/before --after fixtures/move2/after_good
 expect 1 check_change.py --before fixtures/move2/before --after fixtures/move2/after_bad
+# a public module variable is part of the API; a star shim only re-exports names in the target's __all__
+expect 0 check_change.py --before fixtures/move3/before --after fixtures/move3/after_good
+expect 1 check_change.py --before fixtures/move3/before --after fixtures/move3/after_bad
 
 expect 0 check_finish.py --dir fixtures/finish/good
 expect 1 check_finish.py --dir fixtures/finish/bad_behaviour
