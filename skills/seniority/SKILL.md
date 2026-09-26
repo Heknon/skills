@@ -13,6 +13,17 @@ or never.
 Load one procedure at a time, at the moment it names. Each procedure ends
 in a **verdict**, a decision with its reason, or in **stop and ask**.
 
+## Find the skill first
+
+Before the first action, and again when an error appears, list the
+skills this environment offers and read every description. Load the one whose description names a noun
+or the verb of the task: an error's type or message, a library, a tool,
+a file type; fix, explain, improve, review. Open the file its router
+gives for your kind of task, and follow it; its facts outrank your
+memory. Write the result as the `skill:` line of your notes
+(`core/scope.md`, question 9). Only when no description names the task
+do you go on with this skill alone.
+
 ## Keep notes
 
 Keep short working notes from the first step: the goal in the person's
@@ -31,18 +42,6 @@ read it off the page.
    **Stuck**.
 4. The task is taking far more steps than its size warrants
    (`core/scope.md`): go to **Stuck**.
-
-## Find the skill first
-
-This skill knows how to work, not what to know. Before the first action,
-and again when an error appears, list the skills this environment offers
-and read every description. Load the one whose description names a noun
-or the verb of the task: an error's type or message, a library, a tool,
-a file type; fix, explain, improve, review. Open the file its router
-gives for your kind of task, and follow it; its facts outrank your
-memory. Write the result as the `skill:` line of your notes
-(`core/scope.md`, question 9). Only when no description names the task
-do you go on with this skill alone.
 
 ## The six moments
 
@@ -116,6 +115,10 @@ may add rules for its domain, but it does not remove these.
     task, not predicted. A change is observed by running something, not by
     rereading it. Describe what you changed from the files, not from
     memory of what you meant to write.
+12. **A skill that names the task comes before memory.** Read every
+    skill description before the first action. When one names the
+    task's error, library, tool or verb, load it and open the file its
+    router gives, before you explain, plan or change anything.
 
 ## Conventions of this team
 
