@@ -28,6 +28,9 @@ spec:
   `hook-succeeded` deletes a successful Job; a failed one stays, so its
   logs can be read: `kubectl logs job/<release>-migrate -n <ns>`.
 - `backoffLimit: 0`: a migration is not retried blindly.
+- An index build on a live MongoDB collection is planned as a one-off
+  job before the release, with a person's go-ahead: the mongodb skill's
+  `core/index-live.md`.
 - Hooks wait on `--timeout`, per hook; set it above the migration's
   longest run.
 - On a first install, `pre-install` runs before any other object of the

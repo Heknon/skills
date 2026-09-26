@@ -29,6 +29,8 @@ thousand nodes. Which stored field that is, per backend, is in
      chosen by the customer but from a short list, and each definition is a
      thing a person would call "what failed".
    - `db.system=<database product>` for a database. Add `server.address`.
+     Reading slow `db.system=mongodb` spans is the mongodb skill's
+     `core/diagnose.md`.
    - `messaging.system=<broker product>` for a queue. Add
      `messaging.destination.name`.
    No, the set of names grows with traffic or with objects: **attribute**.
