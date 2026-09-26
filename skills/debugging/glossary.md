@@ -21,6 +21,8 @@ One sentence per term. Use these words and no synonyms.
 | first exception | The top traceback in a chain: the one that started it. |
 | exception group | An `ExceptionGroup` holding several unrelated exceptions, each with its own traceback, printed with `|` borders. |
 | prove the fix | Run the same reproduction with the fix (passes) and with the fix reverted (fails). |
+| error type | The exception's class, printed with its module before the colon (`json.decoder.JSONDecodeError`); what an error is matched by, never its words. |
+| error improvement | A change to what an error says, not to what the code does: a message naming the value, `raise ... from exc`, a note, a check at the boundary, or `logger.exception`; its own commit after the fix. |
 | regression | A bug that was not there at an older version; found by bisecting between a good and a bad commit. |
 | good commit | A commit where the reproduction passes, checked by running it, not assumed. |
 | stack dump | Every thread's current stack, printed by `faulthandler`, `py-spy dump` or 3.14's `python -m pdb -p`, while a process hangs or when it crashes. |
