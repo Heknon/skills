@@ -7,8 +7,10 @@ Status: draft for decision. Nothing is built yet.
 Safe everyday git for a model that cannot afford to lose work: state
 checked before and after every change, deliberate staging, merges and
 conflicts done properly, bisect, recovery, and carrying work across the
-air gap. Every command is in a form that never waits for an editor, a
-pager or a password. Each command the skill uses has one risk class:
+air gap. It also names things the way the repository already does
+(commit messages, branch names, tags) and tidies a branch's history
+before anyone else sees it. Every command is in a form that never waits
+for an editor, a pager or a password. Each command the skill uses has one risk class:
 
 | Class | Examples | What the model does first |
 | --- | --- | --- |
@@ -55,6 +57,8 @@ version they ran on, and evals written first. No hooks, no aliases.
 | --- | --- | --- |
 | **Orient** | say what state the repository is in | branch, upstream, ahead and behind, staged, unstaged and untracked files, any merge, rebase, cherry-pick or bisect in progress, stashes |
 | **Commit** | commit a change | the files staged by name, `diff --cached --stat`, the hash and message |
+| **Name** | write a commit message, name a branch or a tag | the convention found and where (a file, a tool's config, or the last 30 subjects), then the name or message |
+| **Tidy** | clean up a branch's history before review: fix, reword, reorder, drop, split or squash commits | the gate passed (not pushed, or the person's own branch), the backup branch, `log --oneline` before and after, and proof the code did not change |
 | **Branch** | create, switch, rename, delete or track a branch | the branch, its upstream, `status` after |
 | **Integrate** | bring main into a branch, or a branch into main | merge or rebase, with the reason; the result; tests run after |
 | **Conflict** | resolve a conflict | per file: what each side and the base did, the resolution, tests after |
@@ -82,6 +86,12 @@ version they ran on, and evals written first. No hooks, no aliases.
 | **Operation left half done** | a merge, rebase or bisect still in progress when the model reports done |
 | **Line-ending churn** | a one-line fix committed as a whole-file change |
 | **Command from memory** | a flag that does not exist, or behaves differently on this version |
+| **Empty message** | `fix`, `update`, `changes`, `WIP`, `address review`; a subject that says what the diff already shows and never why |
+| **Convention ignored** | `Fixed bug` in a repository of `fix(billing): ...` subjects; Conventional Commits forced on a repository of plain subjects; the issue key CI requires left out |
+| **Mixed commit** | a bug fix, a rename and a formatting sweep in one commit; it cannot be reverted or bisected alone |
+| **Unusable branch name** | spaces or `..` in the name; `fix/x` refused because a branch `fix` exists; a name that differs from another only in case, which collides on Windows |
+| **Tidy that changed the code** | a squash or reorder that dropped a hunk or kept a stale version; no backup branch, so nothing to compare with |
+| **Tidy of shared history** | a pushed branch someone else builds on, rebased "to clean it up" |
 
 ## 5. Layout
 
@@ -90,18 +100,99 @@ skills/git/
   SKILL.md     router, risk classes, invariants, session setup, answer
   glossary.md  ours, theirs, base, upstream, detached HEAD, ...
   core/        one procedure per kind, each ending in a verdict: orient,
-               commit, branch, integrate, conflicts (:1: :2: :3:,
-               zdiff3), undo (pushed? committed? staged?), move-work
-               (stash, cherry-pick, worktrees), bisect, recover,
-               clean-up, secrets, submodules, carry, push
+               commit, name (find the convention, then messages,
+               branches, tags), tidy (history before review), branch,
+               integrate, conflicts (:1: :2: :3:, zdiff3), undo (pushed?
+               committed? staged?), move-work (stash, cherry-pick,
+               worktrees), bisect, recover, clean-up, secrets,
+               submodules, carry, push
   reference/   non-interactive.md (every editor, pager, prompt trap),
                windows.md (quoting, autocrlf, paths, case, credentials),
-               risk.md (each command's class), versions.md
+               risk.md (each command's class), versions.md,
+               conventions.md (Conventional Commits, trailers, GitLab
+               closing patterns, issue keys, branch name rules),
+               rewrite.md (each tidy recipe, verified, and its undo)
   recipes/     bisect-test.ps1 and .sh; a .gitattributes and .gitignore
   examples/    a conflict from the base, a lost branch recovered, a
                bisect run, a branch carried by bundle
   evals/       evals.json and sandbox setup scripts
 ```
+
+## 5a. Naming and tidy history
+
+**Find the convention first (`core/name.md`).** In this order, and the
+answer cites which one decided:
+
+1. Written rules: `CONTRIBUTING.md`, `docs/`, a merge request template.
+2. Tools that enforce one: `commitlint.config.*` or `.commitlintrc*`,
+   `[tool.commitizen]` in `pyproject.toml`, commitizen or gitlint in
+   `.pre-commit-config.yaml`, `.gitlint`, a semantic-release config, a
+   `commit.template`, a CI job that checks messages. GitLab push rules
+   (a message or branch-name pattern) live on the server; deployment owns
+   reading them through the API.
+3. Recent practice: `git log --no-merges -n 30 --format=%s origin/main`
+   for subjects, and `git branch -r --sort=-committerdate` for branch
+   names. A pattern in most of them is the convention.
+4. None of these: the defaults below, and the answer says so.
+
+**Commit messages.** Default with no convention: a subject in the
+imperative ("Add", "Fix", not "Added" or "Fixes"), capitalised, no full
+stop, aiming at 50 characters and never over 72; a blank line; a body
+wrapped at 72 that says why and what changes for a user, since the diff
+already shows how; trailers last (`Refs #12`, `Closes #12`,
+`Co-authored-by:`). Where the repository uses Conventional Commits:
+`type(scope)!: subject`, with the types and scopes it already uses, and
+`BREAKING CHANGE:` as a trailer. A multi-paragraph message is one `-m`
+per paragraph (checked on 2.43.0) or `commit -F <file>` on PowerShell.
+One logical change per commit, and each commit builds and passes its
+tests, so revert and bisect work on it. A formatting sweep is its own
+commit (linting decides when; git makes it and adds it to
+`.git-blame-ignore-revs`).
+
+**Branch names.** Default with no convention: `<type>/<issue>-<slug>`,
+lower case, hyphens, under about 50 characters
+(`fix/PROJ-123-null-discount`). Checked on 2.43.0:
+`git check-ref-format --branch <name>` rejects spaces, `..` and a
+`.lock` ending; a branch `fix` makes `fix/x` impossible ("cannot lock
+ref"). Names that differ only in case collide on Windows (to verify in
+the lab). Renaming: `git branch -m`, push the new name, set its
+upstream; delete the old remote branch only when asked.
+
+**Tags.** Annotated (`git tag -a v1.4.0 -m ...`). Which number is
+packaging's (its PK3); pushing a tag is "leaves this machine".
+
+**Tidy a branch (`core/tidy.md`).**
+
+1. Gate: the commits are not pushed, or the person says the branch is
+   theirs alone (G2). If GitLab squashes on merge for this project, say
+   that tidying matters less and a good merge request title matters more.
+2. Backup: `git branch backup/<branch>` before anything moves.
+3. Run the recipe, with `GIT_EDITOR` and `GIT_SEQUENCE_EDITOR` set.
+4. Prove it: for a tidy that must not change the code (reword, reorder,
+   fixup, squash), `git diff --quiet backup/<branch> HEAD` is empty;
+   `git range-diff` shows what changed per commit; tests pass on the tip.
+5. Answer with `log --oneline <base>..` before and after. Push only when
+   asked, with `--force-with-lease --force-if-includes`.
+
+The recipes, each run on git 2.43.0 with `GIT_EDITOR=false` so any
+editor call would have failed:
+
+| Want | Recipe |
+| --- | --- |
+| fix the last commit | stage, `git commit --amend --no-edit` |
+| reword the last commit | `git commit --amend -m "..."` |
+| fix an older commit | `git commit --fixup=<sha>` (or `":/<subject>"`), then `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash <base>` |
+| reword an older commit | `git commit --allow-empty -m "amend! <old subject>" -m "<new message>"`, then the same autosquash; `--fixup=reword:` refuses `-m` |
+| drop or reorder | `GIT_SEQUENCE_EDITOR` set to a script that edits the todo list (`sed` checked on Linux; the PowerShell form to verify) |
+| squash the whole branch | backup, `git reset --soft $(git merge-base HEAD <base>)`, one commit; the tree equals the backup's |
+| split a commit | `git reset HEAD~1`, then stage and commit by file; by hunk with `git apply --cached` on a partial patch, never `add -p` |
+| committed on the wrong branch | `git branch <right>` at HEAD, then move the wrong branch back to its upstream |
+| wrong author on the last commit | `git commit --amend --reset-author --no-edit` |
+| continue after a conflict | resolve, `git add`, then `GIT_EDITOR=true git rebase --continue`; with a failing editor it stops, since `--continue` opens one |
+| undo the whole tidy | `git reset --hard backup/<branch>` |
+
+Pushed and shared history is never tidied: a bad message stays, a bad
+change is reverted.
 
 ## 6. Dependencies and boundaries
 
@@ -137,6 +228,11 @@ state to clean up, and finds a change in behaviour by running code.
 last three risk classes. Deployment owns GitLab (protected branches,
 merge requests, CI, tokens); git stops at `git push` and its answer.
 Pytest owns the test a bisect script runs; git owns its exit codes.
+Packaging owns version numbers and when to cut a release; git owns the
+tag. Deployment owns GitLab's push rules and the project's squash-on-
+merge setting, read through the API; git follows what they say.
+Code-review may cite `core/name.md` on a merge request's commits; it does
+not rewrite them.
 
 ### Proposed changes to the roadmap
 
@@ -163,9 +259,15 @@ Pytest owns the test a bisect script runs; git owns its exit codes.
 - **Round trips.** Bundles and patch series from Windows applied on
   Linux and back, `bundle verify` on a base-only clone, `am` with CRLF
   files under each `autocrlf` value.
+- **Naming and tidy on Windows.** Every recipe in section 5a on
+  PowerShell 5.1 and 7: `GIT_EDITOR=true` and a `GIT_SEQUENCE_EDITOR`
+  script under Git for Windows, quoting `":/subject"`, `$(...)` written as
+  PowerShell, branch names differing only in case on NTFS. Whether a
+  newer git lets `--fixup=reword:` take `-m`.
 - **GitLab 19.4.** What a protected branch answers to a force push, and
   whether a rewritten secret stays reachable in `refs/merge-requests/*`
-  and forks: to verify in the lab.
+  and forks: to verify in the lab. Which closing patterns (`Closes #12`)
+  close an issue on merge, and what a push rule rejection looks like.
 
 ## 8. Evals, written first
 
@@ -189,6 +291,13 @@ shows in the grade.
 | `crlf` | commit my one-line fix | mismatched `autocrlf`, no `.gitattributes` | a one-line diff committed (Windows run) |
 | `carry` | prepare my branch for the other network | zip the folder; bundle without a base | a bundle of the range, verified on a base-only clone, with a checksum |
 | `half-done` | merge main in and report | a conflict the model resolves but never commits | ends with no operation in progress |
+| `conventional` | commit my fix to the discount rounding | commitlint config and `fix(pricing): ...` subjects | a `fix(pricing):` subject; body says why |
+| `plain-subjects` | commit my change | plain imperative subjects with `Refs PROJ-n` trailers | follows that; no Conventional Commits forced |
+| `mixed-change` | commit my changes | the diff holds a bug fix and a formatting sweep | two commits, the fix first, each with its own message |
+| `branch-name` | start a branch for issue PROJ-42 | a branch `fix` exists; the title has spaces | a valid name that `check-ref-format` accepts, following the remote's pattern |
+| `tidy` | clean up my branch before the merge request | unpushed: a `WIP`, a `fixup` and a typo subject | backup made, tree equal to the backup, no editor call, log before and after |
+| `tidy-shared` | clean up my branch | it is pushed and a colleague branched from it | asks, or leaves history alone; nothing rewritten |
+| `reword-old` | fix the message of my third-last commit | `rebase -i` hangs; `--fixup=reword:` with `-m` fails | an `amend!` commit and autosquash; no editor call |
 
 ## 9. Decisions needed
 
@@ -222,5 +331,23 @@ verify); GitLab's server-side cleanup is described, not run.
 
 *Recommended:* `.gitattributes` (`* text=auto`) decides; the skill never
 changes `core.autocrlf`, and renormalising is its own commit, only when
-asked. Messages follow the repository's recent subjects; otherwise an
-imperative subject under 72 characters and a body that says why.
+asked. Messages follow the convention found as in section 5a (G6).
+
+### G6. Commit message default with no convention
+
+*Recommended:* plain imperative subjects with an issue trailer, as in
+section 5a; Conventional Commits only where the repository uses them or a
+tool enforces them. Which tracker do the teams use for issue keys: GitLab
+issues (`#12`) or Jira (`PROJ-12`)?
+
+### G7. Branch name default with no convention
+
+*Recommended:* `<type>/<issue>-<slug>`, types `feat`, `fix`, `chore`,
+`docs`, `refactor`. Does the team have a pattern, or GitLab push rules?
+
+### G8. When to tidy history
+
+*Recommended:* only when asked, or offered once when an unpushed branch
+holds `WIP` or `fixup!` commits before a merge request; never on pushed
+history unless the person says the branch is theirs alone. Does GitLab
+squash on merge in the team's projects?
