@@ -67,3 +67,21 @@ pyright has no plugin. *Lab, pyright 1.1.414:* it rejected the same
 three calls as mypy without the plugin (`No parameter named "name"
 (reportCallIssue)`), so with `validate_by_name` it will always disagree
 with the runtime; say so rather than change working code.
+
+## pyright and basedpyright on pydantic code
+
+*Lab,* pyright 1.1.414 and basedpyright 1.40.1 with pydantic 2.13.5 and
+pydantic-settings 2.15.0, no config:
+
+| Line | Finding | Fix |
+| --- | --- | --- |
+| `settings = Settings()`, a required field read from `APP_DB_PASSWORD` | both: `Argument missing for parameter "db_password" (reportCallIssue)`; mypy with the plugin: none | one narrow ignore naming the source: `settings = Settings()  # pyright: ignore[reportCallIssue]  # filled from APP_ variables` |
+| `model_config = ConfigDict(extra="forbid")` | basedpyright only (its default mode, `recommended`): ``Type annotation for attribute `model_config` is required because this class is not decorated with `@final` (reportUnannotatedClassAttribute)`` | `model_config: ClassVar[ConfigDict] = ConfigDict(...)`, and `ClassVar[SettingsConfigDict]` on a `BaseSettings` |
+
+With both fixes, pyright and basedpyright reported `0 errors`, mypy
+with the plugin `Success: no issues found in 1 source file`, and at
+runtime `extra="forbid"` still rejected an unknown field
+(`extra_forbidden`). Never make the settings field optional or give it
+a fake default to quiet the checker: that changes what the settings
+accept. What a model's config means is the pydantic skill's
+(`skills/pydantic/typing/checkers.md`).

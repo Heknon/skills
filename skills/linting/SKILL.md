@@ -1,6 +1,6 @@
 ---
 name: linting
-description: Run ruff, mypy and pyright the way the project and CI run them, read what they report, and decide for each finding whether to fix the code, change the configuration or suppress one line. Lint, format, type check, fix a CI lint or type error, explain a ruff rule or mypy error code, noqa and type ignore comments, safe and unsafe fixes, per-file ignores, import sorting, ruff format against black, mypy strict mode and per-module overrides, missing imports and stubs offline, the pydantic mypy plugin, pyright and basedpyright, Zed's diagnostics panel, adding a checker to legacy code, and matching CI's versions. Also pre-commit in full - config, hook types and stages, commit-msg and pre-push hooks, hooks with no network, monorepos, CI, Windows - and a commit refused by a hook. Verified on ruff 0.16.9, mypy 2.3.1 and 1.20.2, pyright 1.1.414, basedpyright 1.40.1 and pre-commit 4.6.2.
+description: Run ruff, mypy and pyright the way the project and CI run them, read what they report, and decide for each finding whether to fix the code, change the configuration or suppress one line. Lint, format, type check, fix a CI lint or type error, explain a ruff rule or mypy error code, noqa and type ignore comments, safe and unsafe fixes, per-file ignores, import sorting, ruff format against black, mypy strict mode and per-module overrides, missing imports and stubs offline, the pydantic mypy plugin, pyright and basedpyright, Zed's diagnostics panel, adding a checker to legacy code, and matching CI's versions. Running import-linter's layer contracts (lint-imports). Also pre-commit in full - config, hook types and stages, commit-msg and pre-push hooks, hooks with no network, monorepos, CI, Windows - and a commit refused by a hook. Verified on ruff 0.16.9, mypy 2.3.1 and 1.20.2, pyright 1.1.414, basedpyright 1.40.1, pre-commit 4.6.2 and import-linter 2.15.
 ---
 
 # Linting
@@ -47,6 +47,7 @@ mypy 1.x to 2.x.
 | **Pre-commit** | set up, extend or repair hooks: offline, per stage, per folder of a monorepo | `pre-commit/config.md`, `pre-commit/offline.md`, `pre-commit/install.md`, then `pre-commit/monorepo.md` or `pre-commit/windows.md` |
 | **Hook blocked** | a commit is refused, or a hook changed files | `pre-commit/blocked.md`, `pre-commit/run.md` |
 | **Hooks in CI** | run the same hooks in a pipeline | `pre-commit/ci.md` |
+| **Layer contracts** | run import-linter where the project has contracts | `core/import-linter.md` |
 
 ## Where the facts are
 

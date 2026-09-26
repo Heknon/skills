@@ -17,6 +17,7 @@ as a local hook on pre-commit 4.6.2, with the tools in the dev group.
 | `detect-private-key` | `uv run --frozen detect-private-key`, `types: [text]` | pre-commit | git (what may be committed) |
 | `check-merge-conflict` | `uv run --frozen check-merge-conflict`, `types: [text]` | pre-commit | git |
 | `check-yaml`, `check-toml` | `uv run --frozen check-yaml`, `types: [yaml]`; `check-toml`, `types: [toml]` | pre-commit | linting |
+| `lint-imports` | `uv run --frozen lint-imports --no-logo`, `pass_filenames: false`, `types: [python]`; only where the project has contracts (`core/import-linter.md`) | pre-commit | architecture (the layer rules) |
 | `uv-lock` | `uv lock --locked --offline`, `pass_filenames: false`, `files: ^(pyproject\.toml\|uv\.lock)$` | pre-commit | packaging (the lock matches `pyproject.toml`) |
 | `issue-key` | `uv run --frozen python scripts/check_issue_key.py`, reading the file in its first argument | commit-msg | git (the message convention) |
 | a fast test subset | `uv run --frozen pytest -m "not slow" -x -q`, `pass_filenames: false`, `always_run: true` | pre-push, only if the team asks | pytest (which subset, the marker) |

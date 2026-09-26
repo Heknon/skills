@@ -34,6 +34,8 @@ Verified on pyright 1.1.414 and basedpyright 1.40.1.
 | `reportOptionalMemberAccess` | `"strip" is not a known attribute of "None"` | a real crash in the lab |
 | `reportAttributeAccessIssue` | `Cannot access attribute "page_size" for class "Settings"` | an attribute set at runtime |
 | `reportCallIssue` | `No parameter named "name"` | pydantic alias without a plugin (`mypy/pydantic.md`) |
+| `reportCallIssue` | `Argument missing for parameter "db_password"` | `Settings()` whose fields come from the environment (`mypy/pydantic.md`) |
+| `reportUnannotatedClassAttribute` | ``Type annotation for attribute `model_config` is required because this class is not decorated with `@final` `` | basedpyright's default mode only; annotate it (`mypy/pydantic.md`) |
 | `reportMissingImports` | `Import "x" could not be resolved` | not in pyright's environment (`pyright/install.md`) |
 | `reportUnknownParameterType`, `reportMissingParameterType`, `reportUnknownVariableType`, `reportUnknownArgumentType` | `Type of parameter "x" is unknown`, `Type annotation is missing for parameter "x"` | strict mode, or basedpyright's default mode |
 | `reportUnnecessaryTypeIgnoreComment` | `Unnecessary "# pyright: ignore" rule: "reportArgumentType"` | off unless configured |

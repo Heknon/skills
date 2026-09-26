@@ -112,8 +112,9 @@ L11 all non-test      raise\s+Exception\(|except\s+Exception\b|in\s+str\(\w+\)|s
 
 ## Tools that enforce some of this
 
-If the project already runs them (the linting skill runs them; never add
-them unasked): ruff `B904`, `BLE001`, `TRY002`, `N818`, `PLC0415`; an
+If the project already runs them (the linting skill runs them,
+import-linter in `skills/linting/core/import-linter.md`; never add them
+unasked): ruff `B904`, `BLE001`, `TRY002`, `N818`, `PLC0415`; an
 import-linter contract (`recipes/*/pyproject.toml`,
 `[tool.importlinter]`). *lab,* import-linter 2.15, a service importing
 `fastapi`: `lint-imports` exited 1 and printed
