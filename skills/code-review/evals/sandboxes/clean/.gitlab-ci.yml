@@ -1,0 +1,13 @@
+default:
+  image: registry.example.com/python-uv:3.12
+
+lint:
+  script:
+    - uv sync --locked
+    - uv run --no-sync ruff check .
+    - uv run --no-sync mypy
+
+test:
+  script:
+    - uv sync --locked
+    - uv run --no-sync pytest

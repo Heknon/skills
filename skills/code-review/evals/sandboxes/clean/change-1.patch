@@ -1,0 +1,77 @@
+Add GET /orders/{order_id}/total
+
+The checkout page needs the order total without summing the lines
+itself. 404 for an unknown order, as GET /orders/{order_id} does.
+---
+diff --git a/src/shop/api.py b/src/shop/api.py
+index 6893a5e..ef5584b 100644
+--- a/src/shop/api.py
++++ b/src/shop/api.py
+@@ -3,7 +3,7 @@
+ from fastapi import FastAPI, HTTPException
+ from pydantic import BaseModel
+ 
+-from shop.orders import get_order
++from shop.orders import get_order, total_cents
+ 
+ app = FastAPI()
+ 
+@@ -14,6 +14,11 @@ class LineOut(BaseModel):
+     unit_cents: int
+ 
+ 
++class TotalOut(BaseModel):
++    order_id: str
++    total_cents: int
++
++
+ class OrderOut(BaseModel):
+     id: str
+     lines: list[LineOut]
+@@ -31,3 +36,11 @@ def read_order(order_id: str) -> OrderOut:
+             for line in order.lines
+         ],
+     )
++
++
++@app.get("/orders/{order_id}/total")
++def read_order_total(order_id: str) -> TotalOut:
++    order = get_order(order_id)
++    if order is None:
++        raise HTTPException(status_code=404, detail="order not found")
++    return TotalOut(order_id=order.id, total_cents=total_cents(order))
+diff --git a/src/shop/orders.py b/src/shop/orders.py
+index 56563bc..db707d0 100644
+--- a/src/shop/orders.py
++++ b/src/shop/orders.py
+@@ -25,3 +25,8 @@ ORDERS = {
+ def get_order(order_id: str) -> Order | None:
+     """The order with this id, or None."""
+     return ORDERS.get(order_id)
++
++
++def total_cents(order: Order) -> int:
++    """The sum of quantity times unit price over the order's lines."""
++    return sum(line.qty * line.unit_cents for line in order.lines)
+diff --git a/tests/test_api.py b/tests/test_api.py
+index 970a79c..09c896e 100644
+--- a/tests/test_api.py
++++ b/tests/test_api.py
+@@ -13,3 +13,17 @@ def test_read_order() -> None:
+ 
+ def test_read_unknown_order_is_404() -> None:
+     assert client.get("/orders/nope").status_code == 404
++
++
++def test_order_total_sums_every_line() -> None:
++    response = client.get("/orders/o-1/total")
++    assert response.status_code == 200
++    assert response.json() == {"order_id": "o-1", "total_cents": 3_499}
++
++
++def test_empty_order_total_is_zero() -> None:
++    assert client.get("/orders/o-2/total").json()["total_cents"] == 0
++
++
++def test_total_of_unknown_order_is_404() -> None:
++    assert client.get("/orders/nope/total").status_code == 404

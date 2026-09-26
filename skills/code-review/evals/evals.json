@@ -1,0 +1,229 @@
+{
+  "skill_name": "code-review",
+  "notes": "Scenarios for checking that a weak model using this skill reviews a change from evidence: it runs the project's tools and tests, reads the callers of what changed, ranks findings by their failure scenario and ends in one verdict. Each names a sandbox under evals/sandboxes/, a uv project with the change as patches. make_repo.py turns a sandbox into a git repository: main holds the base, feature holds one commit per change-<n>.patch (its message is the text above the diff) (status422 has no feature branch; its change is incoming/reserve-limit.patch). Every planted bug was reproduced, and every clean change passed ruff 0.16.9, mypy 2.3.1 and pytest 9.1.1 on Python 3.12.14 with FastAPI 0.141.1, pydantic 2.13.5, Beanie 2.2.0, PyMongo 4.18.2; the MongoDB bugs (login, users, counter) were reproduced against MongoDB 8.0.32. evals/lab/ holds the proofs and the record of what each checklist's signs find.",
+  "how_to_run": [
+    "copy the skill folder without evals/ to <skill>",
+    "python evals/sandboxes/make_repo.py evals/sandboxes/<sandbox> <work>",
+    "in <work>: uv sync (from the mirror), so the model can run uv run --no-sync",
+    "start the model in <work> with: 'Load the skill at <skill>/SKILL.md and follow it. Task: <prompt>'; add the machine's operating system",
+    "grade each expectation by hand, from the answer and from git status in <work> (the review must leave the tree as it found it)",
+    "the users sandbox's bug shows only with MongoDB at MONGODB_URL; without one, the model is expected to say what could not run"
+  ],
+  "evals": [
+    {
+      "id": 0,
+      "name": "nit-wall",
+      "sandbox": "pagination",
+      "prompt": "Review the change on branch feature before it merges into main.",
+      "bait": "the diff is full of ugly names (getPage, pageNum, sz, tmp, L, x), comments that repeat the code and a range(len()) loop; hidden among them, getPage ends each page one item early (e = s + sz - 1), so every tenth product is never shown. The new test only checks the first item of page 2 and passes",
+      "expectations": [
+        "Runs ruff, mypy and pytest on the branch and lists each with its summary line under Checked (All checks passed!, Success, 2 passed)",
+        "Reports a blocker (or major) at src/shop/catalog.py:28 (the end of the slice) or :29, with a scenario such as: page=1&size=10 returns 9 products; SKU-010 and SKU-020 appear on no page",
+        "Proves it by running something (a request or a call to getPage) rather than by reading only, or labels it inferred",
+        "Puts that finding first; naming remarks are nits, grouped into at most five lines, after every other finding",
+        "Mentions that the new test cannot catch the bug (it checks only the first item of a page), as a minor or major finding",
+        "Verdict: changes needed",
+        "Ends with ## Verdict, ## Findings, ## Checked, ## Not reviewed, in that order"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "broken-caller-outside-diff",
+      "sandbox": "lookup",
+      "prompt": "Can branch feature be merged into main? It only touches find_customer and its tests.",
+      "bait": "find_customer now returns None instead of raising CustomerNotFound; the caller in src/shop/invoices.py is not in the diff, still catches CustomerNotFound and then reads customer.name. Tests pass, mypy passes (the caller is untyped), ruff passes",
+      "expectations": [
+        "Names the changed contract of find_customer: it no longer raises CustomerNotFound for an unknown email, it returns None",
+        "Searches for the callers of find_customer (or CustomerNotFound) outside the diff and names src/shop/invoices.py:8 (the call) and :11 (customer.name)",
+        "Gives the scenario: invoice_header('nobody@example.com', 8) raises AttributeError ('NoneType' object has no attribute 'name') where it returned 'Invoice 8 - guest customer' before",
+        "Ranks it major or blocker, at the caller's path:line",
+        "Does not accept 'tests pass and mypy passes' as proof: says mypy does not check the body of an untyped function (or shows mypy --check-untyped-defs reporting union-attr at invoices.py:11)",
+        "Verdict: changes needed",
+        "Ends with ## Verdict, ## Findings, ## Checked, ## Not reviewed, in that order"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "tool-echo",
+      "sandbox": "refunds",
+      "prompt": "Please review feature against main. CI runs ruff, mypy and pytest.",
+      "bait": "ruff reports F401 (os imported but unused) and mypy reports an incompatible default for percent; a review can fill itself by retelling those two. The real bug neither tool sees: refund_amount returns total * 100 // percent, so a 50% refund pays out twice the order",
+      "expectations": [
+        "Runs ruff check and mypy as the CI file (.gitlab-ci.yml) does, and pytest",
+        "Lists the two tool errors once each under Checked, as new errors CI will fail on, with the tool's own line; does not restate them as findings in its own words",
+        "Reports the refund formula as a blocker at src/shop/refunds.py:30 with a scenario such as: refund_amount of a 40.00 order at 50 percent returns 8000 cents, not 2000",
+        "Notes that the added tests only try the default (100 percent) and a refused refund, which is why they pass",
+        "Verdict: changes needed, giving both the blocker and the failing CI tools as reasons",
+        "Ends with ## Verdict, ## Findings, ## Checked, ## Not reviewed, in that order"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "clean-change-lgtm",
+      "sandbox": "clean",
+      "prompt": "Quick look at feature against main please, it's a small one. What do you think?",
+      "bait": "the change is correct and tested; the bait is to say 'looks good' without running anything, or to invent problems to look thorough, or to answer with remarks and no verdict",
+      "expectations": [
+        "Runs ruff, mypy and pytest and quotes their summary lines (All checks passed!, Success: no issues found in 4 source files, 5 passed)",
+        "Reads the callers or users of what changed, or says there are none new (a new function and a new route)",
+        "Reports no blocker and no major",
+        "At most a few nits, each marked nit, or none",
+        "Verdict: approve (or approve with comments if it lists nits), stated under ## Verdict",
+        "Ends with ## Verdict, ## Findings, ## Checked, ## Not reviewed, in that order"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "remembered-api",
+      "sandbox": "status422",
+      "prompt": "Review the patch in incoming/reserve-limit.patch before I apply it to main.",
+      "bait": "the patch uses status.HTTP_422_UNPROCESSABLE_CONTENT; a model that remembers only HTTP_422_UNPROCESSABLE_ENTITY claims the name does not exist or is wrong. It exists on the installed Starlette 1.7.0 (starlette/status.py:139); the old name is the deprecated one. No test covers the 422 path, so running the tests does not settle it",
+      "expectations": [
+        "Checks the patch applies: git apply --check (and --stat) on main, and reviews it without committing it",
+        "Before any claim about HTTP_422_UNPROCESSABLE_CONTENT, reads it in the installed starlette (status.py, the line that defines it) or runs a call that uses it; says which version",
+        "Makes no finding that the constant is wrong or missing",
+        "Reports the untested 422 path (no test sends qty 11) as a minor finding, not a blocker",
+        "Verdict: approve with comments",
+        "Ends with ## Verdict, ## Findings, ## Checked, ## Not reviewed, in that order"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "security-mongo-operator",
+      "sandbox": "login",
+      "prompt": "Do a security pass over the change on feature against main.",
+      "bait": "the route now takes body: dict[str, Any] and passes body values straight into a MongoDB filter; tests use a fake collection that only compares values, so they pass",
+      "expectations": [
+        "Traces the request body from the route (src/shop/api.py:31, body: dict[str, Any], and :35-36) to the filter in src/shop/clients.py:15",
+        "Reports a blocker with the exploiting input, such as {\"client_id\": \"acme\", \"api_key\": {\"$ne\": null}}, and what it gets: the client's scopes without its key",
+        "Says why the tests did not see it (the fake compares values; it has no operators) and, if it proves it, does so outside the repository",
+        "Suggests the smallest fix: a model with str fields for both spellings (or a check that both values are strings), not a redesign",
+        "Under Checked or Not reviewed, names what else was searched for outside input (other routes, other sinks) or states it was not",
+        "Verdict: changes needed",
+        "Ends with ## Verdict, ## Findings, ## Checked, ## Not reviewed, in that order"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "leak-above-layering",
+      "sandbox": "users",
+      "prompt": "Review feature against main.",
+      "bait": "the new route queries User with Beanie in the router (architecture L1) and returns the User document, whose password_hash reaches the client (L3). A review can stop at 'layering' and rank everything minor, or rewrite the route through the service itself",
+      "expectations": [
+        "Runs architecture's recognise step or reads the card-worthy facts: routes call the service, only the repository queries (the module docstrings)",
+        "Reports the password_hash leak as a blocker at src/shop/api.py:51 (the return type User) or :55 with the scenario GET /users/by-email/<email> returns the hash, citing L3",
+        "Reports the query in the route as L1, ranked below the leak (minor)",
+        "Suggests a restructuring by name (a repository method and a service call returning UserOut; architecture shapes L1 and L3, refactoring skill) without writing or applying it",
+        "Says the new route has no test and the existing tests do not reach Mongo; lists what could not run",
+        "Verdict: changes needed",
+        "Ends with ## Verdict, ## Findings, ## Checked, ## Not reviewed, in that order"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "test-cannot-fail",
+      "sandbox": "mocktest",
+      "prompt": "Review the tests in the change on feature. Are they good enough to merge?",
+      "bait": "both new tests replace the thing they test (shipping_cents with a lambda, HEAVY_CENTS with the same value) and assert the replacement, so they pass whatever shipping_cents does",
+      "expectations": [
+        "Says each new test asserts on its own patch and cannot fail, naming both test functions",
+        "Shows it: breaks shipping_cents (for example returns 0), runs the tests, sees them still pass, and restores the file (git status clean afterwards)",
+        "Lists the untested behaviour: the three bands and their limits (1000 g, 5000 g, above)",
+        "Ranks it at least minor; does not rank the test style issues above it",
+        "Does not edit the tests in the repository (suggests the fix as text)",
+        "Verdict: changes needed or approve with comments, with the reason",
+        "Ends with ## Verdict, ## Findings, ## Checked, ## Not reviewed, in that order"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "re-review",
+      "sandbox": "rereview",
+      "prompt": "The author pushed fixes for my first review (notes/review-1.md). Re-review branch feature.",
+      "bait": "of the three findings, 1 (negative transfer) and 3 (no balance test) are fixed; 2 (except Exception: pass around audit) is not; the fix changed the balance check from < to <=, so moving the whole balance, which the docstring allows, now raises InsufficientPoints",
+      "expectations": [
+        "Reads the fix commit on its own (git show or git diff HEAD~1..HEAD, or from the reviewed commit to HEAD)",
+        "Marks finding 1 fixed, finding 3 fixed, finding 2 not fixed, each with the line or test that shows it",
+        "Finds the new bug at src/shop/points.py:31: transfer_points(Account('ann', 10), Account('bob', 0), 10) raises InsufficientPoints; before the fix it moved the 10 points",
+        "Ranks the new bug major (or blocker) and does not raise the fixed findings again",
+        "Verdict: changes needed",
+        "Ends with ## Verdict, ## Findings, ## Checked, ## Not reviewed, in that order"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "lost-update",
+      "sandbox": "counter",
+      "prompt": "Review feature against main.",
+      "bait": "the change replaces an atomic $inc with find_one, add one in Python, then update_one with $set; the tests use a single-threaded fake, so they pass. Under concurrent requests, views are lost",
+      "expectations": [
+        "Reports a major (or blocker) finding at src/shop/pages.py:16-20 with the interleaving: two requests read views=41, both write 42, one view lost",
+        "Says why the tests cannot show it (one thread, a fake collection) and that def routes run in a thread pool, so requests overlap (api skill)",
+        "Suggests the smallest fix: keep find_one_and_update with $inc and raise PageNotFound when it returns None (mongodb skill, core/writes.md)",
+        "Verdict: changes needed",
+        "Ends with ## Verdict, ## Findings, ## Checked, ## Not reviewed, in that order"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "severity-inflation",
+      "sandbox": "docstring",
+      "prompt": "Review feature against main. Be strict, we want high standards here.",
+      "bait": "the only remarks available are a missing docstring and a long function name; 'be strict' invites marking them major or must fix",
+      "expectations": [
+        "Runs the tools and tests and quotes their summary lines",
+        "Ranks the missing docstring and the long name as nits (at most minor), with no failure scenario invented for them",
+        "No blocker and no major",
+        "Verdict: approve with comments",
+        "Ends with ## Verdict, ## Findings, ## Checked, ## Not reviewed, in that order"
+      ]
+    },
+    {
+      "id": 11,
+      "name": "trust-the-description",
+      "sandbox": "defaults",
+      "prompt": "Review feature against main. The MR says: 'A pure move into shop.repository. No behaviour change.' So it should be quick.",
+      "bait": "the move flipped list_orders' default include_cancelled from False to True; revenue_cents and report_line call it without the argument, so cancelled orders now count. The tests only use customer c-1, who has no cancelled order",
+      "expectations": [
+        "Compares the moved code with the original (the old and new list_orders side by side, or a tool that compares signatures), not only the description",
+        "Reports the changed default at src/shop/repository.py:22 as a finding, ranked major or blocker",
+        "Names the callers that rely on the default: src/shop/orders.py:8 (revenue_cents) and src/shop/reports.py:8 (report_line)",
+        "Gives the scenario: revenue_cents('c-2') was 1200 and is now 11100 (the cancelled order o-4 counts)",
+        "Says the description is wrong about behaviour, once, without blaming",
+        "Verdict: changes needed",
+        "Ends with ## Verdict, ## Findings, ## Checked, ## Not reviewed, in that order"
+      ]
+    },
+    {
+      "id": 12,
+      "name": "swallowed-write",
+      "sandbox": "swallow",
+      "prompt": "Review feature against main.",
+      "bait": "to survive the audit service going down, the change wraps both the note write and the audit call in except Exception: pass, and the route still answers 201 saved true",
+      "expectations": [
+        "Reports a finding at src/shop/api.py:38-43 ranked blocker or major, with the scenario: store.add raises (the database is down) and the client gets 201 {\"saved\": true} while nothing was stored",
+        "Suggests the smallest fix: only the audit call inside the try, and log the exception",
+        "Does not only say 'broad except' (a rule name) without the scenario",
+        "Verdict: changes needed",
+        "Ends with ## Verdict, ## Findings, ## Checked, ## Not reviewed, in that order"
+      ]
+    },
+    {
+      "id": 13,
+      "name": "forty-files",
+      "sandbox": "wide",
+      "prompt": "Review feature against main. It is big, sorry.",
+      "bait": "40 files changed: 38 job modules only rename log to logger; discounts.py adds a loyalty discount with order_count > 10 where its own docstring says 10 or more; tax.py changes rounding correctly. Skimming all forty equally hides the bug; claiming all forty were reviewed is false",
+      "expectations": [
+        "Starts with git diff --stat (or --shortstat, or the skill's scope tool) before reading any file",
+        "Groups the 38 job files as one repeated edit and checks that claim with a command (the tool's groups, or a search), rather than reading each or skipping them silently",
+        "Reviews discounts.py and tax.py line by line",
+        "Reports discounted_cents(10000, None, 10) returning 10000 instead of 9500 at src/shop/discounts.py:17, ranked major (or blocker)",
+        "Lists under Not reviewed anything it did not read line by line, or says every file was read and how",
+        "Verdict: changes needed",
+        "Ends with ## Verdict, ## Findings, ## Checked, ## Not reviewed, in that order"
+      ]
+    }
+  ],
+  "runs": []
+}

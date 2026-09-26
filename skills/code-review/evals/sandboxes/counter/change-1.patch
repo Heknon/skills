@@ -1,0 +1,92 @@
+Answer 404 for views of an unknown page
+
+Counting a view of a page that does not exist returned 0, which hid
+typos in the front end. record_view now raises PageNotFound and the
+route answers 404.
+---
+diff --git a/src/shop/api.py b/src/shop/api.py
+index ad5bdcc..13f6039 100644
+--- a/src/shop/api.py
++++ b/src/shop/api.py
+@@ -3,12 +3,12 @@
+ import os
+ from typing import Annotated
+ 
+-from fastapi import Depends, FastAPI
++from fastapi import Depends, FastAPI, HTTPException
+ from pydantic import BaseModel
+ from pymongo import MongoClient
+ from pymongo.collection import Collection
+ 
+-from shop.pages import PageDoc, record_view
++from shop.pages import PageDoc, PageNotFound, record_view
+ 
+ app = FastAPI()
+ _mongo: MongoClient[PageDoc] | None = None
+@@ -30,4 +30,8 @@ class ViewsOut(BaseModel):
+ def count_view(
+     slug: str, pages: Annotated[Collection[PageDoc], Depends(get_pages)]
+ ) -> ViewsOut:
+-    return ViewsOut(slug=slug, views=record_view(pages, slug))
++    try:
++        views = record_view(pages, slug)
++    except PageNotFound:
++        raise HTTPException(status_code=404, detail="no such page") from None
++    return ViewsOut(slug=slug, views=views)
+diff --git a/src/shop/pages.py b/src/shop/pages.py
+index b047f59..dae0458 100644
+--- a/src/shop/pages.py
++++ b/src/shop/pages.py
+@@ -2,19 +2,20 @@
+ 
+ from typing import Any
+ 
+-from pymongo import ReturnDocument
+ from pymongo.collection import Collection
+ 
+ PageDoc = dict[str, Any]
+ 
+ 
++class PageNotFound(LookupError):
++    """No page has this slug."""
++
++
+ def record_view(pages: Collection[PageDoc], slug: str) -> int:
+-    """Count one view of the page; return the new count, or 0 for no page."""
+-    page = pages.find_one_and_update(
+-        {"slug": slug},
+-        {"$inc": {"views": 1}},
+-        return_document=ReturnDocument.AFTER,
+-    )
++    """Count one view of the page and return the new count."""
++    page = pages.find_one({"slug": slug})
+     if page is None:
+-        return 0
+-    return int(page["views"])
++        raise PageNotFound(slug)
++    views = page["views"] + 1
++    pages.update_one({"_id": page["_id"]}, {"$set": {"views": views}})
++    return int(views)
+diff --git a/tests/test_pages.py b/tests/test_pages.py
+index 5f199f2..ce76ced 100644
+--- a/tests/test_pages.py
++++ b/tests/test_pages.py
+@@ -1,6 +1,8 @@
+ from typing import Any
+ 
+-from shop.pages import record_view
++import pytest
++
++from shop.pages import PageNotFound, record_view
+ 
+ 
+ class FakePages:
+@@ -39,3 +41,8 @@ def test_record_view_counts() -> None:
+     pages = FakePages([{"_id": 1, "slug": "home", "views": 41}])
+     assert record_view(pages, "home") == 42  # type: ignore[arg-type]
+     assert record_view(pages, "home") == 43  # type: ignore[arg-type]
++
++
++def test_unknown_page_raises() -> None:
++    with pytest.raises(PageNotFound):
++        record_view(FakePages([]), "nope")  # type: ignore[arg-type]

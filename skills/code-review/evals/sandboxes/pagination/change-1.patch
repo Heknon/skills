@@ -1,0 +1,77 @@
+Page the product list
+
+The mobile app cannot show 25 products at once. GET /products takes
+page and size; the defaults return everything as before.
+---
+diff --git a/src/shop/api.py b/src/shop/api.py
+index 8b62acd..ad46e5b 100644
+--- a/src/shop/api.py
++++ b/src/shop/api.py
+@@ -1,9 +1,11 @@
+ """HTTP routes for the catalogue."""
+ 
+-from fastapi import FastAPI
++from typing import Annotated
++
++from fastapi import FastAPI, Query
+ from pydantic import BaseModel
+ 
+-from shop.catalog import all_products
++from shop.catalog import all_products, getPage
+ 
+ app = FastAPI()
+ 
+@@ -15,8 +17,17 @@ class ProductOut(BaseModel):
+ 
+ 
+ @app.get("/products")
+-def list_products() -> list[ProductOut]:
+-    return [
+-        ProductOut(sku=p.sku, name=p.name, price_cents=p.price_cents)
+-        for p in all_products()
+-    ]
++def list_products(
++    page: Annotated[int, Query(ge=1)] = 1,
++    size: Annotated[int, Query(ge=1, le=100)] = 100,
++) -> list[ProductOut]:
++    # get all the products
++    L = all_products()
++    # page them
++    x = getPage(L, page, size)
++    result = []
++    for i in range(len(x)):
++        result.append(
++            ProductOut(sku=x[i].sku, name=x[i].name, price_cents=x[i].price_cents)
++        )
++    return result
+diff --git a/src/shop/catalog.py b/src/shop/catalog.py
+index 960c484..9d39e35 100644
+--- a/src/shop/catalog.py
++++ b/src/shop/catalog.py
+@@ -19,3 +19,12 @@ PRODUCTS = [
+ def all_products() -> list[Product]:
+     """Every product, in catalogue order."""
+     return list(PRODUCTS)
++
++
++def getPage(lst: list[Product], pageNum: int, sz: int) -> list[Product]:
++    # calculate the start
++    s = (pageNum - 1) * sz
++    # calculate the end
++    e = s + sz - 1
++    tmp = lst[s:e]
++    return tmp
+diff --git a/tests/test_api.py b/tests/test_api.py
+index 27d892a..3da8868 100644
+--- a/tests/test_api.py
++++ b/tests/test_api.py
+@@ -9,3 +9,9 @@ def test_list_products_returns_every_product() -> None:
+     response = client.get("/products")
+     assert response.status_code == 200
+     assert len(response.json()) == 25
++
++
++def test_second_page_starts_after_the_first() -> None:
++    response = client.get("/products", params={"page": 2, "size": 10})
++    assert response.status_code == 200
++    assert response.json()[0]["sku"] == "SKU-011"
