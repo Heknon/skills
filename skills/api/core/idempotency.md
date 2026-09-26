@@ -95,5 +95,5 @@ those three tests failed.
 
 Send the request twice and assert on the side effect, not only on the
 status: one row in the store, one call to the charging function (patch
-it where it is used; pytest skill, `core/mocking.md`), the same body
+it where it is used: `skills/pytest/core/mocking.md`), the same body
 both times.

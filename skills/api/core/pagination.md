@@ -97,10 +97,11 @@ a bounded loop so a broken cursor fails instead of hanging. From the
 recipe (25 orders created with one frozen `created_at`):
 
 ```python
-for pages in range(1, 6):                             # bounded: a bad cursor must not hang
+while pages < 5:                                      # bounded: a bad cursor must not hang
     params = {"limit": 10, **({"cursor": cursor} if cursor else {})}
     page = client.get("/orders", params=params).json()
     seen += [o["id"] for o in page["items"]]
+    pages += 1
     cursor = page["next_cursor"]
     if cursor is None:
         break

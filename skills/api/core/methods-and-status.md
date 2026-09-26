@@ -77,9 +77,9 @@ Decisions that go wrong most often:
 
 ## Names in code
 
-Write the number or the constant from `starlette.status` (re-exported as
-`fastapi.status`). *lab, Starlette 1.7.0:* `status.HTTP_422_UNPROCESSABLE_ENTITY`
-still returns 422 but warns `'HTTP_422_UNPROCESSABLE_ENTITY' is
+Write the number or the constant from `starlette.status` (re-exported
+as `fastapi.status`). *lab, Starlette 1.7.0:*
+`status.HTTP_422_UNPROCESSABLE_ENTITY` still returns 422 but warns `'HTTP_422_UNPROCESSABLE_ENTITY' is
 deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.`; the same
 for `HTTP_413_REQUEST_ENTITY_TOO_LARGE`, `HTTP_414_REQUEST_URI_TOO_LONG`
 and `HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE`. Python 3.12's

@@ -3,7 +3,7 @@ name = "orders-api"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.121",          # Depends(scope=...) needs 0.121
+    "fastapi>=0.118",          # 22 tests pass on 0.118.0 and 0.141.1
     "pydantic>=2.12",          # patching.py: exclude_computed_fields needs 2.12
     "pydantic-partial>=0.9",
     "uvicorn>=0.30",

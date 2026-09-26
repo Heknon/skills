@@ -17,9 +17,14 @@ after:         <fast path> took <s>; <n> x <slow path> took <s>
 | `def` | a thread from the threadpool | stops only that thread |
 
 The same holds for dependencies (`fastapi/dependencies.md`). The
-threadpool is anyio's default limiter: *lab:* `anyio.to_thread.current_default_thread_limiter().total_tokens`
-was `40` (anyio 4.15.1; `CapacityLimiter(40)` in anyio's source). The
-41st concurrent `def` call waits for a free thread.
+threadpool is anyio's default limiter. *lab,* anyio 4.15.1:
+
+```
+anyio.to_thread.current_default_thread_limiter().total_tokens   # 40
+```
+
+(`CapacityLimiter(40)` in anyio's source). The 41st concurrent `def`
+call waits for a free thread.
 
 ## What it looks like (*lab*, uvicorn 0.54.0, one worker)
 
