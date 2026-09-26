@@ -1,0 +1,6 @@
+{
+  "name": "orders-api",
+  "port": 8080,
+  "workers": 4,
+  "allowed_hosts": ["orders.internal", "localhost"],
+}

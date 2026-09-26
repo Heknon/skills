@@ -1,0 +1,210 @@
+{
+ "skill_name": "debugging",
+ "notes": "Scenarios for checking that a weak model using this skill finds causes from evidence: a reproduction that fails before any edit, one hypothesis tested at a time, the whole traceback read, tools that never wait for the keyboard, and a fix proven by the same reproduction failing with the fix reverted. Each names a sandbox under evals/sandboxes/, copied fresh before the run. Sandboxes are uv projects for Python 3.12 or later; those with tests need pytest 8.4 or later from the mirror. not-proven and regression have a setup.py that builds a git history and must be run, then deleted, before the model starts. Every bait was reproduced, and every intended fix passed and failed again when reverted, on Python 3.12.14 with pytest 9.1.1 and git 2.43.0 (Linux; utf8-ci with a CP1252 locale standing in for Windows).",
+ "how_to_run": [
+  "copy the skill folder without evals/ to <skill>",
+  "copy evals/sandboxes/<sandbox> to a fresh <work>",
+  "if <work> has setup.py: run `uv run --no-project python setup.py` in <work>, then delete setup.py",
+  "start the model in <work> with: 'Load the skill at <skill>/SKILL.md and follow it. Task: <prompt>'; add the machine's operating system",
+  "give the terminal tool a time limit (such as 120 seconds) and record every command that hit it",
+  "grade each expectation by hand, from the answer, the commands and the diff"
+ ],
+ "evals": [
+  {
+   "id": 0,
+   "name": "symptom-not-cause",
+   "sandbox": "missing-key",
+   "prompt": "`uv run python -m sales data/may.csv` crashes with KeyError: 'region' in report.py. April's file works. Fix it.",
+   "bait": "the KeyError is raised in report.py, so `row.get('region', 'unknown')` there makes it run, silently putting every sale under 'unknown'; the cause is upstream: may.csv starts with a UTF-8 byte order mark, so the parser's first key is '\\ufeffregion'",
+   "expectations": [
+    "Runs the command and quotes the KeyError before editing anything",
+    "Prints the keys at the boundary between parser and report (a probe) and quotes '\\ufeffregion', or finds the byte order mark by reading the file's first bytes",
+    "Fixes the parser (encoding='utf-8-sig', or stripping the mark there), not report.py; does not add .get('region', ...) or a default",
+    "Adds a reproduction that fails without the fix: a test with a file that starts with the mark (through pytest's write-test), or a script, and shows it failing with the fix reverted and passing with it",
+    "Both files give real regions after the fix: may.csv prints East, North and South, and the existing tests pass",
+    "Removes the probe and ends with Cause, Reproduction, Fix, Proof"
+   ]
+  },
+  {
+   "id": 1,
+   "name": "reproduce-first",
+   "sandbox": "wrong-totals",
+   "prompt": "Some customers say their invoice total is wrong, but not all of them. There is no error anywhere. The batch runs with `uv run python -m billing.batch`. Please fix it.",
+   "bait": "build_invoice has a mutable default argument; a model that spots it by reading edits it at once, before any command has shown a wrong total, and cannot prove the fix",
+   "expectations": [
+    "Before any edit, runs the batch and names a wrong total with the arithmetic that shows it (dune: 3 x 4.00 = 12.00, printed 37.50)",
+    "Writes at least two hypotheses, each with a test that could disprove it, before changing code (for example: state shared between calls, versus rounding or the data)",
+    "Shows that the order matters: dune alone is right, dune after birch is wrong (or an equivalent observation)",
+    "Fixes with lines=None and a fresh list per call, keeping the balance lines working",
+    "Proof: the batch prints dune 12.00 with the fix, and 37.50 again with the fix reverted"
+   ]
+  },
+  {
+   "id": 2,
+   "name": "one-change",
+   "sandbox": "two-suspects",
+   "prompt": "Please fix ticket 1042 (TICKET.md). I bet it is float rounding in order_total, so switch the prices to Decimal while you're at it.",
+   "bait": "two suspects: the float sum and the strict `>` comparison; the person pushes the float one, and changing both makes it impossible to tell which one mattered",
+   "expectations": [
+    "Reproduces the ticket: shipping_cost([12.50, 37.50]) returns 4.95",
+    "Tests the float hypothesis on its own and rules it out with output: order_total([12.50, 37.50]) is exactly 50.0",
+    "Changes one thing: > to >=, and shows shipping_cost([12.50, 37.50]) returns 0.0",
+    "Does not switch to Decimal in this change; says once, with the evidence, why the person's suggestion is not the cause, and lists it under Not done if worth doing",
+    "Proof: the reproduction returns 4.95 again with the fix reverted; the existing tests pass"
+   ]
+  },
+  {
+   "id": 3,
+   "name": "works-there-fails-here",
+   "sandbox": "utf8-ci",
+   "prompt": "test_load_names fails on my Windows laptop with UnicodeDecodeError, but CI is green (the log is in ci-log.txt). CI runs the same code, so is my machine broken?",
+   "bait": "the model on a machine where it passes says 'cannot reproduce' or blames the laptop; the cause is open() without encoding, which uses the locale code page on Windows and UTF-8 on the Linux runner",
+   "expectations": [
+    "Lists the differences between the two runs from evidence: operating system, Python version from the CI log, and the locale encoding (locale.getencoding() or sys.flags.utf8_mode on both)",
+    "Flips one difference and shows the result follow it: with PYTHONUTF8=1 the test passes, with PYTHONUTF8=0 (or unset, on Windows) it fails",
+    "Names open() without encoding in names/load.py as the cause, not the machine",
+    "Fixes with encoding='utf-8' and shows the test passing with PYTHONUTF8=0",
+    "Does not set PYTHONUTF8 in the project or CI as the fix; may mention -X warn_default_encoding to find other calls"
+   ]
+  },
+  {
+   "id": 4,
+   "name": "do-not-silence",
+   "sandbox": "worker-crash",
+   "prompt": "The nightly stock import sometimes stops half-way, but the job stays green. The log shows 'Exception in thread importer'. Please wrap the worker loop in a try/except so one bad line can't kill it.",
+   "bait": "the person asks for exactly the silencing fix; `except Exception: continue` makes the run say 'imported 30 of 31 lines', exit 0, and drops B-220 without a word",
+   "expectations": [
+    "Runs the import and quotes the thread's traceback: ValueError: invalid literal for int() with base 10: '1,200', and 'imported 12 of 31 lines' with exit code 0",
+    "Explains that an exception in a thread does not change the process's exit code, which is why the job stays green",
+    "Fixes the cause in parse.py (quantities with a thousands separator) and shows 'imported 31 of 31 lines'",
+    "Does not add an except that swallows the error; says once why; if it adds per-line handling, the bad line is reported and the exit code is not 0",
+    "Proof: with the parse fix reverted the run stops at 12 again"
+   ]
+  },
+  {
+   "id": 5,
+   "name": "first-exception",
+   "sandbox": "chained",
+   "prompt": "`uv run python -m app` crashes at start with AttributeError: 'JSONDecodeError' object has no attribute 'line'. Fix it.",
+   "bait": "the last exception is in the error handler; fixing exc.line to exc.lineno removes it, but the app still does not start, because the first exception is a syntax error in settings.json",
+   "expectations": [
+    "Reads the whole output and explains the chain: the JSONDecodeError came first, and the AttributeError was raised while handling it ('During handling of the above exception')",
+    "Names the first error exactly: Expecting property name enclosed in double quotes: line 6 column 1, caused by the trailing comma at the end of line 5",
+    "Fixes the handler (exc.lineno) and the trailing comma, as two changes, running the command after each",
+    "Shows the app starting: 'orders-api listening on port 8080'",
+    "Does not stop after the AttributeError is gone"
+   ]
+  },
+  {
+   "id": 6,
+   "name": "context-behind-from-none",
+   "sandbox": "from-none",
+   "prompt": "The service fails at start with ConfigError: invalid config. The config looks fine to me. What is wrong with it?",
+   "bait": "`raise ... from None` hides the real error, so the model guesses at the config (the timeout, the name, the path) instead of printing the hidden exception",
+   "expectations": [
+    "Prints the hidden exception without guessing: exc.__context__ through a one-off script or python -c (or temporarily removes 'from None'), and quotes TOMLDecodeError: Unescaped '\\' in a string (at line 3, column 16)",
+    "Explains that from None hides the context from the traceback but keeps it in __context__",
+    "Fixes settings.toml with a literal string ('C:\\logs\\reports') or doubled backslashes, and shows the service starting",
+    "Removes any temporary probe; proposes 'from exc' so the cause shows next time, and does not change it unasked (or asks)"
+   ]
+  },
+  {
+   "id": 7,
+   "name": "no-keyboard",
+   "sandbox": "leftover-breakpoint",
+   "prompt": "Run report.py and tell me the March total.",
+   "bait": "report.py has a breakpoint() on negative amounts; March has a refund, so a plain run stops at a (Pdb) prompt and the terminal tool waits until its time limit",
+   "expectations": [
+    "Notices the breakpoint() before running (by reading the script) or recognises the (Pdb) prompt as a wait for the keyboard, and does not run it again the same way",
+    "Runs it with PYTHONBREAKPOINT=0 (PowerShell: $env:PYTHONBREAKPOINT = \"0\", then Remove-Item Env:PYTHONBREAKPOINT) or another form that cannot wait",
+    "Reports March as 490.00 and says the refund of -40.00 is included",
+    "Reports the leftover breakpoint() with its line (13), and removes it or offers to, saying any plain run will stop there"
+   ]
+  },
+  {
+   "id": 8,
+   "name": "prove-with-revert",
+   "sandbox": "not-proven",
+   "prompt": "I fixed BUG-88 in the last commit and added a test. Can you confirm it's fixed so I can close the ticket?",
+   "bait": "the new test passes with and without the fix (10.005 rounds up either way), and the fix does not fix the ticket's case: Decimal(2.675) is already below 2.675, so 1 x 2.675 still gives 2.67",
+   "expectations": [
+    "Runs the tests: 2 passed, and does not stop there",
+    "Reverts the fix (git show HEAD~1:billing/total.py, git stash, or an edit) and shows the new test still passing, so it proves nothing",
+    "Runs the ticket's own case and quotes 2.67 with the fix in place: the bug is not fixed",
+    "Explains the cause (a float passed to Decimal) and fixes it (Decimal(str(...)) or equivalent), with a test for 1 x 2.675 == 2.68 that fails with the old code and passes with the new",
+    "Does not say the ticket can be closed before that proof; restores the working tree after any revert"
+   ]
+  },
+  {
+   "id": 9,
+   "name": "race-made-certain",
+   "sandbox": "race",
+   "prompt": "Under load our hit counter is sometimes a few hits short (seen in production). I can't reproduce it: `uv run python -m stats.load` always prints the right number. Maybe add a tiny sleep in record() to let the threads settle?",
+   "bait": "the race almost never shows with the default switch interval, so the model declares it cannot reproduce, or adds the sleep the person suggests",
+   "expectations": [
+    "Counts the failure rate first: runs the load N times (for example 10) and states it: 0 of 10",
+    "Makes it fail every time without changing the code under test: sys.setswitchinterval(1e-6) in a reproduction script (or more threads and requests), and states the new rate: 10 of 10",
+    "Names the cause: a read-modify-write in record() with a Python call (weight) between the read and the write, so another thread can run in between",
+    "Fixes with a threading.Lock around the read and the write; declines the sleep once, with the reason",
+    "Proof: the reproduction passes N of N with the lock and fails again without it"
+   ]
+  },
+  {
+   "id": 10,
+   "name": "dump-the-hang",
+   "sandbox": "deadlock",
+   "prompt": "`uv run python -m sync` hangs and never finishes. Find out why and fix it.",
+   "bait": "the model runs it, the terminal tool times out, and it runs it again, or reads the code and guesses, without ever seeing where each thread waits",
+   "expectations": [
+    "Runs it under a time limit that dumps every thread's stack (faulthandler.dump_traceback_later, the skill's watchdog, or -X faulthandler with a dump), not a plain run that waits for the tool to give up",
+    "Quotes the dump: the shipper thread at store.py line 19 (with ledger_lock) and the auditor thread at line 27 (with inventory_lock)",
+    "Names the lock-order inversion: ship takes inventory then ledger, reconcile takes ledger then inventory",
+    "Fixes by taking the locks in one order everywhere (not with a timeout on acquire or a sleep)",
+    "Proof: 10 runs under the time limit all print 'sync finished'"
+   ]
+  },
+  {
+   "id": 11,
+   "name": "bisect-with-script",
+   "sandbox": "regression",
+   "prompt": "test_pounds_to_kg passed at tag v1.4 and fails on main. Find which commit broke it and why.",
+   "bait": "reading 27 diffs and guessing; or bisecting with a command that also fails on the commit that does not import (Start troy ounces), which is then named as the culprit",
+   "expectations": [
+    "Confirms the test fails on main and passes at v1.4 before bisecting",
+    "Writes a reproduction script that exits 0 when good, 1 when the bug shows, and 125 when the code cannot be tested (the syntax error commit), kept outside the repository or untracked",
+    "Runs git bisect run with it, and quotes the first bad commit: 'Tidy conversion helpers'",
+    "Explains the cause from that commit's diff: _scale truncates with int() where the old code rounded, so 1.13398 becomes 1.133",
+    "Ends the bisect (git bisect reset) and leaves main checked out; does not name 'Start troy ounces'"
+   ]
+  },
+  {
+   "id": 12,
+   "name": "what-holds-memory",
+   "sandbox": "growing-cache",
+   "prompt": "The profile service's memory grows until the pod is OOM-killed, about every six hours. I think Python just isn't freeing memory; let's call gc.collect() after each request. `uv run python -m profiles.serve` simulates the traffic.",
+   "bait": "gc.collect() frees nothing that is still referenced; the cache keys include the request id, so every request adds an entry",
+   "expectations": [
+    "Measures growth with tracemalloc: two snapshots with requests between them, and quotes the top lines (json encoding called from render.py line 19, and the key at line 16)",
+    "Names what holds the memory: the module-level _rendered dict, keyed by (user_id, request_id), so it never hits and never shrinks",
+    "Shows that gc.collect() does not stop the growth (a run with it still grows), or explains with evidence why it cannot",
+    "Fixes the key to the user id (as the docstring says: cached per user), and bounds the cache or says why it is bounded by the number of users",
+    "Proof: the same measurement shows no growth after the fix, and growth again with it reverted"
+   ]
+  },
+  {
+   "id": 13,
+   "name": "every-sub-exception",
+   "sandbox": "task-group",
+   "prompt": "`uv run python -m feeds` fails with an ExceptionGroup. Fix it.",
+   "bait": "the group holds two unrelated errors; the model reads the first sub-exception, fixes it, and reports done, or treats the group line as the error",
+   "expectations": [
+    "Quotes both sub-exceptions from the first run: KeyError: 'quantity' in stock, and ValueError: Invalid isoformat string: '2026-10-02T09:00:00Z' in deliveries",
+    "Explains that a TaskGroup collects every task's error into one ExceptionGroup, so there are two separate causes",
+    "Fixes each at its cause: the stock feed's field is 'qty'; the delivery time is a datetime with a Z, parsed with datetime.fromisoformat(...).date()",
+    "Runs after each fix; the final run prints prices, stock and both delivery dates with exit code 0",
+    "Does not wrap the TaskGroup in except* or try/except to make it pass"
+   ]
+  }
+ ],
+ "runs": []
+}

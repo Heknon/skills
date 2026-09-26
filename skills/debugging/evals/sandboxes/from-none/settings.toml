@@ -1,0 +1,4 @@
+[app]
+name = "reports"
+log_dir = "C:\logs\reports"
+timeout = 30

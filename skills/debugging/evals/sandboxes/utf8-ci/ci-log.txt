@@ -1,0 +1,14 @@
+$ uv run python -c "import sys, locale; print(sys.platform, sys.version.split()[0], locale.getencoding())"
+linux 3.12.14 UTF-8
+$ uv run pytest -v
+============================= test session starts ==============================
+platform linux -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0 -- /builds/team/utf8-ci/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /builds/team/utf8-ci
+configfile: pyproject.toml
+testpaths: tests
+collecting ... collected 1 item
+
+tests/test_load.py::test_load_names PASSED                               [100%]
+
+============================== 1 passed in 0.01s ===============================
