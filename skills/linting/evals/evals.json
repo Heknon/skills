@@ -224,8 +224,8 @@
       "expectations": [
         "Quotes the two lines that explain it: [WARNING] Unstaged files detected. and [WARNING] Stashed changes conflicted with hook auto-fixes... Rolling back fixes...",
         "Sees with git status that src/cart/totals.py is both staged and modified (MM) and reads the unstaged edit",
-        "Decides what happens to the unstaged edit and says so: stage it too, or keep it out with git stash push --keep-index and restore it after",
-        "Formats the file (uv run --no-sync ruff format src/cart/totals.py), stages it, and commits once; hooks pass",
+        "Decides what happens to the unstaged edit and says so: stage it with the formatted change, or stop and ask, because keeping it out needs interactive staging (git stash push --keep-index then pop ended in a conflict in the lab)",
+        "Formats the file in the working tree (uv run --no-sync ruff format src/cart/totals.py), stages it, and commits once; hooks pass",
         "Does not retry the same commit a third time unchanged and does not bypass hooks",
         "Ends with the skill's headings"
       ]

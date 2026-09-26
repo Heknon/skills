@@ -1,0 +1,67 @@
+# Checker settings for a uv project with code in src/app and tests in
+# tests/. Copy the tables below [dependency-groups] into the project's
+# pyproject.toml (keep one config file per tool: no ruff.toml, mypy.ini
+# or pyrightconfig.json beside it). Change: the package names (app,
+# app.legacy), the Python version, and the rule list if the team chose
+# another.
+
+[project]
+name = "app"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["pydantic==2.13.5"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "ruff==0.16.9",
+    "mypy==2.3.1",
+    "pyright[nodejs]==1.1.414",
+    "pre-commit==4.6.2",
+    "pytest>=8.4",
+]
+
+[tool.ruff]
+line-length = 88
+required-version = ">=0.16.9"
+
+[tool.ruff.lint]
+# Pinned, so a ruff upgrade does not change the rules (0.16 enabled 413
+# rules by default where 0.15 enabled 59).
+select = ["E", "F", "W", "I", "B", "UP", "S", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.mypy]
+strict = true
+warn_unused_configs = true
+files = ["src", "tests"]
+plugins = ["pydantic.mypy"]
+enable_error_code = ["ignore-without-code"]
+
+# Legacy modules: checked, but untyped functions allowed. Remove a module
+# once `mypy --strict` passes on it; add none.
+[[tool.mypy.overrides]]
+module = ["app.legacy.*"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false
+check_untyped_defs = true
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+
+[tool.pyright]
+include = ["src", "tests"]
+typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
