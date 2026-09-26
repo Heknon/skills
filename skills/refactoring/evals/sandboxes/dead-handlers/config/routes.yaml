@@ -1,0 +1,2 @@
+# kinds handled through a route instead of the @handler registry
+invoice: events.handlers.on_invoice
