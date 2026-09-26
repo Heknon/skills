@@ -1,0 +1,13 @@
+test:
+  image: python:3.12-slim
+  script:
+    - uv sync --locked
+    - uv run pytest
+
+build-api:
+  script:
+    - buildah bud -f docker/api.Dockerfile -t acme-api .
+
+build-worker:
+  script:
+    - buildah bud -f docker/worker.Dockerfile -t acme-worker .

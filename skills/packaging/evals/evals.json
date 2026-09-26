@@ -1,6 +1,6 @@
 {
  "skill_name": "packaging",
- "notes": "Scenarios for checking that a weak model using this skill packages from evidence (the built wheel and sdist, uv's own output) and not from memory or the person's first idea. Each names a sandbox under evals/sandboxes/, copied fresh before the run. The sandboxes are uv projects that need click, httpx, pydantic, pytest and hatchling (setuptools for lost-template, hatch-vcs for shallow-tag) from the package index or a mirror; confusion carries its two indexes as local folders; pypi-lock and linux-wheelhouse are graded from the answer where the mirror cannot be reached. Every bait was reproduced, and every intended fix passed, on uv 0.12.19, hatchling 1.32.4, hatch-vcs 0.5.0, setuptools 84.0.0 and Python 3.12, with a local index standing in for the mirror.",
+ "notes": "Scenarios for checking that a weak model using this skill packages from evidence (the built wheel and sdist, uv's own output) and not from memory or the person's first idea. Each names a sandbox under evals/sandboxes/, copied fresh before the run. The sandboxes are uv projects that need click, httpx, pydantic, pytest and hatchling (setuptools for lost-template, hatch-vcs for shallow-tag) from the package index or a mirror; confusion carries its two indexes as local folders; pypi-lock and linux-wheelhouse are graded from the answer where the mirror cannot be reached. tangled-units starts with no lock and a requirements.txt (the task makes the lock); one-project-two-services and folders-not-units carry a uv.lock whose URLs name the mirror at https://pypi-mirror.example.com/simple. Every bait was reproduced, and every intended fix passed, on uv 0.12.19, hatchling 1.32.4, hatch-vcs 0.5.0, setuptools 84.0.0 and Python 3.12, with a local index standing in for the mirror.",
  "how_to_run": [
   "copy the skill folder without evals/ to <skill>",
   "copy evals/sandboxes/<sandbox> to a fresh <work>",
@@ -238,6 +238,56 @@
     "Proves the clash from built wheels, for example `uv build --all-packages` then `uv pip install --dry-run --find-links dist acme-api`, which fails on acme-core<2",
     "Does not raise the dependents' bounds or remove legacy_total's caller unasked; stops and asks with the list of what each dependent needs",
     "Does not tag, publish or push"
+   ]
+  },
+  {
+   "id": 16,
+   "name": "tangled-units",
+   "sandbox": "tangled-units",
+   "prompt": "This is our monorepo and it is a mess. Let's make it better.",
+   "bait": "nothing here is packaged: api/main.py and api/tests/conftest.py reach common/ with sys.path lines, worker relies on PYTHONPATH (CI, worker/Dockerfile, .env, README), worker/money.py is a byte-for-byte copy of common/money.py, and one unbounded requirements.txt is installed into both images with pytest. One root [project] listing everything looks like a fix: in the lab it locked, `2 passed`, and the api still ran, but the wheel shipped top-level `common` and `worker` packages, worker/Dockerfile, the copied money.py and the tests, api was not packaged at all, and every image still installed everything. Converting everything in one move leaves no working state to check against",
+   "expectations": [
+    "Maps before changing anything (recipes/tools/map_units.py or the searches in core/units-and-ties.md): the units api, worker and common; the ties with file:line (the two sys.path lines, the four PYTHONPATH places, the copy worker/money.py = common/money.py, requirements.txt read by CI and both Dockerfiles)",
+    "Records a baseline the old way before step one: api and worker tests with PYTHONPATH as CI sets it (1 passed each), `python api/main.py quote 12.50 3` -> `quote 37.50 EUR`, `python -m worker 1.10 2.20` -> `batch total 3.30 EUR`",
+    "Places the repository on the spectrum (several unpackaged units tied by path hacks, a copy and one shared requirements file) and aims at one uv workspace because both services import common",
+    "Asks no question, or only one the evidence cannot answer; does not ask whether it is a monorepo or which folders are units",
+    "Moves one step at a time with a check after each: the copy removed first (worker imports common.money), then a lock, then common as a member, then api, then worker; each check runs the unit's tests and entry point",
+    "Ends with a virtual root whose members are common, api and worker (acme-common, acme-api, acme-worker or similar prefixed names), sibling requirements bounded (`acme-common>=1.0,<2`) with workspace sources, no requirements.txt, no sys.path lines and no PYTHONPATH anywhere",
+    "Fixes the console scripts uv init writes (`acme-api = \"acme_api:main\"` points at nothing) to the real commands, and shows `acme-api quote 12.50 3` and `acme-worker 1.10 2.20` working from wheels installed by path in a clean venv, outside the checkout",
+    "Shows that each service now installs only its own needs (`uv sync --package acme-api --no-dev`, `uv export --package` or uv tree: no httpx for api, no pydantic for worker, no pytest in either)",
+    "Says what the Dockerfiles and CI must change (whole repository as build context, `uv sync --locked --no-dev --no-editable --package <member>`, CMD the console script, no PYTHONPATH) and points to the deployment skill for them",
+    "Ends with the packaging headings"
+   ]
+  },
+  {
+   "id": 17,
+   "name": "folders-not-units",
+   "sandbox": "folders-not-units",
+   "prompt": "This is a monorepo, let's make it better. Split it up properly.",
+   "bait": "the person calls it a monorepo, but it is one project: one pyproject.toml, one console script, one Dockerfile, one CI build, and loaders/, renderers/ and store/ are subpackages that import each other inside acme_reports. Turning each folder into a workspace member looks like doing what was asked and adds three versions, three wheels and bounds for nothing",
+   "expectations": [
+    "Maps the repository before deciding: one unit (acme-reports, script acme-reports, Dockerfile and CI build name it), the folders are subpackages of one import package with no entry point or Dockerfile of their own",
+    "Verdict: one project with folders, not a monorepo; no workspace, no new pyproject.toml, no folders moved",
+    "Says what would make it a monorepo (a second thing that builds, runs or deploys on its own) and offers core/layout.md or the architecture skill for how the folders are organised",
+    "Checks the one project is sound from evidence rather than assuming: `uv lock --check` or `uv sync --locked`, tests pass, and optionally the wheel lists every subpackage",
+    "Does not ask the person whether it is a monorepo; asks at most which improvement they meant, with a recommendation",
+    "Ends with the packaging headings"
+   ]
+  },
+  {
+   "id": 18,
+   "name": "one-project-two-services",
+   "sandbox": "one-project-two-services",
+   "prompt": "Is this a monorepo? Map it and tell me what you would change. Do not change anything yet.",
+   "bait": "one pyproject.toml builds two deployable services (acme-api and acme-worker, each with a script and a Dockerfile) and the shared code they both import, so the repository does not look like a monorepo; both images run `uv sync --locked --no-dev --no-editable` and install every dependency (the api image gets httpx, anyio, certifi, h11, httpcore and idna, which only the worker uses). legacy_export/ has code that nothing imports and nothing runs. Answering 'no, it is one project', asking a list of questions, or splitting it unasked are the easy answers",
+   "expectations": [
+    "Finds three units inside one project: acme_api and acme_worker (each with a console script and a Dockerfile in docker/ that runs it) and acme_shared (imported by both), with file:line evidence",
+    "Shows that everything is installed everywhere: the api image's sync installs httpx and its dependencies (from uv tree, uv export, or the sync run in a scratch copy)",
+    "Places it on the spectrum (one project, several deployables) and says one lock fits, because both services import acme_shared",
+    "Proposes the move to one uv workspace (acme-shared first, then each service as a member with `--package` in its image) as numbered steps with the check after each, and changes no file",
+    "Asks exactly one question: is legacy_export/ a unit or dead code, with the evidence (no importer, no entry point, no Dockerfile or CI line) and the default it will take (leave it out of every member and every image, delete nothing)",
+    "Does not ask whether the services must upgrade together (the shared package decides it), nor where folders should go",
+    "Ends with the packaging headings, the question under Needs a person"
    ]
   }
  ],
