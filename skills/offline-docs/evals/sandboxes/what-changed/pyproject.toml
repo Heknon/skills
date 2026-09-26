@@ -1,0 +1,15 @@
+[project]
+name = "catalogue"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["fetchkit==1.4.0"]
+
+# The wheelhouse stands in for packages the internal mirror serves.
+[[tool.uv.index]]
+name = "wheelhouse"
+url = "./wheels"
+format = "flat"
+explicit = true
+
+[tool.uv.sources]
+fetchkit = { index = "wheelhouse" }
