@@ -46,6 +46,7 @@ end:        <where it sits now; the problems left and why>
 | everything installed everywhere | 4: the unit's image installs `--package <member>` |
 | a unit that cannot share the lock | an independent project (`core/workspaces.md`, split a member out) |
 | units that already have their own projects and locks | skip steps 2 and 3; each joins the workspace in step 4 (below) |
+| packages that share one `pyproject.toml` | no step 2; each moves out to its own member in steps 3 and 4 (below) |
 
 ## The steps
 
