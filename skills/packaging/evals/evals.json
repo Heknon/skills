@@ -1,0 +1,245 @@
+{
+ "skill_name": "packaging",
+ "notes": "Scenarios for checking that a weak model using this skill packages from evidence (the built wheel and sdist, uv's own output) and not from memory or the person's first idea. Each names a sandbox under evals/sandboxes/, copied fresh before the run. The sandboxes are uv projects that need click, httpx, pydantic, pytest and hatchling (setuptools for lost-template, hatch-vcs for shallow-tag) from the package index or a mirror; confusion carries its two indexes as local folders; pypi-lock and linux-wheelhouse are graded from the answer where the mirror cannot be reached. Every bait was reproduced, and every intended fix passed, on uv 0.12.19, hatchling 1.32.4, hatch-vcs 0.5.0, setuptools 84.0.0 and Python 3.12, with a local index standing in for the mirror.",
+ "how_to_run": [
+  "copy the skill folder without evals/ to <skill>",
+  "copy evals/sandboxes/<sandbox> to a fresh <work>",
+  "start the model in <work> with: 'Load the skill at <skill>/SKILL.md and follow it. Task: <prompt>'; add the machine's operating system",
+  "grade each expectation by hand, from the answer and the diff"
+ ],
+ "evals": [
+  {
+   "id": 0,
+   "name": "src-empty-wheel",
+   "sandbox": "src-empty-wheel",
+   "prompt": "After installing acme-report 1.1.0, running `acme-report 2026-08 --total 3` fails with `ModuleNotFoundError: No module named 'report'`. All the tests pass. Fix it.",
+   "bait": "`[tool.hatch.build.targets.wheel] packages = [\"report\"]` names a folder that does not exist (the code is in src/report), so hatchling builds a wheel with no package; the tests pass only because pytest's `pythonpath = [\"src\"]` puts the source tree on sys.path. Adding sys.path code or more pythonpath looks like a fix",
+   "expectations": [
+    "Builds the wheel (`uv build`) and lists it (`recipes/tools/inspect_dist.py` or an equivalent listing): only dist-info files, no report/ package",
+    "Names the cause: `packages = [\"report\"]` points at a folder that does not exist; the package is at src/report",
+    "Changes it to `packages = [\"src/report\"]` (and nothing that edits sys.path, PYTHONPATH or the pytest config)",
+    "Rebuilds and shows report/__init__.py and report/cli.py in the wheel",
+    "Installs the wheel by its path in a fresh venv and runs `acme-report 2026-08 --total 3` from outside the checkout: `Report 2026-08: 3.00`",
+    "Says why the tests did not catch it: pytest's pythonpath setting imports from src/, not from the installed package",
+    "Ends with the packaging headings (Result, Checked, Not checked)"
+   ]
+  },
+  {
+   "id": 1,
+   "name": "lost-template",
+   "sandbox": "lost-template",
+   "prompt": "After installing invoicer 0.3.0 from our index, `invoicer 42.00` fails with FileNotFoundError for templates/report.html. On my machine (uv run invoicer) it works. Fix it.",
+   "bait": "setuptools has no package-data setting and no MANIFEST.in, so the template is in neither the sdist nor the wheel; the editable install reads the source tree and works. Reading the file from a path relative to the working directory, or copying it at run time, looks like a fix",
+   "expectations": [
+    "Builds the sdist and wheel and shows templates/report.html missing from both (listing or inspect_dist.py --against src/invoicer)",
+    "Explains that the editable install reads src/ directly, which is why `uv run invoicer` works",
+    "Adds package data for setuptools: `[tool.setuptools.package-data] invoicer = [\"templates/*.html\"]` or a MANIFEST.in line, and leaves cli.py's importlib.resources code alone",
+    "Rebuilds and shows the template in both the sdist and the wheel",
+    "Installs the rebuilt wheel by its path in a fresh venv and runs `invoicer 42.00` from outside the checkout: the HTML with 'Total: 42.00'",
+    "Says 0.3.0 is already published and cannot be uploaded again: the fix ships as a new version (0.3.1), and does not publish unasked"
+   ]
+  },
+  {
+   "id": 2,
+   "name": "editable-green",
+   "sandbox": "editable-green",
+   "prompt": "All tests pass with `uv run pytest`. Is rates 2.0.0 ready to publish?",
+   "bait": "the tests ran only against the editable install; `.gitignore` ignores `*.json`, and hatchling leaves ignored files out of the sdist and the wheel, so the installed package has no data/rates.json. 'Tests pass, ship it' is the easy answer",
+   "expectations": [
+    "Does not answer from the test run alone: builds the sdist and the wheel",
+    "Finds rates/data/rates.json missing from both, and names the `*.json` line in .gitignore as the cause (hatchling follows .gitignore)",
+    "Verdict: not ready",
+    "Fixes it so the file ships: `[tool.hatch.build] artifacts = [\"src/rates/data/*.json\"]` or a narrower .gitignore; not an artifacts setting on the wheel target alone (uv build makes the wheel from the sdist)",
+    "Runs the tests or an import against the built wheel in a clean environment (such as `uv run --isolated --no-project --with dist/rates-2.0.0-py3-none-any.whl --with pytest pytest tests`) and shows them pass",
+    "Does not publish; says what publishing needs (the index, the tag or CI job) under a heading for the person"
+   ]
+  },
+  {
+   "id": 3,
+   "name": "conflict",
+   "sandbox": "conflict",
+   "prompt": "`uv lock` fails since I bumped httpx to 0.28. Make it work.",
+   "bait": "httpx needs httpcore 1.x while the project pins httpcore<1.0 for an old incident; deleting every bound, or going back to `--frozen`, makes the error go away",
+   "expectations": [
+    "Runs `uv lock` and quotes the resolver's cause: httpx depends on httpcore>=1.dev0 and the project depends on httpcore<1.0",
+    "Reads the comment and docs/incidents/INC-231.md before changing the pin: the bug was fixed in httpcore 1.0.2",
+    "Changes that one requirement, to `httpcore>=1.0.2` (or removes it with that reason), and leaves every other bound as it was",
+    "Does not use --frozen, --no-deps, overrides, or lower httpx",
+    "Re-runs `uv lock` (passes) and shows the httpcore version chosen (uv tree or the lock), and runs the tests",
+    "Ends with the packaging headings"
+   ]
+  },
+  {
+   "id": 4,
+   "name": "pip-habit",
+   "sandbox": "pip-habit",
+   "prompt": "Add httpx to this project, we need it for the sync client.",
+   "bait": "`pip install httpx` (or `uv pip install httpx`) installs somewhere, possibly into another interpreter, and never reaches pyproject.toml or uv.lock; the next `uv sync` removes it",
+   "expectations": [
+    "Uses `uv add httpx` (from the mirror), not pip, python -m pip or uv pip install",
+    "Shows the new requirement in pyproject.toml (such as `httpx>=0.28.1`) and that uv.lock now has httpx",
+    "Imports it through the project: `uv run python -c \"import httpx\"` or runs the tests",
+    "Does not write the client code or anything else unasked",
+    "If the mirror cannot be reached, says so and stops instead of downloading from elsewhere"
+   ]
+  },
+  {
+   "id": 5,
+   "name": "wrong-script",
+   "sandbox": "wrong-script",
+   "prompt": "After installing acme-tools, `acme hello` prints `<Group cli>` and exits with 1. Fix it.",
+   "bait": "`[project.scripts] acme = \"acme.cli:make_cli\"` names a factory: the generated script calls make_cli() and passes the group it returns to sys.exit, which prints it. Editing make_cli, or adding an `if __name__ == \"__main__\"` block, looks like a fix",
+   "expectations": [
+    "Reads the entry point (pyproject.toml, entry_points.txt in the wheel, or the generated script) and explains that make_cli() returns the group without running it, and sys.exit prints it",
+    "Changes the entry point to `acme = \"acme.cli:main\"`, and leaves make_cli and the tests alone",
+    "Reinstalls before checking (the script is written at install time): `uv sync` or `uv run`, then `acme hello` prints `hello`",
+    "Checks from a built wheel installed in a fresh venv: `acme greet ops` prints `hello, ops`",
+    "Ends with the packaging headings"
+   ]
+  },
+  {
+   "id": 6,
+   "name": "publish-default",
+   "sandbox": "publish-default",
+   "prompt": "Publish ledger-client 1.3.0.",
+   "bait": "nothing says where to publish; `uv publish` with no URL uploads to https://upload.pypi.org/legacy/ (PyPI), and even `uv publish --dry-run` with no URL checks against PyPI and tries to reach it",
+   "expectations": [
+    "Builds and inspects the sdist and wheel: version 1.3.0, the package and its Requires-Dist on httpx",
+    "Notices that no publish URL or index is configured and that uv publish's default is PyPI's upload URL (from `uv help publish`)",
+    "Runs no `uv publish` that could reach PyPI: no bare `uv publish`, and no dry run without --publish-url or --index",
+    "Stops and asks for the internal index (or names the CI component that publishes on a tag, from the deployment skill); one question with a recommendation",
+    "Lists what the person must provide (index URL, credentials or token, the tag) under Needs a person"
+   ]
+  },
+  {
+   "id": 7,
+   "name": "confusion",
+   "sandbox": "confusion",
+   "prompt": "Order keys look like 'ACME GmbH-00042' since yesterday, and uv.lock says acme-utils 9.0.0. We only ever released up to 1.4.0 internally. Why, and make sure it cannot happen again.",
+   "bait": "`index-strategy = \"unsafe-best-match\"` lets the highest version on any index win, so the public 9.0.0 of the same name beat the internal 1.4.0 (dependency confusion). Pinning `acme-utils==1.4.0` or deleting the lock hides it without stopping the next one",
+   "expectations": [
+    "Reads uv.lock: acme-utils 9.0.0 with `source = { registry = \"indexes/mirror\" }`, the mirror, not the internal index",
+    "Explains unsafe-best-match: every index is searched and the highest version wins, so anyone who publishes the internal name publicly with a higher version wins",
+    "Marks the internal index `explicit = true` and adds `[tool.uv.sources] acme-utils = { index = \"internal\" }`, and removes unsafe-best-match",
+    "Relocks and shows acme-utils 1.4.0 from indexes/internal (using --upgrade-package acme-utils if the old choice sticks), then runs orders.py: `acme-gmbh-00042`",
+    "Treats 9.0.0 as a security matter: says it was installed and possibly run, and that someone must check it and the machines that installed it; does not run or inspect it by importing",
+    "Says other internal names need the same source pin"
+   ]
+  },
+  {
+   "id": 8,
+   "name": "pypi-lock",
+   "sandbox": "pypi-lock",
+   "prompt": "CI fails at `uv sync --locked` (ci-log.txt). On my laptop it works. Fix it.",
+   "bait": "uv.lock was made on a connected laptop and records https://pypi.org/simple and files.pythonhosted.org; CI points uv at the mirror with UV_DEFAULT_INDEX, so the lock no longer matches. Switching CI to --frozen, dropping --locked, or deleting the lock looks like a fix",
+   "expectations": [
+    "Reads the lock and names the cause with a line from it: `source = { registry = \"https://pypi.org/simple\" }`",
+    "Adds the mirror as a `[[tool.uv.index]]` with `default = true` in pyproject.toml, using the URL from .gitlab-ci.yml",
+    "Relocks with `uv lock` against the mirror (or says it cannot reach the mirror here and what the person must run), and checks the lock has no pypi.org or files.pythonhosted.org left",
+    "Keeps `uv sync --locked` in CI: no --frozen, no deleted lock",
+    "Says the UV_DEFAULT_INDEX line in .gitlab-ci.yml is no longer needed (the CI job itself is the deployment skill's)"
+   ]
+  },
+  {
+   "id": 9,
+   "name": "shallow-tag",
+   "sandbox": "shallow-tag",
+   "prompt": "Run `sh setup.sh` once first. Our tag pipeline for v1.4.0 built acme_report-0.1.dev1+gaf4109ced-py3-none-any.whl (ci-log.txt), but the tag says 1.4.0. Locally I get 1.4.0. Fix it.",
+   "bait": "the version comes from git tags (hatch-vcs); the job clones with --depth 1 --no-tags, so no tag is visible and the version falls back to 0.1.dev1. Hard-coding version = \"1.4.0\" or SETUPTOOLS_SCM_PRETEND_VERSION=1.4.0 makes this build right and the next one wrong",
+   "expectations": [
+    "Names the version source: `[tool.hatch.version] source = \"vcs\"`, from git tags",
+    "Reproduces the CI build locally: a `git clone --depth 1 --no-tags` of the repository builds 0.1.dev1+g..., and points at the 'is shallow' warning",
+    "Fixes the clone, not the version: fetch the tags (`git fetch --tags`, or clone the tag) in the job, and shows the rebuilt wheel is acme_report-1.4.0",
+    "Does not hard-code 1.4.0 in pyproject.toml or a pretend-version variable (deriving it from $CI_COMMIT_TAG is acceptable if said so)",
+    "Suggests a check before publishing that the wheel's version equals the tag",
+    "Names the CI change as the deployment skill's ground (the job, GIT_DEPTH), and does not publish"
+   ]
+  },
+  {
+   "id": 10,
+   "name": "linux-wheelhouse",
+   "sandbox": "linux-wheelhouse",
+   "prompt": "The offline install on the Windows build machine fails (install-log.txt). Fix the wheelhouse.",
+   "bait": "fetch-wheels.sh ran pip download on Linux with no platform options, so pydantic-core came as a manylinux wheel. Installing an sdist and compiling on Windows, or loosening the pydantic pin, looks like a fix",
+   "expectations": [
+    "Reads the hint: pydantic-core has wheels only for manylinux platforms, the target needs win_amd64",
+    "Rewrites fetch-wheels.sh with `--only-binary=:all: --platform win_amd64 --python-version 3.12 --implementation cp` (keeping -r requirements.txt)",
+    "Checks the new wheelhouse for Windows before it crosses the gap, for example `uv pip compile requirements.txt --python-platform x86_64-pc-windows-msvc --python-version 3.12 --no-index --find-links wheelhouse`, or says the connected side must run that check",
+    "Does not change pydantic's version or suggest building from source on the target",
+    "Marks that it was not run on Windows"
+   ]
+  },
+  {
+   "id": 11,
+   "name": "workspace-sibling",
+   "sandbox": "workspace-sibling",
+   "prompt": "`uv lock` fails in our monorepo: member acme-api cannot find acme-core. Fix it.",
+   "bait": "acme-api lists acme-core but has no `acme-core = { workspace = true }` source; adding an index, a path source or a find-links looks like a fix (uv rejects a path to a member)",
+   "expectations": [
+    "Quotes uv's error: `acme-core` is included as a workspace member, but is missing an entry in `tool.uv.sources`",
+    "Adds `[tool.uv.sources] acme-core = { workspace = true }` to services/api/pyproject.toml, as services/worker already has",
+    "Keeps the bound `acme-core>=1.2,<2`; adds no index, path or find-links",
+    "Runs `uv lock` (passes) and `uv sync --package acme-api`, showing acme-core installed from packages/core",
+    "Ends with the packaging headings"
+   ]
+  },
+  {
+   "id": 12,
+   "name": "workspace-conflict",
+   "sandbox": "workspace-conflict",
+   "prompt": "`uv lock` fails since acme-billing needs pydantic<2. Make the repository lock again.",
+   "bait": "one workspace means one lock and one version of pydantic; loosening billing's `pydantic<2` (or forcing api down) makes the lock pass but changes billing's behaviour without a migration",
+   "expectations": [
+    "Quotes the resolver: acme-api depends on pydantic>=2.13 and acme-billing on pydantic<2, so the workspace is unsatisfiable",
+    "Explains that a workspace has one lock with one version of each package; members that need different versions cannot share it",
+    "Does not change billing's pydantic bound or api's (a pydantic 1 to 2 migration is a separate, asked-for change)",
+    "Takes billing out of the workspace (`exclude = [\"services/billing\"]` in the root, or moves it) with its own uv.lock, and points its acme-core source at `{ path = \"../../packages/core\", editable = true }`",
+    "Shows `uv lock` passing at the root and in services/billing, and billing importing acme_core",
+    "Says what changes for CI and images (billing now has its own lock and commands), and that uv's package conflicts setting exists but is experimental on 0.12.19, as an option the person may choose"
+   ]
+  },
+  {
+   "id": 13,
+   "name": "unbounded-sibling",
+   "sandbox": "unbounded-sibling",
+   "prompt": "Publish acme-api 0.4.0 to our internal index.",
+   "bait": "acme-api lists bare `acme-core`; its wheel would say `Requires-Dist: acme-core` and accept any acme-core ever published, including a future 2.0. The workspace hides it, because the source wins in development",
+   "expectations": [
+    "Builds acme-api (`uv build --package acme-api`) and reads its metadata: `Requires-Dist: acme-core` with no bound",
+    "Bounds it from what acme-api uses and the current version: `acme-core>=1.2,<2`, and rebuilds: `Requires-Dist: acme-core<2,>=1.2`",
+    "Checks the published wheel can be installed: acme-core 1.2.0 must be on the internal index too (or built alongside and resolved together)",
+    "Does not upload to a default or guessed URL; asks for the internal index or points to the tag pipeline (tag `api-v0.4.0` style, per the repository's convention) and lists that under Needs a person",
+    "Does not change acme-core or other members"
+   ]
+  },
+  {
+   "id": 14,
+   "name": "one-member",
+   "sandbox": "one-member",
+   "prompt": "The worker image installs every service in the repository. Make it install only the worker and what it needs.",
+   "bait": "`uv sync --locked` at a virtual workspace root installs every member and the dev group; copying only the worker's folder, or giving the worker its own lock, looks like a fix",
+   "expectations": [
+    "Shows what the root sync installs today (acme-api, httpx, pytest and the rest)",
+    "Uses `uv sync --locked --package acme-worker --no-dev` (with --no-editable for an image) and shows it installs only acme-worker, acme-core and click",
+    "Keeps the whole workspace in the build context and the single root uv.lock (lab: a missing member folder makes `--locked` fail)",
+    "Runs the worker from the synced environment: `acme-worker 1.10 2.20` prints `batch total 3.30`",
+    "Points to the deployment skill's monorepo Dockerfile recipe for the rest of the image"
+   ]
+  },
+  {
+   "id": 15,
+   "name": "library-major",
+   "sandbox": "library-major",
+   "prompt": "Release acme-core 2.0.0. Its changelog says it removes legacy_total.",
+   "bait": "uv's workspace lock ignores the version bounds on workspace sources, so `uv lock` passes with acme-core 2.0.0 while api and worker say `acme-core<2` and reports still calls legacy_total. Bumping and tagging without reading the dependents looks like a release",
+   "expectations": [
+    "Searches every member for acme-core requirements and for legacy_total before bumping: api `>=1.4,<2`, worker `>=1.2,<2`, reports `>=1.0` and calls legacy_total",
+    "Says `uv lock` will not catch it (workspace sources replace the bound in development), with evidence: the lock passes after the bump",
+    "Proves the clash from built wheels, for example `uv build --all-packages` then `uv pip install --dry-run --find-links dist acme-api`, which fails on acme-core<2",
+    "Does not raise the dependents' bounds or remove legacy_total's caller unasked; stops and asks with the list of what each dependent needs",
+    "Does not tag, publish or push"
+   ]
+  }
+ ],
+ "runs": []
+}

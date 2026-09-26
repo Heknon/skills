@@ -1,0 +1,18 @@
+[project]
+name = "acme-billing"
+version = "3.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "acme-core>=1.2,<2",
+    "pydantic<2",
+]
+
+[build-system]
+requires = ["hatchling>=1.32"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = ["pytest>=8.4"]
+
+[tool.uv.sources]
+acme-core = { workspace = true }

@@ -1,0 +1,9 @@
+variables:
+  UV_DEFAULT_INDEX: https://pypi-mirror.example.com/simple
+  UV_PYTHON_DOWNLOADS: never
+
+test:
+  image: registry.example.com/mirror/astral-sh/uv:0.12-python3.12-trixie-slim
+  script:
+    - uv sync --locked
+    - uv run pytest

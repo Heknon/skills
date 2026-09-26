@@ -1,0 +1,11 @@
+$ git clone --depth 1 --no-tags "$CI_REPOSITORY_URL" build
+Cloning into 'build'...
+$ cd build
+$ uv build
+Building source distribution...
+/root/.cache/uv/builds-v0/.tmpx3BDVs/lib/python3.12/site-packages/vcs_versioning/_backends/_git.py:709: UserWarning: "/builds/acme/acme-report/build" is shallow and may cause errors
+  pre_parse(wd)
+Building wheel from source distribution...
+Successfully built dist/acme_report-0.1.dev1+gaf4109ced.tar.gz
+Successfully built dist/acme_report-0.1.dev1+gaf4109ced-py3-none-any.whl
+Uploading artifacts for successful job

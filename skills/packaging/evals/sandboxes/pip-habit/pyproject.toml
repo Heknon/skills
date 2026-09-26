@@ -1,0 +1,16 @@
+[project]
+name = "notes"
+version = "0.2.0"
+description = "Sync meeting notes to the wiki."
+requires-python = ">=3.12"
+dependencies = ["click>=8.1"]
+
+[project.scripts]
+notes = "notes.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.32"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = ["pytest>=8.4"]

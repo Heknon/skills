@@ -1,0 +1,22 @@
+[project]
+name = "fetcher"
+version = "0.7.0"
+description = "Fetch partner price lists over HTTP."
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.1",
+    "httpx>=0.28",
+    # Pinned below 1.0: proxy tunnels broke in httpcore 1.0.0 (INC-231).
+    # Fixed upstream in httpcore 1.0.2, see docs/incidents/INC-231.md.
+    "httpcore<1.0",
+]
+
+[project.scripts]
+fetcher = "fetcher.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.32"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = ["pytest>=8.4"]

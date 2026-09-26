@@ -1,0 +1,17 @@
+# Recipe: a uv workspace of one library and one service, each its own
+# distribution under a shared namespace (acme.core, acme.api), one lock.
+# Locked, synced per member, built, installed from the wheels in a clean
+# venv and run on uv 0.12.19, hatchling 1.32.4, Python 3.12.
+# Change: member globs, the mirror URL. This root is virtual: it has no
+# [project], so `uv sync` here installs every member.
+[tool.uv.workspace]
+members = ["packages/*", "services/*"]
+
+[dependency-groups]
+# Installed by `uv sync` at the root; not by `uv sync --package <member>`.
+dev = ["pytest>=8.4"]
+
+[[tool.uv.index]]
+name = "mirror"
+url = "https://pypi-mirror.example.com/simple"
+default = true

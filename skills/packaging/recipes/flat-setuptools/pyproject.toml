@@ -1,0 +1,40 @@
+# Recipe: an existing flat-layout project on setuptools, with package data
+# and a version read from the package. Built, installed from the wheel in a
+# clean venv and run on uv 0.12.19, setuptools 84.0.0, Python 3.12.
+# Change: name, the package name in every table, the data patterns, the
+# script line, the mirror URL.
+[project]
+name = "ledger"
+dynamic = ["version"]
+description = "Post ledger entries from CSV files."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "LicenseRef-Proprietary"
+dependencies = []
+
+[project.scripts]
+ledger = "ledger.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8.4"]
+
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+# Flat layout: name the package, so tests/, scripts/ and a second
+# top-level folder are never discovered by accident.
+include = ["ledger*"]
+
+[tool.setuptools.package-data]
+# Files that are not .py are left out unless named here (or in MANIFEST.in).
+ledger = ["data/*.json", "py.typed"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ledger.__version__" }
+
+[[tool.uv.index]]
+name = "mirror"
+url = "https://pypi-mirror.example.com/simple"
+default = true

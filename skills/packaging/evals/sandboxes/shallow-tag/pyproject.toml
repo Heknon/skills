@@ -1,0 +1,13 @@
+[project]
+name = "acme-report"
+dynamic = ["version"]
+description = "Render monthly sales reports."
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["hatchling>=1.32", "hatch-vcs>=0.5"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"

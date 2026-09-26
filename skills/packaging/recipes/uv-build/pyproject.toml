@@ -1,0 +1,35 @@
+# Recipe: a pure-Python library on uv's own build backend, src layout.
+# Built, installed from the wheel in a clean venv and run on uv 0.12.19
+# with uv_build 0.12.19, Python 3.12. Change: name, dependencies, the
+# script line, the mirror URL; rename src/acme_tax to match (or set
+# module-name below).
+[project]
+name = "acme-tax"
+version = "0.3.0"
+description = "VAT rates and calculations."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "LicenseRef-Proprietary"
+dependencies = []
+
+[project.scripts]
+acme-tax = "acme_tax.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8.4"]
+
+[build-system]
+# uv build and uv sync use uv's built-in copy when the range holds the
+# running uv; --force-pep517 or pip fetch uv_build from the mirror.
+requires = ["uv_build>=0.12.19,<0.13"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+# Only needed when the folder is not the project name with - as _.
+# Unknown keys in this table are ignored without a warning: check spelling.
+module-name = "acme_tax"
+
+[[tool.uv.index]]
+name = "mirror"
+url = "https://pypi-mirror.example.com/simple"
+default = true

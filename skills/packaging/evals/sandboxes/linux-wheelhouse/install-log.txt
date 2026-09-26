@@ -1,0 +1,6 @@
+PS C:\build\reporter> uv pip install --offline --no-index --find-links wheelhouse -r requirements.txt
+Using Python 3.12.3 environment at: .venv
+error: No solution found when resolving dependencies
+  cause: Because pydantic-core==2.46.5 has no wheels with a matching platform tag (e.g., `win_amd64`) and you require pydantic-core==2.46.5, we can conclude that your requirements are unsatisfiable.
+
+hint: Wheels are available for `pydantic-core` (v2.46.5) on the following platforms: `manylinux_2_17_x86_64`, `manylinux2014_x86_64`

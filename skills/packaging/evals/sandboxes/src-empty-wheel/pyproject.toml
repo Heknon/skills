@@ -1,0 +1,23 @@
+[project]
+name = "acme-report"
+version = "1.1.0"
+description = "Render monthly sales reports."
+requires-python = ">=3.12"
+dependencies = ["click>=8.1"]
+
+[project.scripts]
+acme-report = "report.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.32"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["report"]
+
+[dependency-groups]
+dev = ["pytest>=8.4"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

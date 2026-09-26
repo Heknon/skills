@@ -1,0 +1,20 @@
+# Recipe: two projects side by side in one repository, each with its own
+# uv.lock and environment, no workspace. billing uses core through a path
+# source. Locked, tested, built and installed on uv 0.12.19, hatchling
+# 1.32.4, Python 3.12. Change: names, paths, the mirror URL (in both files:
+# a project outside a workspace does not see another project's index).
+[project]
+name = "acme-core"
+version = "1.2.0"
+description = "Shared money helpers."
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["hatchling==1.32.4"]
+build-backend = "hatchling.build"
+
+[[tool.uv.index]]
+name = "mirror"
+url = "https://pypi-mirror.example.com/simple"
+default = true

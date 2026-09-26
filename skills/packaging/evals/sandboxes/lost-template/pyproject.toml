@@ -1,0 +1,16 @@
+[project]
+name = "invoicer"
+version = "0.3.0"
+description = "Render invoices as HTML."
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+invoicer = "invoicer.cli:main"
+
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[dependency-groups]
+dev = ["pytest>=8.4"]
