@@ -35,7 +35,7 @@ first. Run everything through uv: `uv run --no-sync python probe.py`.
 | **Validate** | add or fix a validator, a constraint, a coercion rule | `core/validate.md`, `typing/annotated.md` |
 | **Serialize** | change what `model_dump` or the JSON looks like: aliases, excludes, serializers, computed fields | `core/serialize.md` |
 | **Read error** | explain a `ValidationError`, a "not fully defined" or schema error, a crash inside validation | `core/read-error.md` |
-| **Type** | `Annotated`, unions, generics, `Optional`, forward refs, `TypeAdapter`, strict and lax | the `typing/` file named in `core/model.md` |
+| **Type** | `Annotated`, unions, generics, `Optional`, forward refs, `TypeAdapter`, strict and lax | `typing/<topic>.md`: `required-and-optional`, `annotated`, `unions`, `generics`, `forward-refs`, `type-adapter`, `strict-and-lax` |
 | **Checker** | say why pyright, basedpyright or mypy flags a model, and fix it | `core/checker.md`, `typing/checkers.md` |
 | **Migrate** | move v1 code to v2, or read v1 code | `core/migrate.md`, `reference/v1-to-v2.md` |
 | **Settings** | add or change settings, `.env` files, prefixes, secrets, layering, settings in tests | `settings/sources.md`, then the `settings/` file for the part |
@@ -89,7 +89,8 @@ reading an installed package).
    merged result with the full model. `model_copy(update=...)` validates
    nothing (`partial/handoff.md`).
 9. **Unset is not `None`.** A patch is dumped with `exclude_unset=True`,
-   never `exclude_none=True` alone.
+   never with `exclude_none` or `exclude_defaults`, which stop a client
+   from clearing a field (`partial/unset-and-none.md`).
 10. **No new packages.** Air gapped: use what is installed, and say what
     is missing.
 

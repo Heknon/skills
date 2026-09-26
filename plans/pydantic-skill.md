@@ -1,6 +1,8 @@
 # Plan: the pydantic skill
 
-Status: draft for decision. Nothing is built yet.
+Status: built in `skills/pydantic/`. The defaults in section 10 were
+taken so the skill could be built; each can be changed. Sections 11 and
+12 say how it was verified and what the lab changed.
 
 ## 1. What it is
 
@@ -244,3 +246,111 @@ A model in Zed sees its language server's errors about models before it
 runs anything. *Recommended:* explain that server first (pyright or
 basedpyright, to verify), then mypy with the plugin. linting owns their
 configuration.
+
+## 10. Decisions taken as defaults
+
+- **PD1. Versions.** pydantic 2.13.5 (pydantic-core 2.46.5),
+  pydantic-settings 2.15.0, pydantic-partial 0.11.1, Python 3.12, all
+  available on the public index. Where behaviour differs, 2.10.6,
+  2.11.10 and 2.12.5 were run too (`reference/versions.md`); the
+  mirror's versions are still to confirm.
+- **PD2. v1 for migration and reading only.** `core/migrate.md` uses the
+  bundled `pydantic.v1` (1.10.26) to show what v1 code did; it is never
+  the target for new code.
+- **PD3. pydantic-partial releases.** 0.11.1, plus every release that
+  installs on pydantic 2.13.5 (0.5.2 to 0.10.2), diffed and probed;
+  0.5.5 backs the `partial-old` eval.
+- **PD4. Validate the merged result with the full model** (roadmap R4).
+  The lab confirmed the losses, and added two rules the merge needs:
+  field validators return `None` unchanged, and model validators return
+  early when the partial is parsed with `context={"partial": True}`
+  (`partial/validators.md`, `recipes/patch/`).
+- **PD5. Environment, `.env` and secrets in depth**; adding a TOML
+  source is shown in `settings/sources.md`; other file sources, the
+  command line and cloud stores are named only.
+- **PD6. The trace script** ships as `recipes/settings/trace_settings.py`
+  and ran; `settings/trace.md` also gives the steps by hand.
+- **PD7. basedpyright first.** Zed's documentation says basedpyright is
+  its default Python server since 0.204.0, in `standard` mode; the lab
+  ran basedpyright 1.40.1, pyright 1.1.414 and mypy 2.3.1 with and
+  without the plugin (`typing/checkers.md`).
+
+## 11. How it was verified
+
+Every API, option, default, message and behaviour in the skill was run
+in a lab outside the repository on Linux, Python 3.12.3, uv 0.8.17, with
+the pins above, or read in the installed source (marked *source*).
+Probes stayed in the lab, outside the repository. In detail:
+
+- The fifteen evals were written first; each bait was reproduced in a
+  fresh copy of its sandbox and each intended fix passed its tests.
+- Settings: the source order on pydantic-settings 2.8.1, 2.12.0 and
+  2.15.0; each `.env`, secrets and variable-name fact on 2.15.0; the
+  settings recipe's six tests on 2.15.0 and 2.14.1 (and the expected
+  failure on 2.13.1); the trace script on 2.15.0 and 2.12.0, run from
+  several working directories with each source on and off.
+- Partial models: `partial.py` and `utils.py` diffed across 0.3.4 to
+  0.11.1; the three problems probed on every installable release; the
+  patch recipe's eleven tests on pydantic-partial 0.9.0, 0.10.2 and
+  0.11.1, on pydantic 2.12.5 and 2.13.5 (and, with two arguments
+  removed, 2.11.10 and 2.10.6), and shown to fail against the naive
+  versions.
+- Checkers: pyright 1.1.414, basedpyright 1.40.1, mypy 2.3.1 with and
+  without `pydantic.mypy`, output recorded for each model shape.
+- The three examples are lab runs with their real output.
+- Not run: anything on Windows or PowerShell (marked *not run on
+  Windows*: `$env:` scope, `setx`, case-insensitive variable names,
+  PowerShell 5.1 writing UTF-16 with `>`, quoting in `python -c`), and
+  Zed itself (its default server is from its documentation).
+
+## 12. What the lab changed
+
+Findings that corrected the plan or a common belief, each now in the
+skill:
+
+- `recursive=True` also skips nested models on fields **with a
+  default** (`work: Addr | None = None`), even with the mixin: only
+  required fields are rebuilt. Listing the field as `"work.*"` works.
+- Inherited **model** validators run on the partial instance, which
+  holds defaults, not stored values: a valid PATCH was rejected
+  (`min_items` 15 against the partial's default `max_items` 10, stored
+  20), and with required fields they crash on `None`. A validation
+  context flag fixes it.
+- Validating the merged result re-runs validators on stored values: a
+  hashing validator re-hashed a stored hash. Validators must be
+  idempotent.
+- The hand-off must carry values from the validated model, not the raw
+  body: a tidying validator rewrote `"  Bea   Stone "`.
+- Constraints are lost on required fields only, and all of them (`gt`,
+  `pattern`, `StringConstraints`), not only lengths; releases before
+  0.10.2 also print a `metadata` deprecation warning.
+- pydantic-partial history: 0.8.0, not 0.9.0, dropped pydantic v1;
+  0.5.2 is the first release installable on current 2.x; 0.7.0 and
+  0.8.0 crash with `TypeError: type 'types.UnionType' is not
+  subscriptable` on `X | None` fields with `recursive=True`. The
+  partial class is typed as the full model, so construct it with
+  `model_validate`; mypy rejects subclassing it, so name it with
+  `create_model`.
+- Unknown config keys are ignored silently: `serialize_by_alias` on
+  pydantic 2.10, `dotenv_filtering` on pydantic-settings 2.13. v1's
+  `allow_mutation=False` leaves a v2 model mutable with only a warning.
+- For a shared `.env`, `dotenv_filtering="match_prefix"` (2.14+) is
+  better than the plan's `extra="ignore"`: other tools' keys are
+  ignored and misspelt `APP_` keys still fail.
+- The plain secrets source does not split nested names
+  (`app_db__password` sets nothing); `NestedSecretsSettingsSource`
+  (2.12+) does. A settings field with `validation_alias` ignores
+  `env_prefix`. `PYDANTIC_SETTINGS_DEBUG` (2.15) logs secrets in clear.
+- Checkers: `Field(validation_alias=, serialization_alias=)` keeps
+  pyright, basedpyright and mypy quiet where `Field(alias=)` fights one
+  or the other; basedpyright's `recommended` mode flags an unannotated
+  `model_config` (`ClassVar[ConfigDict]` fixes it).
+- Probes: a probe named `types.py` or `pydantic.py` shadows the module;
+  a `src/` project without a build system needs `PYTHONPATH=src` for a
+  probe; `StringConstraints` checks `pattern` before `to_upper`.
+
+The plan's section 7 claims were all reconfirmed on Python 3.12: the
+default order, nested merging, the stripped newline in secrets, the
+cached subclass, the relative `.env` path, `extra_forbidden` without the
+prefix, the `TypeError` escaping from a validator, and the three
+partial-model problems.

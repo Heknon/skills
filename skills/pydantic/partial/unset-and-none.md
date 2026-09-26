@@ -23,16 +23,18 @@ UserPatch.model_validate({"email": None}).model_fields_set
     {'email'}
 ```
 
-## What each dump does to a stored user `email='ann@example.com', status='suspended'`
+## Each dump merged onto a stored user
 
-| Merged with | `{"name": "Xavier"}` gives | `{"email": null}` gives |
-| --- | --- | --- |
-| `model_dump()` | **`id=None`, `email=None`, `status='active'`**: everything reset | same resets |
-| `model_dump(exclude_none=True)` | `status` still reset to `'active'` | **`email` unchanged**: a client can never clear a field |
-| `model_dump(exclude_defaults=True)` | fine here, but a client can never set a field back to its default value | |
-| `model_dump(exclude_unset=True)` | only `name` changes | `email` cleared |
+The stored user has `email='ann@example.com'` and `status='suspended'`.
 
-(*lab:* the first row is the patch-resets case: `id=None name='Xavier'
+| Dump of the patch | `{"name": "Xavier"}` | `{"email": null}` | `{"status": "active"}` |
+| --- | --- | --- | --- |
+| `model_dump()` | all fields: **`id`, `email` set to `None`, `status` to `'active'`** | same resets | same resets |
+| `model_dump(exclude_none=True)` | `{'name': 'Xavier', 'status': 'active'}`: status reset | `{'status': 'active'}`: **email not cleared**, status reset | `{'status': 'active'}` |
+| `model_dump(exclude_defaults=True)` | `{'name': 'Xavier'}` | `{}`: **email not cleared** (`None` is its default) | `{}`: **cannot set a field back to its default** |
+| `model_dump(exclude_unset=True)` | `{'name': 'Xavier'}` | `{'email': None}` | `{'status': 'active'}` |
+
+(*lab*, every cell; merged, the first row gave `id=None name='Xavier'
 email=None status='active'`.) Use `exclude_unset=True`, and only that.
 
 ## Nested and lists
