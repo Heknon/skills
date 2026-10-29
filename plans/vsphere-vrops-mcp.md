@@ -28,14 +28,47 @@ steps in the agent's reach:
   hours. A VM name is reused by later environments, so a name alone never
   identifies a machine.
 - **The Twix environment id is the anchor.** Each environment is a folder
-  under the projects/environments folders on its vCenter, so the
-  environment's VMs are the VMs in that folder.
-- **Sahara already holds the way in.** Its VMware Tools error logs carry,
-  in their extra data, the vCenter, the machine name and the environment
-  id. From those three the MCP goes straight to the machine: vCenter →
-  environment folder → VM by name inside it. Within one environment's
-  folder a name is unique; across environments it is not, and the MCP
-  never searches by name outside the folder.
+  on its vCenter, under a parent that groups environments. There are two
+  kinds of vCenter: one kind groups them as *environments*, the other as
+  *projects*. Within a kind the layout is the same on every vCenter.
+  The environment's VMs are the VMs in its folder.
+- **Sahara already holds the way in.** Its VMware Tools error logs carry
+  the vCenter, the machine name and the environment id, somewhere in
+  their extra data. From those three the MCP goes straight to the
+  machine: vCenter → environment folder → VM by name inside it. Within one
+  environment's folder a name is unique; across environments it is not,
+  and the MCP never searches by name outside the folder.
+
+### 2.1 Concepts, not constants
+
+Nothing in the MCP or the skill hard-codes a folder path, a log field
+name, a vCenter's kind or a naming pattern. Layouts change, and a
+hard-coded path turns every inconsistency into a wrong answer or a
+silent miss. Instead:
+
+- **The MCP discovers.** `find_environment(env_id)` looks for folders
+  whose name is or contains the env id, on the vCenter given or on all of
+  them, and reports *what it found and where*: the full folder path, the
+  parent it sits under, how many VMs it holds. One match is used; none or
+  several are reported as such, with the candidates, never guessed
+  between. It does not need to know whether a vCenter is the
+  environments kind or the projects kind; it reports which parent the
+  folder sat under, and the model can see it.
+- **Config may give hints, never requirements.** An optional list of
+  parent folder names to look under first makes the lookup faster; if
+  the env is not found there, the MCP looks everywhere and says so.
+- **The skill teaches the concepts**: an environment is a folder named by
+  its Twix id, under an environments or projects parent; a VM is
+  identified by its vCenter and moref, its name only inside its folder;
+  the Sahara log carries the vCenter, the machine and the env id under
+  some key in its extra data, so read the record and find them rather
+  than expect one field name. When the data does not match the concept
+  (two folders for one id, a VM outside any env folder, a log without a
+  vCenter), the skill says to report the inconsistency as a finding, not
+  to work around it silently.
+- **Thresholds are defaults, and the raw values always come back.** A
+  check that says "CPU starvation" also returns the demand and ready time
+  it judged on, so the model, and the person reading, can disagree.
 - **Once found, the key is `(vcenter, moref)`**, with `instanceUuid` and
   `config.createDate` alongside. Every later call uses that key. If the
   VM has since been destroyed, the tool says *destroyed* and does not fall
@@ -127,8 +160,8 @@ All read-only. Every result names the vCenter, the moref, the
 | Tool | Answers | API |
 | --- | --- | --- |
 | `list_vcenters` | the nine, reachable or not, their versions | `ServiceInstance.content.about` |
+| `find_environment(env_id, vcenter=None)` | the folder(s) matching the env id, with full path, parent and VM count; on every vCenter when none is given; ambiguity reported, not resolved | `PropertyCollector` over folder names |
 | `get_environment(vcenter, env_id)` | the environment's folder and every VM in it, with power state, Tools state, host, datastore, boot time | `ContainerView` on the folder + `PropertyCollector` |
-| `find_environment(env_id)` | which vCenter holds the environment, when the log did not say | the env folder looked up on each vCenter |
 | `get_vm(vcenter, env_id, vm_name)` | the VM's key | inside the env folder only |
 
 ### 6.2 Scanning: the other way in
@@ -161,6 +194,8 @@ The checks, with thresholds in config:
 | `boot_loop` | several resets or guest reboots in the last N minutes, from events |
 | `blocked_on_question` | a pending VM question |
 | `lost_heartbeat` | Tools were running, heartbeat now gray or red |
+| `tools_flapping` | Tools running and not running in turn, from events and `vmware.log`: the "Tools keeps crashing" symptom |
+| `customization_failed` | a guest customization (Sysprep on Windows) started and did not succeed, from events |
 | `inaccessible` | disconnected, inaccessible, orphaned or invalid |
 | `overcommitted_host` | a host above the CPU demand threshold, with the VMs on it |
 | `slow_datastore` | a datastore above the latency threshold, with the VMs on it |
@@ -280,23 +315,55 @@ kernel's own error.
    warnings and path errors for the datastore's device, at the minute the
    timeline stopped.
 
-**Getting the kernel's own words**, read-only on our side, with one
-change to the templates on theirs:
+**Windows first.** Most of the fleet is Windows, and it causes most of
+the trouble. What that changes:
 
-- **A virtual serial port that writes to a file** in the VM's datastore
-  folder, and the guest kernel booted with its console on that port
-  (`console=ttyS0` alongside the normal one, for Linux). Then every
-  kernel line, timeouts and panics included, lands in a file that
-  `read_vm_log` can read like `vmware.log`. This is the only way to see
-  the guest kernel's messages from vCenter without the guest running.
-- **No graphical splash and no `quiet`** on the kernel command line, so
-  the console shows text and the screenshot OCR has something to read.
-- For **Windows** guests, the equivalent is boot logging and a serial
-  debug port; less useful, and to be checked against the guest versions.
+- **The console says more on Windows than on Linux.** Windows draws its
+  state on the screen, and OCR reads it: the spinning boot dots, "Working
+  on updates", "Getting devices ready", "Preparing Automatic Repair",
+  "Scanning and repairing drive", a Windows Boot Manager error with its
+  code, a blue screen with its stop code. Each is a different diagnosis,
+  and the screenshot is often the single most useful piece of evidence
+  for a Windows VM that did not come back. The OCR engine must handle
+  these screens; that is tested in phase 0 on real captures.
+- **A black screen on Windows** is usually early boot before the display
+  is initialised, or a hang before the logon screen; two captures and the
+  VM's CPU and disk counters separate a slow boot from a hang.
+- **Not every "did not come back" is a fault.** A cloned Windows VM may
+  run guest customization (Sysprep) with reboots of its own, and Windows
+  Update may run on the way up. Both take minutes and can outlast the
+  timeout that raises the Tools error. vCenter logs customization start,
+  success and failure as events; the console shows updates. A slow
+  customization on a CPU-starved host is the CPU cause showing up as a
+  Windows symptom.
+- **"Tools keeps crashing."** Tools on Windows is a service started late
+  in boot. vCenter cannot see why the service died (that is in the guest's
+  event log), but it can see the pattern: Tools running, then not, then
+  running again, in events and `vmware.log`. A flapping Tools on a
+  starved host and on a healthy host are different findings.
 
-Both are template changes owned by whoever builds the templates; the MCP
-only reads what they produce. Without them, the timeline and the console
-are what there is, and the diagnosis says so.
+**Getting the guest's own words**, read-only on our side, with a change
+to the templates on theirs:
+
+- **Windows: Emergency Management Services on a virtual serial port**
+  that writes to a file in the VM's datastore folder (`bcdedit /ems on`
+  and `/emssettings`, set in the template). With EMS on, Windows writes
+  its boot and, on a bugcheck, its stop information to that port, so a
+  blue screen lands in a file the MCP reads like `vmware.log`, even when
+  nobody saw the console. What exactly it writes on your Windows versions
+  is checked in the lab before relying on it.
+- **Linux: the kernel console on the same kind of serial port**
+  (`console=ttyS0` alongside the normal one), and no `quiet` or graphical
+  splash, so every kernel line, timeouts and panics included, is in the
+  file and on the screen.
+- **Crash dumps** are written inside the guest's disk, which vCenter
+  cannot read. If the VM later comes back and Sahara collects the dump as
+  a monitor, the Sahara MCP's dump workflow takes over; the skill points
+  there.
+
+These are template changes owned by whoever builds the templates; the MCP
+only reads what they produce. Without them, the timeline, the console and
+the counters are what there is, and the diagnosis says so.
 
 | Tool | Answers |
 | --- | --- |
@@ -364,7 +431,10 @@ carries more of the reasoning:
    VMs before blaming the host or datastore they share.
 3. **Never identify by name** outside the environment folder; carry the
    key from the first call to the last.
-4. **The causes and their evidence**:
+4. **Concepts, not constants** (section 2.1): find the env folder, the
+   log fields and the vCenter's kind from the data each time; report an
+   inconsistency as a finding.
+5. **The causes and their evidence**:
 
    | Cause | Evidence for | Evidence against |
    | --- | --- | --- |
@@ -375,19 +445,24 @@ carries more of the reasoning:
    | Pending VM question | `runtime.question` set | none |
    | Guest hang in early boot | CPU near zero; console black and frozen across captures; `vmware.log` reset then nothing from the guest; host and storage healthy | console changing; Tools came up |
    | Guest booted, Tools did not start | console at a login prompt or guest IPs reported; Tools not running; host and storage healthy | Tools running |
+   | Windows still working (customization, updates, disk check) | customization started and not finished in events; the console shows updates, "Getting devices ready" or a disk scan; CPU and disk busy | customization succeeded; console at the logon screen |
+   | Windows crashed or cannot boot | the console or the EMS serial log shows a stop code, Automatic Repair, or a Boot Manager error | console at the logon screen |
+   | Tools flapping | Tools running and not running in turn; check whether the host was starved at those moments | Tools steady |
    | Something else reset or moved it | HA, migration or reset events not from Sims | none |
 
-5. **Starved is not hung.** A VM still booting on an overcommitted host
+6. **Starved is not hung.** A VM still booting on an overcommitted host
    is a timeout in Sims or Sahara, not a broken VM; the verdict says
    which.
-6. **Correlation rules**: a shared timestamp is not a cause; name the
+7. **Correlation rules**: a shared timestamp is not a cause; name the
    evidence for each claim, the competing explanation, and the check that
    separates them.
-7. **Evals that bait the failures**: looking up the machine by name
-   across vCenters and finding another environment's VM; blaming the
-   guest while its host sits at 120%; blaming the host while the
-   environment's VMs on other hosts are equally stuck; calling a slowly
-   booting VM hung; trusting one black screenshot without a second.
+8. **Evals that bait the failures**: looking up the machine by name
+   across vCenters and finding another environment's VM; expecting a fixed
+   folder path or log field and missing the env when the layout differs;
+   blaming the guest while its host sits at 120%; blaming the host while
+   the environment's VMs on other hosts are equally stuck; calling a
+   slowly booting VM hung, or a Windows VM still in customization or
+   updates broken; trusting one black screenshot without a second.
 
 ## 9. Security
 
@@ -416,12 +491,12 @@ carries more of the reasoning:
 
 ## 11. Open questions
 
-1. **The env folder's path**: is it the same pattern on all nine vCenters
-   (for example `<datacenter>/vm/projects/<env_id>`), or does it vary per
-   vCenter or project?
-2. **The Sahara log's fields**: the exact keys in the extra data for the
-   vCenter, the machine name and the env id, and whether the vCenter is a
-   hostname or a short name to map to one.
+1. **A few real examples, for the lab only**: an env folder's path on
+   each kind of vCenter (environments and projects), and a Sahara Tools
+   error record. They test that discovery finds them; nothing is
+   hard-coded from them (section 2.1).
+2. **How the Sahara log names the vCenter**: a hostname, or a short name
+   that has to be matched to one of the nine?
 3. **vCenter and vROps versions**, the statistics level, and the event
    retention setting.
 4. **The two past incidents**: dates, windows, the hosts at ~120%, the
@@ -434,8 +509,10 @@ carries more of the reasoning:
 7. **Does your GLM 5.3 client pass image content** from an MCP result to
    the model? *Default: no; the text form of the screenshot carries it.*
 8. **Will the bare metal team grant the read-only accounts?**
-9. **The guests**: Linux, Windows, or both, and which versions? It decides
-   what the console shows and how a serial log is set up.
-10. **Can the templates get a serial port to a file and a text console**
-    (section 6.5)? That is the difference between "the kernel stopped
-    after loading its drivers" and the kernel's own timeout message.
+9. **The Windows versions** in the templates (most of the fleet, and most
+   of the trouble), and whether the clones run guest customization
+   (Sysprep) on first boot.
+10. **Can the templates get a serial port to a file**, with EMS on for
+    Windows and the kernel console on it for Linux (section 6.5)? That is
+    the difference between "the boot stopped after the drivers loaded" and
+    the guest's own stop code or timeout message.
