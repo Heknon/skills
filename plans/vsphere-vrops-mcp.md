@@ -83,6 +83,55 @@ Three consequences shape everything below:
 The grouping in step 2 is the finding. One stuck VM is an anecdote;
 29 of 33 on one datastore inside six minutes is a cause to chase.
 
+### 3.1 The causes seen so far, and the fast path
+
+The recurring symptom is Sahara reporting VMware Tools errors after a
+reboot, because the VM did not come back in time. Two causes have been
+found behind it so far:
+
+- **ESXi CPU overcommitted**: hosts at around 120% CPU demand. A VM that
+  boots on such a host waits for CPU on every instruction (ready time), so
+  a 60-second boot takes ten minutes and Tools start after Sims or Sahara
+  has given up. The VM is often not hung, only starved, and it may come
+  up later on its own.
+- **PowerFlex saturated**: very high IOPS on the storage. A booting guest
+  reads its disk hard; with device latency in the hundreds of
+  milliseconds the bootloader and kernel stall, and a long enough stall
+  looks like a hang from the console.
+
+Both are **shared-infrastructure causes**, so the fastest diagnosis does
+not start from a VM at all. **`diagnose_window(since, until)`** runs the
+known causes first, across the fleet, for the incident window, and
+answers in one call:
+
+1. **Which VMs were affected**: the sweep (or the sweeper's records) for
+   the window, grouped by host, cluster and datastore.
+2. **CPU**: per host and cluster, CPU demand against capacity, and the
+   affected VMs' ready time and co-stop during their boot. A group on
+   hosts above 100% demand with ready time above a threshold is reported
+   as *CPU starvation*, with the hosts named.
+3. **Storage**: per datastore, device latency, kernel and queue latency,
+   IOPS, aborted commands and resets; with the PowerFlex adapter (6.6),
+   the volumes, storage pools and SDS nodes behind those datastores. A
+   group on datastores whose latency crossed a threshold in their boot
+   windows is reported as *storage saturation*, with the datastores and
+   the PowerFlex pool named. Queue latency high with device latency normal
+   points at the host's queue; device latency high points at PowerFlex.
+4. **Neither**: if CPU and storage were healthy for the group, it says so,
+   and the investigation moves to the VMs themselves (`vm_triage`,
+   template, events).
+
+It also reports **boot-to-Tools time** (from the reboot to Tools running)
+as a distribution per host and datastore, from the sweeper's
+observations. That separates *slow* from *stuck*: if the fleet's median
+is 70 seconds and the VMs on three hosts take 9 minutes but get there,
+they were starved, not hung; if they never get there, they hung.
+
+The causes are checked in a fixed order with fixed thresholds, held in
+config and tuned in phase 0, so the answer does not depend on the model
+remembering what to look at. A third recurring cause, once found, is
+added as a fourth check.
+
 ## 4. The layers and how they join
 
 | Layer | Owner | Agent access today | Holds |
@@ -188,6 +237,21 @@ of destroying them (question 3).
 | `get_datastore_health(ds, since)` | free space, accessibility, latency over the window, how many VMs live on it and how many are anomalous | `summary`, `PerfManager` |
 | `get_host_health(host, since)` | CPU, memory, per-datastore device and kernel latency, anomalous VMs on it | same |
 | `read_host_log(host, log, since, grep)` | `vmkernel`, `hostd` lines in the window: path failures, APD/PDL, latency warnings | `DiagnosticManager.BrowseDiagnosticLog` |
+| **`diagnose_window(since, until)`** | the fast path of section 3.1: affected VMs, then CPU, then storage, then "neither" | the sweep, `PerfManager`, PowerFlex |
+| `get_boot_times(since, until, group_by)` | boot-to-Tools time per host, datastore, template: slow versus stuck | the sweeper's records |
+
+The counters behind the CPU and storage checks (to confirm on your
+vCenter's statistics level): `cpu.ready.summation`,
+`cpu.costop.summation`, `cpu.demand.average` and `cpu.usage.average` on
+VMs and hosts; `disk.deviceLatency.average`, `disk.kernelLatency.average`,
+`disk.queueLatency.average`, `disk.numberReadAveraged.average`,
+`disk.numberWriteAveraged.average`, `disk.commandsAborted.summation`,
+`disk.busResets.summation` on hosts; `datastore.totalReadLatency.average`
+and `datastore.totalWriteLatency.average`. Ready time is reported as a
+percentage of the sample interval per vCPU, not as raw milliseconds,
+because the raw number misleads a model as easily as it misleads a person.
+Realtime counters last about an hour, so the sweeper keeps these for
+the hosts and datastores too (section 8), and vROps covers older windows.
 
 ### 6.5 vROps
 
@@ -201,7 +265,26 @@ few points at best and may already be gone from it.
 | `vrops_compare_window(resource, window, baseline_days)` | the incident window against the same window on previous days: "is 02:10 always like this?" |
 | `vrops_get_alerts(resource, since)` | alerts and symptoms on it and its parents |
 
-### 6.6 Actions (off by default)
+### 6.6 PowerFlex
+
+vCenter sees PowerFlex only as a slow device. Whether the cause is one
+saturated storage pool, one overloaded SDS node, a rebuild or rebalance,
+or another tenant's load on the same pool is visible only from PowerFlex
+itself, through its REST API (the gateway or PowerFlex Manager; exact
+endpoints confirmed on your version). An optional adapter, read-only:
+
+| Tool | Answers |
+| --- | --- |
+| `powerflex_map_datastore(ds)` | the volume, storage pool, protection domain and SDS nodes behind a datastore |
+| `powerflex_get_stats(object, since)` | IOPS, bandwidth and latency of a volume, pool or SDS |
+| `powerflex_get_activity(since)` | rebuilds, rebalances, degraded or failed devices in the window |
+| `powerflex_top_volumes(pool, since)` | which volumes drove the IOPS on a pool: the noisy neighbour |
+
+`diagnose_window` uses it when configured; without it, the storage check
+stops at "datastore latency high" and says that the PowerFlex side was
+not checked.
+
+### 6.7 Actions (off by default)
 
 Behind `VSPHERE_ACTIONS=1`, a second vCenter role, and an explicit
 confirmation: `answer_vm_question`, `reset_vm`. Nothing that creates,
@@ -241,6 +324,16 @@ ones. Then:
 - the anomaly rate per datastore or host is a population baseline that
   vROps cannot give for VMs this short-lived.
 
+It also records, each minute:
+
+- the **boot-to-Tools time** of every VM it sees rebooting: the boot time
+  from `runtime.bootTime`, Tools running from the first sweep that sees
+  it. Nothing else measures this, and it is the number that separates
+  starved from hung;
+- **host CPU demand and ready time, and datastore latency and IOPS**, so
+  `diagnose_window` can answer for a window older than vCenter's realtime
+  hour without depending on vROps' rollups.
+
 It runs the same code as `sweep_vms`, so the classes stay in one place.
 
 ## 9. The skill: `vm-incident`
@@ -248,7 +341,9 @@ It runs the same code as `sweep_vms`, so the classes stay in one place.
 What `SKILL.md` carries, in this repo's style:
 
 1. **The ladder**: Sahara (which tests, which envs, when) → Sims logs
-   (which VMs, which vCenters, what Sims did) → `sweep_vms` or
+   (which VMs, which vCenters, what Sims did) → **`diagnose_window` for
+   the window: the known causes first** → only if it says "neither",
+   `sweep_vms` or
    `sweep_history` for that window → `explain_group` → `vm_triage` on the
    representatives (or their captures) → shared infrastructure → vROps
    history → verdict.
@@ -261,6 +356,8 @@ What `SKILL.md` carries, in this repo's style:
 
    | Cause | Evidence for | Evidence against |
    | --- | --- | --- |
+   | ESXi CPU overcommit | the group is on hosts above 100% demand; high ready time during boot; boot-to-Tools slow but often finishing | hosts below capacity, ready time low |
+   | PowerFlex saturation | the group shares datastores on one pool; device latency and pool IOPS high in its boot windows; a rebuild or a noisy volume | same pool, same window, healthy VMs booted |
    | Storage latency, APD/PDL | the group shares a datastore; latency and `vmkernel` errors in its boot window | same datastore, same window, healthy VMs booted |
    | Datastore full | free space near 0; `blocked_on_question` about disk space | space healthy |
    | Host contention | the group shares a host; ready time, swap or balloon high | spread across hosts |
@@ -302,11 +399,11 @@ What `SKILL.md` carries, in this repo's style:
 | Phase | Builds | Done when |
 | --- | --- | --- |
 | **0. Collect** (days) | `govc` scripts that dump the sweep properties from all nine vCenters, run during a few bad nights; a person labels which VMs were really stuck | the anomaly classes and thresholds are tuned on real data, and the `vmware.log` lines of a real hang are on file |
-| **1. Sweep + triage** | 6.1, 6.2, 6.4, read-only | the black-screen incident worked end to end through Sahara MCP + Elastic + this, while the VMs lived |
+| **1. Sweep + fast path + triage** | 6.1, 6.2, 6.4 with `diagnose_window`, read-only | the CPU incident and the PowerFlex incident each named correctly by `diagnose_window`, replayed on recorded data or a live recurrence |
 | **2. Capture + sweeper** | 6.3 and section 8 | last night's incident investigated this morning, after the VMs were destroyed |
-| **3. vROps** | 6.5 | "is this window unusual for this datastore" answered |
+| **3. vROps + PowerFlex** | 6.5, 6.6 | "is this window unusual for this datastore" answered; a PowerFlex saturation traced to its pool and the volumes behind it |
 | **4. Skill, full** | section 9 with evals | evals pass with GLM 5.3 in your client |
-| 5. Actions (optional) | 6.6 | the bare metal team agrees to the role |
+| 5. Actions (optional) | 6.7 | the bare metal team agrees to the role |
 
 ## 12. Open questions
 
@@ -328,3 +425,14 @@ What `SKILL.md` carries, in this repo's style:
    a once-a-minute sweep's load on nine vCenters?
 7. **Does your GLM 5.3 client pass image content** from an MCP result to
    the model? *Default: no; the text form of the screenshot carries it.*
+8. **The two past incidents**: their dates and windows, which hosts were
+   at ~120%, which PowerFlex pool was saturated. Phase 0 tunes
+   `diagnose_window`'s thresholds on them, and they become its first
+   regression cases.
+9. **PowerFlex access**: version, gateway or PowerFlex Manager, and
+   whether storage will grant a read-only API user. Also: is there a
+   PowerFlex management pack in vROps already? *Default: no, use the
+   adapter.*
+10. **What Sims and Sahara wait for after a reboot**, and for how long?
+    That timeout is where "starved" turns into a Tools error, and
+    `diagnose_window` should report against it.
