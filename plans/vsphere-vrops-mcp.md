@@ -2,8 +2,9 @@
 
 Status: the MCP is built in `servers/vsphere-mcp/` (see its README) and tested
 against two simulated vCenters in Docker; section 12 says what was built and
-what was not. The `vm-incident` skill and the PowerFlex adapter are not built
-yet. Section 11 lists the open questions.
+what was not. The `vm-incident` skill is built in `skills/vm-incident/`
+(table-top evals in its `evals/`, not yet run on a live vCenter). The
+PowerFlex adapter is not built yet. Section 11 lists the open questions.
 
 ## 1. What it is
 
