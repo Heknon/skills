@@ -20,11 +20,13 @@ from typing import TYPE_CHECKING, Any
 
 from vsphere_mcp.checks import (
     ABNORMAL,
-    BOOT_LOOP,
-    CONSOLIDATION_NEEDED,
+    ATTENTION_FLAGS,
+    FLAG_MEANING,
+    FLAGS,
     MEANING,
     OFF,
     RESET_EVENTS,
+    STATES,
     Verdict,
     classify,
     count_states,
@@ -70,7 +72,9 @@ MIN_GROUP = 2
 GROUPS_PER_DIMENSION = 5
 REPRESENTATIVES = 3
 # What a scan reports by default: every abnormal state, and the flags.
-FLAGGED = (*ABNORMAL, BOOT_LOOP, CONSOLIDATION_NEEDED)
+FLAGGED = (*ABNORMAL, *ATTENTION_FLAGS)
+# Anything a caller may ask a scan for: every state, every flag.
+SELECTABLE = (*STATES, *FLAGS)
 
 
 @dataclass
@@ -92,6 +96,7 @@ class Scan:
     started: datetime
     vcenters: dict[str, VCenterScan]
     errors: dict[str, str]
+    host_memory_percent: float = 95.0
 
     def all_vms(self) -> list[tuple[VmFacts, Verdict]]:
         """Every VM read, with its verdict."""
@@ -187,7 +192,13 @@ async def run_scan(pool: VCenterPool, settings: Settings, names: Sequence[str]) 
             )
         else:
             scans[name] = result
-    return Scan(id=uuid.uuid4().hex[:8], started=started, vcenters=scans, errors=errors)
+    return Scan(
+        id=uuid.uuid4().hex[:8],
+        started=started,
+        vcenters=scans,
+        errors=errors,
+        host_memory_percent=settings.thresholds.host_memory_percent,
+    )
 
 
 def groups(scan: Scan, *, states: Sequence[str] = FLAGGED) -> dict[str, list[dict[str, Any]]]:
@@ -267,6 +278,28 @@ def summary(scan: Scan, *, states: Sequence[str] = FLAGGED, limit: int) -> dict[
         for host in vscan.hosts.values()
         if host.get("overcommitted") or host.get("near_capacity")
     ]
+    memory_pressed = sorted(
+        (
+            {
+                "vcenter": name,
+                "name": host.name,
+                "memory_percent": round(host.memory_percent, 1),
+                "cluster": host.cluster,
+            }
+            for name, vscan in scan.vcenters.items()
+            for host in vscan.inventory.hosts.values()
+            if host.memory_percent is not None and host.memory_percent >= scan.host_memory_percent
+        ),
+        key=lambda host: host["memory_percent"],
+        reverse=True,
+    )
+    not_connected = [
+        {"vcenter": name, "name": host.name, "connection_state": host.connection_state}
+        for name, vscan in scan.vcenters.items()
+        for host in vscan.inventory.hosts.values()
+        if host.connection_state not in (None, "connected")
+    ]
+    flag_counts: Counter[str] = Counter(flag for _, verdict in everything for flag in verdict.flags)
     slow_storage = [
         finding
         for vscan in scan.vcenters.values()
@@ -295,6 +328,25 @@ def summary(scan: Scan, *, states: Sequence[str] = FLAGGED, limit: int) -> dict[
             f"{int(INFRASTRUCTURE_WINDOW.total_seconds() // 60)} min: {listed}"
             + (f", and {more} more" if more > 0 else "")
         )
+    if memory_pressed:
+        listed = ", ".join(
+            f"{host['vcenter']}:{host['name']} {host['memory_percent']}%"
+            for host in memory_pressed[:HOSTS_LISTED]
+        )
+        findings.append(f"{len(memory_pressed)} host(s) near memory capacity: {listed}")
+    if not_connected:
+        findings.append(
+            f"{len(not_connected)} host(s) not connected to vCenter: "
+            + ", ".join(
+                f"{host['vcenter']}:{host['name']} ({host['connection_state']})"
+                for host in not_connected[:HOSTS_LISTED]
+            )
+        )
+    findings.extend(
+        f"{count} VM(s) flagged {flag}: {FLAG_MEANING[flag]}"
+        for flag, count in flag_counts.most_common()
+        if flag in ATTENTION_FLAGS
+    )
     findings.extend(slow_storage[:10])
     for name, error in scan.errors.items():
         findings.append(f"vCenter {name} not scanned: {error}")
@@ -310,9 +362,13 @@ def summary(scan: Scan, *, states: Sequence[str] = FLAGGED, limit: int) -> dict[
         "findings": findings,
         "counts_by_state": by_state,
         "states_meaning": {state: MEANING[state] for state in by_state},
+        "counts_by_flag": dict(flag_counts.most_common()),
+        "flags_meaning": {flag: FLAG_MEANING[flag] for flag in flag_counts},
         "strongest_groups": strongest,
         "groups": grouped,
         "hosts_over_cpu_threshold": overcommitted,
+        "hosts_near_memory_capacity": memory_pressed,
+        "hosts_not_connected": not_connected,
         "storage_findings": slow_storage,
         "vcenters": {
             name: {

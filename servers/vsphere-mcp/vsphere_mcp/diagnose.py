@@ -30,8 +30,14 @@ from vsphere_mcp.checks import (
     BOOTING,
     BUSY_NOT_UP,
     HEALTHY,
+    HEARTBEAT_INTERMITTENT,
+    HOST_MEMORY_PRESSURE,
+    HOST_NOT_CONNECTED,
     HUNG,
     INACCESSIBLE,
+    MEMORY_RECLAIMED,
+    NO_TOOLS,
+    PAUSED,
     TOOLS_FLAPPING,
     Verdict,
     classify,
@@ -46,6 +52,7 @@ from vsphere_mcp.inventory import (
     FolderFacts,
     HostFacts,
     VmFacts,
+    alarm_names,
     find_environment,
     read_datastores,
     read_folders,
@@ -75,6 +82,9 @@ VM_FAULT = "the virtual machine faulted"
 TOOLS_FLAPPING_CAUSE = "Tools flapping"
 INACCESSIBLE_CAUSE = "vCenter cannot reach the VM"
 QUESTION = "a pending VM question blocks it"
+PAUSED_CAUSE = "the VM is paused"
+MEMORY = "memory pressure (the host ballooning or swapping the VM)"
+HOST_DISCONNECTED = "its ESXi host is not connected to vCenter"
 
 DIAGNOSE_PATHS = (*VM_PATHS, DEVICE_PATH, "config.files.vmPathName", "config.files.logDirectory")
 LAYOUT_TTL_SECONDS = 60.0
@@ -124,6 +134,7 @@ def read_vms(
     """VMs with everything a diagnosis reads, and the raw rows for file paths."""
     now = session.now()
     rows = session.retrieve(vim.VirtualMachine, DIAGNOSE_PATHS, objects=objects, root=root)
+    names = alarm_names(session, rows)
     return [
         (
             vm_facts(
@@ -134,6 +145,7 @@ def read_vms(
                 layout.hosts,
                 layout.datastores,
                 with_devices=True,
+                alarms=names,
             ),
             row,
         )
@@ -459,6 +471,25 @@ def conclude(  # noqa: C901, PLR0912, PLR0915 - one ordered list of causes, kept
         evidence(INACCESSIBLE_CAUSE, weight=4, text=verdict.reasons[0])
     if verdict.state == BLOCKED_ON_QUESTION:
         evidence(QUESTION, weight=5, text=verdict.reasons[0])
+    if verdict.state == PAUSED:
+        evidence(PAUSED_CAUSE, weight=5, text=verdict.reasons[0])
+    values = verdict.values
+    if MEMORY_RECLAIMED in verdict.flags:
+        evidence(
+            MEMORY,
+            weight=2,
+            text=(
+                f"{values.get('ballooned_mb') or 0} MB ballooned, "
+                f"{values.get('swapped_mb') or 0} MB swapped, "
+                f"{values.get('compressed_kb') or 0} KB compressed"
+            ),
+        )
+    if HOST_MEMORY_PRESSURE in verdict.flags:
+        evidence(MEMORY, weight=2, text=f"its host is at {values.get('host_memory_percent')}% of memory")
+    if HOST_NOT_CONNECTED in verdict.flags:
+        evidence(HOST_DISCONNECTED, weight=3, text="vCenter reports the host not connected")
+    if HEARTBEAT_INTERMITTENT in verdict.flags:
+        evidence(TOOLS_FLAPPING_CAUSE, weight=2, text="Tools runs but its heartbeat is intermittent (yellow)")
 
     if cpu.get("available", True):
         for text in cpu.get("findings", []):
@@ -617,12 +648,19 @@ def conclude(  # noqa: C901, PLR0912, PLR0915 - one ordered list of causes, kept
     )
     if starved_not_hung:
         headline += "; the VM is busy, so it is more likely booting slowly than hung"
+    if verdict.state == NO_TOOLS:
+        headline += (
+            "; VMware Tools is not installed, so its absence says nothing: judge by the console, "
+            "CPU and boot log"
+        )
     return {
         "headline": headline,
         "causes": likely,
         "argued_against": [entry for entry in ranked if entry["score"] <= 0],
         "not_checked": not_checked,
         "vm_state": verdict.state,
+        "flags": verdict.flags,
+        "alarms": verdict.values.get("alarms", []),
     }
 
 
@@ -633,6 +671,8 @@ def next_checks(conclusion: dict[str, Any], vm: VmFacts) -> list[str]:
     if CPU in leading:
         steps.append(f"explain_group on host {vm.host!r} from a scan: are other VMs on it starved too?")
         steps.append("vROps: the host's or cluster's CPU demand over the past days at this hour")
+    if MEMORY in leading:
+        steps.append(f"get_host_health on {vm.host!r}: is the host itself out of memory?")
     if leading & {STORAGE, BOOT_STORM}:
         steps.append("get_datastore_health on the VM's datastores over a wider window")
         steps.append("PowerFlex (if available): the pool behind the datastore, its IOPS and any rebuild")

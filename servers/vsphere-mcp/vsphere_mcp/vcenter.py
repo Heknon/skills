@@ -205,14 +205,47 @@ class VCenterSession:
         """Read `paths` from every `kind` under `root`, or from the given objects.
 
         Each row carries `_ref` (the object), `moref` and whichever paths came
-        back. `_missing` names paths the server refused, usually permission.
+        back. `_missing` names paths the server withheld (usually permission)
+        or does not have at all (an older vCenter): a path vCenter rejects is
+        dropped and the read retried, rather than failing every VM for one
+        property. An object listed by hand that no longer exists (a destroyed
+        VM) is dropped the same way.
         """
+        wanted = list(paths)
+        listed = list(objects) if objects is not None else None
+        rejected: list[str] = []
+        for _ in range(len(wanted) + (len(listed) if listed else 0) + 1):
+            if listed is not None and not listed:
+                return []
+            try:
+                rows = self._retrieve_once(kind, wanted, root=root, objects=listed)
+            except vmodl.query.InvalidProperty as fault:
+                name = getattr(fault, "name", None)
+                if not name or name not in wanted:
+                    raise
+                wanted.remove(name)
+                rejected.append(name)
+                continue
+            except vmodl.fault.ManagedObjectNotFound as fault:
+                gone = getattr(getattr(fault, "obj", None), "_moId", None)
+                if listed is None or gone is None:
+                    raise
+                listed = [item for item in listed if item._moId != gone]  # noqa: SLF001
+                continue
+            if rejected:
+                for row in rows:
+                    row["_missing"] = [*row.get("_missing", []), *rejected]
+            return rows
+        msg = "Property read did not settle after dropping rejected paths"
+        raise VSphereError(msg)
+
+    def _retrieve_once(
+        self, kind: type, paths: list[str], *, root: Any, objects: list[Any] | None
+    ) -> list[dict[str, Any]]:
         content = self.content
         view = None
         if objects is not None:
             object_set = [vmodl.query.PropertyCollector.ObjectSpec(obj=item, skip=False) for item in objects]
-            if not object_set:
-                return []
         else:
             view = content.viewManager.CreateContainerView(root or content.rootFolder, [kind], recursive=True)
             traversal = vmodl.query.PropertyCollector.TraversalSpec(
@@ -223,7 +256,7 @@ class VCenterSession:
             ]
         spec = vmodl.query.PropertyCollector.FilterSpec(
             objectSet=object_set,
-            propSet=[vmodl.query.PropertyCollector.PropertySpec(type=kind, pathSet=list(paths), all=False)],
+            propSet=[vmodl.query.PropertyCollector.PropertySpec(type=kind, pathSet=paths, all=False)],
         )
         collector = content.propertyCollector
         rows: list[dict[str, Any]] = []
@@ -237,10 +270,6 @@ class VCenterSession:
                 if not token:
                     break
                 result = collector.ContinueRetrievePropertiesEx(token)
-        except vmodl.fault.ManagedObjectNotFound:
-            # An object listed by hand is gone: a short-lived VM was destroyed.
-            if objects is None:
-                raise
         finally:
             if view is not None:
                 with contextlib.suppress(Exception):

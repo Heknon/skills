@@ -112,6 +112,7 @@ read, and diagnostics (host logs).
 | `list_vcenters` | which vCenters, reachable, version, clock |
 | `scan` | abnormal VMs on some or all vCenters, grouped by what they share; hosts over the CPU threshold and slow storage right now |
 | `explain_group` | what a scan group's abnormal VMs share that the healthy ones beside them do not; CPU and storage over its boot window |
+| `find_old_environments` | environments older than N hours (the age of their oldest VM), optionally only under `projects`, `environments`, `projects/team-x` or any other path segments, oldest first, with their VMs' states |
 | `diagnose_window` | resets, failed power-ons, host CPU and storage over a past window, when VMs may be gone |
 | `find_environment` | where an environment's folder is, on which vCenter(s), and its VMs |
 | `diagnose_vm` | one VM: machine, CPU, storage, environment, boot timeline, serial console (EMS), console; the likely cause with evidence for and against |
@@ -125,6 +126,37 @@ read, and diagnostics (host logs).
 | `get_datastore_health` | a datastore's latency and IOPS from every host mounting it, its VMs |
 | `read_host_log` | `vmkernel` / `hostd` / `vpxa` lines, filtered |
 | `vrops_*` | find a resource, list its stat keys, read stats, compare a window with previous days, alerts |
+
+### States and flags
+
+Every VM gets exactly one state, from the bulk read alone:
+
+| State | Means |
+| --- | --- |
+| `inaccessible` | vCenter cannot reach or account for it |
+| `blocked_on_question` | waiting on a VM question |
+| `paused` | powered on, but the hypervisor is not running it |
+| `hung` | booted over 10 min ago, Tools never up, almost no CPU |
+| `busy_not_up` | the same, but burning CPU: starved, spinning or still working |
+| `booted_not_up` | booted over 10 min ago, Tools never up (or stuck running its startup scripts) |
+| `lost_heartbeat` | Tools runs, heartbeat red |
+| `no_boot_time` | powered on, no boot time reported |
+| `no_tools` | Tools not installed: not counted as stuck; judged by CPU, console and boot log |
+| `booting` | booted recently, normal so far |
+| `healthy`, `suspended`, `off` | as named |
+
+Flags ride beside the state. Those that matter alone (counted as abnormal):
+`boot_loop`, `tools_flapping`, `heartbeat_intermittent` (yellow heartbeat:
+Tools may be crashing), `memory_reclaimed` (ballooned, swapped or compressed),
+`host_memory_pressure`, `vcenter_alarm` (a red alarm, by name),
+`host_not_connected`, `long_running` (older than `long_running_hours`, 24 by
+default), `consolidation_needed`. Those that only add detail:
+`host_in_maintenance`, `tools_outdated`. `scan(states=[...])` selects any
+state or flag, for example `["no_tools"]` or `["long_running"]`.
+
+The bulk read asks for about 35 properties per VM. A property an older vCenter
+does not have is dropped and the read retried, rather than failing the scan,
+and the result names what was dropped.
 
 Results lead with `finding` / `findings`, keep the raw values, say what was
 not read (`not_checked`, `available: false` with a reason), and are bounded to

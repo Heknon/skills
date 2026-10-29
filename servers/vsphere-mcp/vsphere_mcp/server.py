@@ -22,11 +22,13 @@ from functools import wraps
 from typing import TYPE_CHECKING, Any
 
 from mcp.server import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from PIL import Image
 from pyVmomi import vim
 from starlette.responses import JSONResponse
 
+from vsphere_mcp import ages
 from vsphere_mcp import scan as scanning
 from vsphere_mcp.checks import classify, count_states
 from vsphere_mcp.config import Settings
@@ -45,9 +47,10 @@ from vsphere_mcp.diagnose import (
 )
 from vsphere_mcp.formatting import bounded
 from vsphere_mcp.inventory import find_environment as environment_folders
+from vsphere_mcp.readonly import ReadOnlyViolationError
 from vsphere_mcp.vcenter import VCenterPool, VSphereError
 from vsphere_mcp.vmlog import grep, parse_lines
-from vsphere_mcp.vrops import KINDS, SUGGESTED_STAT_KEYS, Vrops
+from vsphere_mcp.vrops import KINDS, SUGGESTED_STAT_KEYS, Vrops, VropsError
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Callable
@@ -55,6 +58,10 @@ if TYPE_CHECKING:
     from starlette.requests import Request
 
     from vsphere_mcp.vcenter import VCenterSession
+
+# Failures a caller can act on: a bad argument, an unreachable or slow vCenter,
+# a vROps refusal, a refused write. Their message reaches the model.
+ANTICIPATED = (ValueError, re.error, VSphereError, VropsError, ReadOnlyViolationError)
 
 READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True)
 MAX_LIMIT = 500
@@ -120,7 +127,6 @@ def build_server(settings: Settings | None = None, pool: VCenterPool | None = No
     fleet = pool or VCenterPool(resolved)
     scans = scanning.ScanStore(resolved.max_scans_kept)
     vrops = Vrops(resolved) if resolved.vrops_url else None
-    active = {"count": 0}
 
     @asynccontextmanager
     async def lifespan(_server: MCPServer) -> AsyncGenerator[dict[str, Any]]:
@@ -139,26 +145,7 @@ def build_server(settings: Settings | None = None, pool: VCenterPool | None = No
         lifespan=lifespan,
     )
 
-    def tool(name: str | None = None) -> Callable[[Callable[..., Awaitable[dict[str, Any]]]], Any]:
-        """Register a read-only tool: admitted, bounded, a lookup miss answered rather than raised."""
-
-        def register(function: Callable[..., Awaitable[dict[str, Any]]]) -> Any:
-            @wraps(function)
-            async def wrapped(*args: Any, **kwargs: Any) -> dict[str, Any]:
-                if active["count"] >= resolved.max_concurrent_tools:
-                    msg = "VSPHERE_MAX_CONCURRENT_TOOLS reached; retry when a call finishes"
-                    raise VSphereError(msg)
-                active["count"] += 1
-                try:
-                    return bounded(await function(*args, **kwargs))
-                except LookupError as error:
-                    return bounded({"found": False, "reason": str(error).strip("'\"")})
-                finally:
-                    active["count"] -= 1
-
-            return server.tool(name=name or function.__name__, annotations=READ_ONLY)(wrapped)
-
-        return register
+    tool = _registrar(server, resolved)
 
     @server.custom_route("/healthz", methods=["GET", "HEAD"])
     async def health(_request: Request) -> JSONResponse:
@@ -172,6 +159,37 @@ def build_server(settings: Settings | None = None, pool: VCenterPool | None = No
         _register_vrops_tools(tool, vrops)
     server.vcenters = fleet  # type: ignore[attr-defined] - the tests read methods_seen
     return server
+
+
+def _registrar(server: MCPServer, resolved: Settings) -> Callable[[str | None], Any]:
+    """The decorator every tool is registered with: read-only, admitted, bounded, worded."""
+    active = {"count": 0}
+
+    def tool(name: str | None = None) -> Callable[[Callable[..., Awaitable[dict[str, Any]]]], Any]:
+        """Register a read-only tool: admitted, bounded, a lookup miss answered rather than raised."""
+
+        def register(function: Callable[..., Awaitable[dict[str, Any]]]) -> Any:
+            @wraps(function)
+            async def wrapped(*args: Any, **kwargs: Any) -> dict[str, Any]:
+                if active["count"] >= resolved.max_concurrent_tools:
+                    msg = "VSPHERE_MAX_CONCURRENT_TOOLS reached; retry when a call finishes"
+                    raise ToolError(msg)
+                active["count"] += 1
+                try:
+                    return bounded(await function(*args, **kwargs))
+                except LookupError as error:
+                    return bounded({"found": False, "reason": str(error).strip("'\"")})
+                except ANTICIPATED as error:
+                    # Said to the model in words; anything else is a crash the SDK hides.
+                    raise ToolError(str(error)) from error
+                finally:
+                    active["count"] -= 1
+
+            return server.tool(name=name or function.__name__, annotations=READ_ONLY)(wrapped)
+
+        return register
+
+    return tool
 
 
 def _register_fleet_tools(
@@ -218,15 +236,16 @@ def _register_fleet_tools(
 
         Args:
             vcenters: vCenter names (any spelling they are known by); all when empty.
-            states: only these states or flags (see the result's states_meaning); all abnormal when empty.
+            states: only these states or flags, e.g. ["no_tools"] or ["long_running"]; the
+                abnormal states and attention flags when empty.
             limit: how many abnormal VMs to list (groups and counts always cover all).
 
         """
         names = _names(fleet, vcenters)
         wanted = tuple(states) if states else scanning.FLAGGED
-        unknown = [state for state in wanted if state not in scanning.FLAGGED]
+        unknown = [state for state in wanted if state not in scanning.SELECTABLE]
         if unknown:
-            msg = f"unknown states {unknown}; choose from {list(scanning.FLAGGED)}"
+            msg = f"unknown states or flags {unknown}; choose from {list(scanning.SELECTABLE)}"
             raise ValueError(msg)
         result = await scanning.run_scan(fleet, resolved, names)
         scans.put(result)
@@ -248,6 +267,39 @@ def _register_fleet_tools(
 
         """
         return await scanning.explain_group(fleet, resolved, scans.get(scan_id), dimension, value)
+
+    @tool()
+    async def find_old_environments(
+        *,
+        older_than_hours: float = 5.0,
+        vcenters: list[str] | None = None,
+        under: list[str] | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        """Environments (and their VMs) that have existed longer than a number of hours.
+
+        An environment is the folder its VMs sit in; its age is its oldest VM's
+        creation time. Use `under` to keep only folders below a path segment
+        ("projects", "environments") or a run of them ("projects/team-a"), at
+        any depth. Oldest first, with each environment's VM states, so a
+        leftover that is still powered on stands out.
+
+        Args:
+            older_than_hours: minimum age, in hours.
+            vcenters: vCenter names; all when empty.
+            under: folder path segments to look under; everywhere when empty.
+            limit: how many environments to list (the count covers all).
+
+        """
+        names = _names(fleet, vcenters)
+        return await ages.find_old_environments(
+            fleet,
+            resolved,
+            names,
+            older_than_hours=max(0.0, older_than_hours),
+            under=[term for term in (under or []) if term.strip("/ ")],
+            limit=max(1, min(limit, MAX_LIMIT)),
+        )
 
     @tool()
     async def diagnose_window(

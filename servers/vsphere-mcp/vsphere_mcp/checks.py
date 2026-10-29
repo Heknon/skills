@@ -10,6 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from vsphere_mcp.inventory import STARTING
+
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
@@ -19,29 +21,34 @@ if TYPE_CHECKING:
 # The states a VM can be in, worst first. A VM has exactly one.
 INACCESSIBLE = "inaccessible"
 BLOCKED_ON_QUESTION = "blocked_on_question"
+PAUSED = "paused"
 HUNG = "hung"
 BUSY_NOT_UP = "busy_not_up"
 BOOTED_NOT_UP = "booted_not_up"
 LOST_HEARTBEAT = "lost_heartbeat"
 NO_BOOT_TIME = "no_boot_time"
+NO_TOOLS = "no_tools"
 BOOTING = "booting"
 HEALTHY = "healthy"
+SUSPENDED = "suspended"
 OFF = "off"
 
 ABNORMAL = (
     INACCESSIBLE,
     BLOCKED_ON_QUESTION,
+    PAUSED,
     HUNG,
     BUSY_NOT_UP,
     BOOTED_NOT_UP,
     LOST_HEARTBEAT,
     NO_BOOT_TIME,
 )
-STATES = (*ABNORMAL, BOOTING, HEALTHY, OFF)
+STATES = (*ABNORMAL, NO_TOOLS, BOOTING, HEALTHY, SUSPENDED, OFF)
 
 MEANING = {
     INACCESSIBLE: "vCenter cannot reach or account for the VM",
     BLOCKED_ON_QUESTION: "the VM waits on a pending question and does nothing until it is answered",
+    PAUSED: "powered on but paused: the hypervisor is not running it",
     HUNG: ("booted long ago, Tools never came up, and the VM uses almost no CPU: it is waiting on something"),
     BUSY_NOT_UP: (
         "booted long ago, Tools never came up, and the VM is burning CPU: starved, spinning or still working"
@@ -49,15 +56,57 @@ MEANING = {
     BOOTED_NOT_UP: "booted long ago and Tools never came up",
     LOST_HEARTBEAT: "Tools runs, but its heartbeat to vCenter has stopped",
     NO_BOOT_TIME: "powered on, but vCenter reports no boot time to judge it by",
+    NO_TOOLS: (
+        "VMware Tools is not installed, so whether the guest came up cannot be judged from Tools; "
+        "its CPU, console and boot log still can"
+    ),
     BOOTING: "powered on recently; Tools not up yet, which is normal this early",
     HEALTHY: "powered on with Tools running",
-    OFF: "powered off or suspended",
+    SUSPENDED: "suspended",
+    OFF: "powered off",
 }
 
 # Flags ride alongside the state; a VM may carry several.
 BOOT_LOOP = "boot_loop"
 CONSOLIDATION_NEEDED = "consolidation_needed"
 TOOLS_FLAPPING = "tools_flapping"
+HEARTBEAT_INTERMITTENT = "heartbeat_intermittent"
+MEMORY_RECLAIMED = "memory_reclaimed"
+HOST_MEMORY_PRESSURE = "host_memory_pressure"
+VCENTER_ALARM = "vcenter_alarm"
+HOST_NOT_CONNECTED = "host_not_connected"
+HOST_IN_MAINTENANCE = "host_in_maintenance"
+LONG_RUNNING = "long_running"
+TOOLS_OUTDATED = "tools_outdated"
+
+# Flags worth a look on their own. The rest only add detail to a verdict.
+ATTENTION_FLAGS = (
+    BOOT_LOOP,
+    TOOLS_FLAPPING,
+    HEARTBEAT_INTERMITTENT,
+    MEMORY_RECLAIMED,
+    HOST_MEMORY_PRESSURE,
+    VCENTER_ALARM,
+    HOST_NOT_CONNECTED,
+    LONG_RUNNING,
+    CONSOLIDATION_NEEDED,
+)
+DETAIL_FLAGS = (HOST_IN_MAINTENANCE, TOOLS_OUTDATED)
+FLAGS = (*ATTENTION_FLAGS, *DETAIL_FLAGS)
+FLAG_MEANING = {
+    BOOT_LOOP: "reset or rebooted several times in a short window",
+    TOOLS_FLAPPING: "Tools started and stopped repeatedly (from vmware.log)",
+    HEARTBEAT_INTERMITTENT: "Tools runs but its heartbeat is intermittent (yellow): Tools may be crashing",
+    MEMORY_RECLAIMED: "the host is reclaiming this VM's memory (ballooned, swapped or compressed)",
+    HOST_MEMORY_PRESSURE: "the VM's host is near its memory capacity",
+    VCENTER_ALARM: "vCenter has a red alarm triggered on this VM",
+    HOST_NOT_CONNECTED: "the VM's host is not connected to vCenter",
+    LONG_RUNNING: "older than the longest an environment should live",
+    CONSOLIDATION_NEEDED: "its disks need consolidation",
+    HOST_IN_MAINTENANCE: "its host is in maintenance mode",
+    TOOLS_OUTDATED: "its Tools version is too old, too new or blocklisted for this host",
+}
+OUTDATED_TOOLS = ("guestToolsTooOld", "guestToolsBlacklisted", "guestToolsTooNew")
 
 RESET_EVENTS = (
     "VmResettingEvent",
@@ -78,8 +127,8 @@ class Verdict:
 
     @property
     def abnormal(self) -> bool:
-        """Whether the state is one a person would want to look at."""
-        return self.state in ABNORMAL or bool(self.flags)
+        """Whether the state, or a flag that matters on its own, is worth a look."""
+        return self.state in ABNORMAL or any(flag in ATTENTION_FLAGS for flag in self.flags)
 
     def as_dict(self) -> dict[str, Any]:
         """The verdict as a tool result shows it."""
@@ -88,11 +137,12 @@ class Verdict:
             "meaning": MEANING[self.state],
             "reasons": self.reasons,
             "flags": self.flags,
+            "flags_meaning": {flag: FLAG_MEANING[flag] for flag in self.flags},
             "values": self.values,
         }
 
 
-def classify(  # noqa: C901, PLR0911 - one decision list, kept in one place
+def classify(  # noqa: C901, PLR0911, PLR0912 - one decision list, kept in one place
     vm: VmFacts,
     thresholds: Thresholds,
     *,
@@ -102,30 +152,45 @@ def classify(  # noqa: C901, PLR0911 - one decision list, kept in one place
     fraction = vm.cpu_fraction
     values: dict[str, Any] = {
         "power_state": vm.power_state,
+        "paused": vm.paused,
         "connection_state": vm.connection_state,
         "uptime_minutes": _round(vm.uptime_minutes),
+        "age_hours": _round(vm.age_hours, 2),
+        "tools_status": vm.tools_status,
         "tools_running": vm.tools_running,
+        "tools_version_status": vm.tools_version_status,
         "heartbeat": vm.heartbeat,
+        "guest_state": vm.guest_state,
         "cpu_mhz": vm.cpu_mhz,
         "cpu_share_of_vcpus": _round(fraction, 3),
+        "memory_mb": vm.memory_mb,
+        "ballooned_mb": vm.ballooned_mb,
+        "swapped_mb": vm.swapped_mb,
+        "compressed_kb": vm.compressed_kb,
+        "host_memory_percent": _round(vm.host_memory_percent),
+        "overall_status": vm.overall_status,
+        "alarms": vm.alarms,
         "resets_in_window": resets_in_window,
     }
-    flags = []
-    if resets_in_window >= thresholds.boot_loop_resets:
-        flags.append(BOOT_LOOP)
-    if vm.consolidation_needed:
-        flags.append(CONSOLIDATION_NEEDED)
+    flags = _flags(vm, thresholds, resets_in_window)
+    reasons_for_flags = []
+    if BOOT_LOOP in flags:
+        reasons_for_flags.append(
+            f"{resets_in_window} resets or guest reboots in the last "
+            f"{thresholds.boot_loop_window_minutes:g} min"
+        )
+    if MEMORY_RECLAIMED in flags:
+        reasons_for_flags.append(
+            f"memory reclaimed by the host: {vm.ballooned_mb or 0} MB ballooned, "
+            f"{vm.swapped_mb or 0} MB swapped, {vm.compressed_kb or 0} KB compressed"
+        )
+    if LONG_RUNNING in flags and vm.age_hours is not None:
+        reasons_for_flags.append(
+            f"created {vm.age_hours:.1f} h ago, over {thresholds.long_running_hours:g} h"
+        )
 
     def verdict(state: str, *reasons: str) -> Verdict:
-        if BOOT_LOOP in flags:
-            reasons = (
-                *reasons,
-                (
-                    f"{resets_in_window} resets or guest reboots in the last "
-                    f"{thresholds.boot_loop_window_minutes:g} min"
-                ),
-            )
-        return Verdict(state, list(reasons), values, flags)
+        return Verdict(state, [*reasons, *reasons_for_flags], values, flags)
 
     if vm.connection_state and vm.connection_state != "connected":
         return verdict(INACCESSIBLE, f"connection state is {vm.connection_state}")
@@ -133,8 +198,12 @@ def classify(  # noqa: C901, PLR0911 - one decision list, kept in one place
         values["question"] = vm.question.text
         values["choices"] = vm.question.choices
         return verdict(BLOCKED_ON_QUESTION, f"pending question: {vm.question.text}")
+    if vm.power_state == "suspended":
+        return verdict(SUSPENDED, "power state is suspended")
     if not vm.powered_on:
         return verdict(OFF, f"power state is {vm.power_state or 'unknown'}")
+    if vm.paused:
+        return verdict(PAUSED, "powered on, but vCenter reports the VM paused")
     if vm.tools_up:
         if vm.heartbeat == "red":
             return verdict(LOST_HEARTBEAT, "Tools running but heartbeat is red")
@@ -142,6 +211,9 @@ def classify(  # noqa: C901, PLR0911 - one decision list, kept in one place
             # Gray beside a running Tools is the first seconds after it starts.
             return verdict(HEALTHY, "Tools running; heartbeat not reported yet (gray)")
         return verdict(HEALTHY, "Tools running")
+    if vm.tools_installed is False:
+        busy = f"; CPU at {fraction:.0%} of its vCPUs" if fraction is not None else ""
+        return verdict(NO_TOOLS, f"guest.toolsStatus is {vm.tools_status}{busy}")
     if vm.uptime_minutes is None:
         return verdict(NO_BOOT_TIME, "powered on, Tools not running, and no boot time reported")
     if vm.uptime_minutes < thresholds.booted_not_up_minutes:
@@ -150,7 +222,13 @@ def classify(  # noqa: C901, PLR0911 - one decision list, kept in one place
             f"booted {vm.uptime_minutes:.1f} min ago, under the "
             f"{thresholds.booted_not_up_minutes:g} min allowed before Tools is expected",
         )
-    up = f"booted {vm.uptime_minutes:.0f} min ago and Tools is {vm.tools_running or 'unreported'}"
+    if vm.tools_running == STARTING:
+        up = (
+            f"booted {vm.uptime_minutes:.0f} min ago and Tools has been starting since "
+            "(executing its startup scripts) without finishing"
+        )
+    else:
+        up = f"booted {vm.uptime_minutes:.0f} min ago and Tools is {vm.tools_running or 'unreported'}"
     if vm.cpu_mhz is not None and vm.cpu_mhz <= thresholds.hung_cpu_mhz:
         return verdict(HUNG, up, f"CPU {vm.cpu_mhz:.0f} MHz, at or under {thresholds.hung_cpu_mhz:g} MHz")
     if fraction is not None and fraction >= thresholds.busy_cpu_fraction:
@@ -161,6 +239,32 @@ def classify(  # noqa: C901, PLR0911 - one decision list, kept in one place
             f"{thresholds.busy_cpu_fraction:.0%}",
         )
     return verdict(BOOTED_NOT_UP, up)
+
+
+def _flags(vm: VmFacts, thresholds: Thresholds, resets_in_window: int) -> list[str]:  # noqa: C901 - one test per flag
+    """The flags a VM carries beside its state."""
+    flags = []
+    if resets_in_window >= thresholds.boot_loop_resets:
+        flags.append(BOOT_LOOP)
+    if vm.powered_on and vm.tools_up and vm.heartbeat == "yellow":
+        flags.append(HEARTBEAT_INTERMITTENT)
+    if vm.powered_on and any((vm.ballooned_mb or 0, vm.swapped_mb or 0, vm.compressed_kb or 0)):
+        flags.append(MEMORY_RECLAIMED)
+    if vm.powered_on and (vm.host_memory_percent or 0) >= thresholds.host_memory_percent:
+        flags.append(HOST_MEMORY_PRESSURE)
+    if any(alarm.get("status") == "red" for alarm in vm.alarms):
+        flags.append(VCENTER_ALARM)
+    if vm.host_connection_state and vm.host_connection_state != "connected":
+        flags.append(HOST_NOT_CONNECTED)
+    if vm.age_hours is not None and vm.age_hours >= thresholds.long_running_hours:
+        flags.append(LONG_RUNNING)
+    if vm.consolidation_needed:
+        flags.append(CONSOLIDATION_NEEDED)
+    if vm.host_maintenance:
+        flags.append(HOST_IN_MAINTENANCE)
+    if vm.tools_version_status in OUTDATED_TOOLS:
+        flags.append(TOOLS_OUTDATED)
+    return flags
 
 
 def host_pressure(

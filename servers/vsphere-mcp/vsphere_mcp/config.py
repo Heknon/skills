@@ -123,6 +123,12 @@ class Thresholds(BaseModel):
 
     boot_loop_window_minutes: PositiveFloat = 30.0
 
+    long_running_hours: PositiveFloat = 24.0
+    """A VM older than this is flagged long-running: past the longest environment's life."""
+
+    host_memory_percent: PositiveFloat = 95.0
+    """Host memory in use at or over this is pressure: its VMs balloon and swap."""
+
     console_black_fraction: Fraction = 0.98
     """A screenshot with at least this share of near-black pixels is black."""
 

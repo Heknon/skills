@@ -10,11 +10,13 @@ from datetime import UTC, datetime, timedelta
 import httpx
 import pytest
 from PIL import Image
+from pyVmomi import vmodl
 
-from vsphere_mcp import checks, console, contention, diagnose, formatting, scan, vmlog
+from vsphere_mcp import ages, checks, console, contention, diagnose, formatting, scan, vmlog
 from vsphere_mcp.config import Settings, Thresholds, VCenter
 from vsphere_mcp.inventory import FolderFacts, Inventory, Question, VmFacts, find_environment, os_family
 from vsphere_mcp.readonly import ALLOWED_METHODS, ReadOnlyStub, ReadOnlyViolationError, ensure_read_request
+from vsphere_mcp.vcenter import VCenterSession
 from vsphere_mcp.vrops import Vrops
 
 NOW = datetime(2026, 10, 29, 2, 30, tzinfo=UTC)
@@ -660,3 +662,107 @@ def test_vrops_logs_in_once_and_compares_a_window_with_previous_days() -> None:
         for request in requests
         if request.method == "GET"
     )
+
+
+# -- the signals beyond "stuck" ---------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("fields", "state"),
+    [
+        ({"paused": True}, checks.PAUSED),
+        ({"power_state": "suspended"}, checks.SUSPENDED),
+        ({"tools_status": "toolsNotInstalled", "cpu_mhz": 3000.0}, checks.NO_TOOLS),
+        ({"tools_status": "toolsNotRunning"}, checks.HUNG),
+        ({"tools_running": "guestToolsExecutingScripts", "cpu_mhz": 900.0}, checks.BOOTED_NOT_UP),
+    ],
+)
+def test_the_newer_states(fields: dict[str, object], state: str) -> None:
+    assert checks.classify(vm(**fields), LIMITS).state == state
+
+
+def test_a_vm_without_tools_is_not_abnormal_but_is_explained() -> None:
+    verdict = checks.classify(vm(tools_status="toolsNotInstalled", cpu_mhz=2000.0), LIMITS)
+
+    assert not verdict.abnormal
+    assert "toolsNotInstalled" in verdict.reasons[0]
+    assert "50%" in verdict.reasons[0]
+
+
+@pytest.mark.parametrize(
+    ("fields", "flag", "attention"),
+    [
+        ({"tools_running": "guestToolsRunning", "heartbeat": "yellow"}, checks.HEARTBEAT_INTERMITTENT, True),
+        ({"swapped_mb": 10}, checks.MEMORY_RECLAIMED, True),
+        ({"ballooned_mb": 10}, checks.MEMORY_RECLAIMED, True),
+        ({"host_memory_percent": 97.0}, checks.HOST_MEMORY_PRESSURE, True),
+        ({"alarms": [{"alarm": "VM CPU", "status": "red"}]}, checks.VCENTER_ALARM, True),
+        ({"host_connection_state": "notResponding"}, checks.HOST_NOT_CONNECTED, True),
+        ({"created": NOW - timedelta(hours=30), "read_at": NOW}, checks.LONG_RUNNING, True),
+        ({"host_maintenance": True}, checks.HOST_IN_MAINTENANCE, False),
+        ({"tools_version_status": "guestToolsTooOld"}, checks.TOOLS_OUTDATED, False),
+    ],
+)
+def test_each_flag_and_whether_it_matters_alone(
+    fields: dict[str, object], flag: str, attention: bool
+) -> None:
+    healthy = {"tools_running": "guestToolsRunning", "heartbeat": "green"}
+
+    verdict = checks.classify(vm(**(healthy | fields)), LIMITS)
+
+    assert flag in verdict.flags
+    assert verdict.abnormal is attention
+    assert verdict.as_dict()["flags_meaning"][flag]
+
+
+def test_a_yellow_alarm_alone_is_not_flagged() -> None:
+    verdict = checks.classify(vm(alarms=[{"alarm": "x", "status": "yellow"}]), LIMITS)
+
+    assert checks.VCENTER_ALARM not in verdict.flags
+
+
+def test_age_is_measured_by_vcenters_clock_and_unknown_without_a_create_date() -> None:
+    assert vm(created=NOW - timedelta(hours=6), read_at=NOW).age_hours == pytest.approx(6.0)
+    assert vm(created=None, read_at=NOW).age_hours is None
+
+
+@pytest.mark.parametrize(
+    ("path", "terms", "inside"),
+    [
+        ("/DC0/vm/projects/env-1", ["projects"], True),
+        ("/DC0/vm/projects/team-x/env-1", ["projects/"], True),
+        ("/DC0/vm/projects/team-x/env-1", ["/projects/team-x/"], True),
+        ("/DC0/vm/projects/team-y/env-1", ["projects/team-x"], False),
+        ("/DC0/vm/environments/env-1", ["Environments"], True),
+        ("/DC0/vm/my-projects-old/env-1", ["projects"], False),
+        ("/DC0/vm/env-1", [], True),
+        (None, ["projects"], False),
+    ],
+)
+def test_under_matches_whole_segments(path: str | None, terms: list[str], inside: bool) -> None:
+    assert ages.under_any(path, terms) is inside
+
+
+def test_a_property_vcenter_rejects_is_dropped_not_fatal(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = Settings.from_environment(
+        {
+            "VSPHERE_VCENTERS": '[{"name": "vc-a", "host": "a"}]',
+            "VSPHERE_USERNAME": "u",
+            "VSPHERE_PASSWORD": "p",
+        }
+    )
+    session = VCenterSession(settings.vcenters[0], settings)
+    asked: list[list[str]] = []
+
+    def once(_kind: object, paths: list[str], *, root: object, objects: object) -> list[dict]:
+        asked.append(list(paths))
+        if "runtime.paused" in paths:
+            raise vmodl.query.InvalidProperty(name="runtime.paused")
+        return [{"moref": "vm-1", "name": "x"}]
+
+    monkeypatch.setattr(session, "_retrieve_once", once)
+
+    rows = session.retrieve(object, ["name", "runtime.paused"])
+
+    assert asked == [["name", "runtime.paused"], ["name"]]
+    assert rows == [{"moref": "vm-1", "name": "x", "_missing": ["runtime.paused"]}]

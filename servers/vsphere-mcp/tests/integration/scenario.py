@@ -149,6 +149,13 @@ class Machine:
     previous_log: str | None = None
     serial_text: str | None = None
     resets: int = 0
+    tools_installed: bool = True
+    paused: bool = False
+    suspended: bool = False
+    ballooned_mb: int = 0
+    swapped_mb: int = 0
+    alarm: str | None = None
+    created_hours_ago: float = 0.5
     moref: str = ""
 
 
@@ -289,7 +296,7 @@ def edit(model: Path, machine: Machine) -> None:
     tree = ET.parse(path)  # noqa: S314 - our own file
     root = tree.getroot()
     now = datetime.now(UTC)
-    power = "poweredOn" if machine.powered_on else "poweredOff"
+    power = "suspended" if machine.suspended else "poweredOn" if machine.powered_on else "poweredOff"
     runtime = _propset(root, "runtime")
     summary = _propset(root, "summary")
     guest = _propset(root, "guest")
@@ -318,7 +325,31 @@ def edit(model: Path, machine: Machine) -> None:
     quick = _child(summary, "quickStats")
     _child(quick, "overallCpuUsage", str(machine.cpu_mhz if machine.powered_on else 0))
     _child(quick, "guestHeartbeatStatus", machine.heartbeat)
-    _child(guest, "toolsRunningStatus", machine.tools if machine.powered_on else "guestToolsNotRunning")
+    _child(quick, "balloonedMemory", str(machine.ballooned_mb))
+    _child(quick, "swappedMemory", str(machine.swapped_mb))
+    if machine.paused:
+        _child(runtime, "paused", "true")
+    running = machine.tools if machine.powered_on else "guestToolsNotRunning"
+    _child(guest, "toolsRunningStatus", running)
+    if not machine.tools_installed:
+        _child(guest, "toolsStatus", "toolsNotInstalled")
+    else:
+        _child(guest, "toolsStatus", "toolsOk" if running == "guestToolsRunning" else "toolsNotRunning")
+    _child(config, "createDate", _stamp(now - timedelta(hours=machine.created_hours_ago)))
+    if machine.alarm:
+        alarms = _propset(root, "triggeredAlarmState")
+        assert alarms is not None
+        state = ET.SubElement(alarms, "AlarmState")
+        _child(state, "key", f"{machine.alarm}.{machine.moref}")
+        entity = ET.SubElement(state, "entity")
+        entity.set("type", "VirtualMachine")
+        entity.text = machine.moref
+        alarm = ET.SubElement(state, "alarm")
+        alarm.set("type", "Alarm")
+        alarm.text = machine.alarm
+        _child(state, "overallStatus", "red")
+        _child(state, "time", _stamp(now - timedelta(minutes=12)))
+        _child(state, "acknowledged", "false")
     _child(guest, "guestFamily", machine.guest[2])
     _child(config, "guestFullName", machine.guest[1])
     if machine.base_disk:
@@ -455,6 +486,66 @@ def fleet(work: Path) -> tuple[World, World]:
     base_a = "[LocalDS_0] base-win10/base-win10.vmdk"
     base_b = "[LocalDS_1] base-win7/base-win7.vmdk"
     a_machines = [
+        # env-1004: one of each signal beyond "stuck", on a host of its own.
+        Machine(
+            "notools-01",
+            "environments/env-1004",
+            "DC0_C1_H1",
+            "LocalDS_1",
+            tools_installed=False,
+            cpu_mhz=600,
+        ),
+        Machine("paused-01", "environments/env-1004", "DC0_C1_H1", "LocalDS_1", paused=True),
+        Machine("susp-01", "environments/env-1004", "DC0_C1_H1", "LocalDS_1", suspended=True),
+        Machine(
+            "starting-01",
+            "environments/env-1004",
+            "DC0_C1_H1",
+            "LocalDS_1",
+            tools="guestToolsExecutingScripts",
+            cpu_mhz=1000,
+        ),
+        Machine(
+            "swap-01",
+            "environments/env-1004",
+            "DC0_C1_H1",
+            "LocalDS_1",
+            tools="guestToolsRunning",
+            heartbeat="green",
+            cpu_mhz=900,
+            ballooned_mb=512,
+            swapped_mb=2048,
+        ),
+        Machine(
+            "alarm-01",
+            "environments/env-1004",
+            "DC0_C1_H1",
+            "LocalDS_1",
+            tools="guestToolsRunning",
+            heartbeat="green",
+            cpu_mhz=300,
+            alarm="alarm-11",
+        ),
+        Machine(
+            "flaky-01",
+            "environments/env-1004",
+            "DC0_C1_H1",
+            "LocalDS_1",
+            tools="guestToolsRunning",
+            heartbeat="yellow",
+            cpu_mhz=300,
+        ),
+        # env-0999: left behind, powered on, a day old.
+        Machine(
+            "left-01",
+            "environments/env-0999",
+            "DC0_H0",
+            "LocalDS_0",
+            tools="guestToolsRunning",
+            heartbeat="green",
+            cpu_mhz=200,
+            created_hours_ago=26,
+        ),
         # env-1001: linked clones of one base disk on LocalDS_0, three stuck. A storage storm.
         Machine(
             "web-01",
@@ -568,6 +659,7 @@ def fleet(work: Path) -> tuple[World, World]:
             tools="guestToolsRunning",
             heartbeat="green",
             cpu_mhz=400,
+            created_hours_ago=7,
         ),
         Machine(
             "p-02",
@@ -577,6 +669,7 @@ def fleet(work: Path) -> tuple[World, World]:
             tools="guestToolsRunning",
             heartbeat="green",
             cpu_mhz=400,
+            created_hours_ago=6.5,
         ),
         Machine(
             "p-01",
@@ -586,6 +679,16 @@ def fleet(work: Path) -> tuple[World, World]:
             tools="guestToolsRunning",
             heartbeat="green",
             cpu_mhz=400,
+            created_hours_ago=2,
+        ),
+        # One level deeper: an environment under a team folder under projects.
+        Machine(
+            "t-01",
+            "projects/team-x/env-3001",
+            "DC0_C0_H2",
+            "LocalDS_0",
+            powered_on=False,
+            created_hours_ago=6,
         ),
         # The same env id as on the other vCenter: found on both, and said so.
         Machine(
@@ -600,13 +703,20 @@ def fleet(work: Path) -> tuple[World, World]:
     ]
     a = build(
         "vsphere-mcp-test-a",
-        ["environments/env-1001", "environments/env-1002", "environments/env-1003", "templates"],
+        [
+            "environments/env-1001",
+            "environments/env-1002",
+            "environments/env-1003",
+            "environments/env-1004",
+            "environments/env-0999",
+            "templates",
+        ],
         a_machines,
         work=work,
     )
     b = build(
         "vsphere-mcp-test-b",
-        ["projects/env-2001", "projects/env-20015", "projects/env-1001"],
+        ["projects/env-2001", "projects/env-20015", "projects/env-1001", "projects/team-x/env-3001"],
         b_machines,
         work=work,
     )

@@ -40,7 +40,16 @@ VM_PATHS = (
     "runtime.question",
     "runtime.host",
     "runtime.consolidationNeeded",
+    "runtime.paused",
     "summary.runtime.bootTime",
+    "summary.overallStatus",
+    "summary.config.memorySizeMB",
+    "summary.quickStats.guestMemoryUsage",
+    "summary.quickStats.balloonedMemory",
+    "summary.quickStats.swappedMemory",
+    "summary.quickStats.compressedMemory",
+    "triggeredAlarmState",
+    "guest.toolsStatus",
     "summary.quickStats.overallCpuUsage",
     "summary.quickStats.uptimeSeconds",
     "summary.quickStats.guestHeartbeatStatus",
@@ -76,6 +85,8 @@ DATACENTER_PATHS = ("name", "parent", "vmFolder")
 CLUSTER_PATHS = ("name",)
 
 RUNNING = "guestToolsRunning"
+STARTING = "guestToolsExecutingScripts"
+NOT_INSTALLED = "toolsNotInstalled"
 
 
 @dataclass
@@ -108,6 +119,16 @@ class VmFacts:
     uptime_minutes: float | None = None
     question: Question | None = None
     consolidation_needed: bool = False
+    paused: bool = False
+    overall_status: str | None = None
+    alarms: list[dict[str, Any]] = field(default_factory=list)
+    memory_mb: int | None = None
+    guest_memory_mb: int | None = None
+    ballooned_mb: int | None = None
+    swapped_mb: int | None = None
+    compressed_kb: int | None = None
+    read_at: datetime | None = None
+    tools_status: str | None = None
     tools_running: str | None = None
     tools_version_status: str | None = None
     heartbeat: str | None = None
@@ -121,6 +142,9 @@ class VmFacts:
     host: str | None = None
     host_moref: str | None = None
     host_core_mhz: float | None = None
+    host_connection_state: str | None = None
+    host_maintenance: bool = False
+    host_memory_percent: float | None = None
     cluster: str | None = None
     datastores: list[str] = field(default_factory=list)
     disk_chain: list[list[str]] = field(default_factory=list)
@@ -144,6 +168,20 @@ class VmFacts:
         return self.tools_running == RUNNING
 
     @property
+    def tools_installed(self) -> bool | None:
+        """Whether Tools is installed at all; None when vCenter did not say."""
+        if self.tools_status is None:
+            return None
+        return self.tools_status != NOT_INSTALLED
+
+    @property
+    def age_hours(self) -> float | None:
+        """How long ago the VM was created, by vCenter's clock (vCenter 6.7 and later)."""
+        if self.created is None or self.read_at is None:
+            return None
+        return max(0.0, (self.read_at - self.created).total_seconds() / 3600)
+
+    @property
     def cpu_fraction(self) -> float | None:
         """CPU use as a share of the VM's own vCPUs, where the host's speed is known."""
         if self.cpu_mhz is None or not self.num_cpu or not self.host_core_mhz:
@@ -158,6 +196,7 @@ class VmFacts:
             "name": self.name,
             "instance_uuid": self.instance_uuid,
             "created": self.created,
+            "age_hours": None if self.age_hours is None else round(self.age_hours, 2),
             "folder": self.folder,
             "folder_path": self.folder_path,
             "host": self.host,
@@ -181,6 +220,15 @@ class HostFacts:
     core_mhz: float | None
     cores: int | None
     cpu_usage_mhz: float | None
+    memory_bytes: int | None = None
+    memory_usage_mb: float | None = None
+
+    @property
+    def memory_percent(self) -> float | None:
+        """Host memory in use as a percent of what it has."""
+        if not self.memory_bytes or self.memory_usage_mb is None:
+            return None
+        return self.memory_usage_mb * 1024 * 1024 / self.memory_bytes * 100
 
     @property
     def capacity_mhz(self) -> float | None:
@@ -353,8 +401,24 @@ def read_hosts(session: VCenterSession) -> dict[str, HostFacts]:
             core_mhz=_number(row.get("summary.hardware.cpuMhz")),
             cores=row.get("summary.hardware.numCpuCores"),
             cpu_usage_mhz=_number(row.get("summary.quickStats.overallCpuUsage")),
+            memory_bytes=row.get("summary.hardware.memorySize"),
+            memory_usage_mb=_number(row.get("summary.quickStats.overallMemoryUsage")),
         )
     return hosts
+
+
+def alarm_names(session: VCenterSession, rows: Iterable[dict[str, Any]]) -> dict[str, str]:
+    """The names of the alarms triggered on these VMs, read in one call."""
+    refs = {}
+    for row in rows:
+        for state in row.get("triggeredAlarmState") or []:
+            alarm = getattr(state, "alarm", None)
+            if alarm is not None:
+                refs[alarm._moId] = alarm  # noqa: SLF001
+    if not refs:
+        return {}
+    named = session.retrieve(vim.alarm.Alarm, ("info.name",), objects=list(refs.values()))
+    return {row["moref"]: row.get("info.name") or row["moref"] for row in named}
 
 
 def read_datastores(session: VCenterSession) -> dict[str, dict[str, Any]]:
@@ -387,8 +451,18 @@ def read_inventory(
     datastores = read_datastores(session)
     paths = (*VM_PATHS, DEVICE_PATH) if with_devices else VM_PATHS
     rows = session.retrieve(vim.VirtualMachine, paths, objects=vm_objects)
+    names = alarm_names(session, rows)
     vms = [
-        vm_facts(session.vcenter.name, row, read_at, folders, hosts, datastores, with_devices=with_devices)
+        vm_facts(
+            session.vcenter.name,
+            row,
+            read_at,
+            folders,
+            hosts,
+            datastores,
+            with_devices=with_devices,
+            alarms=names,
+        )
         for row in rows
     ]
     return Inventory(
@@ -411,9 +485,10 @@ def vm_facts(  # noqa: C901, PLR0912, PLR0915 - one flattening of one row
     datastores: dict[str, dict[str, Any]],
     *,
     with_devices: bool,
+    alarms: dict[str, str] | None = None,
 ) -> VmFacts:
     """Flatten one property-collector row into `VmFacts`, noting what disagrees."""
-    facts = VmFacts(vcenter=vcenter, moref=row["moref"], name=row.get("name", row["moref"]))
+    facts = VmFacts(vcenter=vcenter, moref=row["moref"], name=row.get("name", row["moref"]), read_at=read_at)
     parent = row.get("parent")
     if parent is not None and isinstance(parent, vim.Folder):
         folder = folders.get(parent._moId)  # noqa: SLF001
@@ -457,6 +532,24 @@ def vm_facts(  # noqa: C901, PLR0912, PLR0915 - one flattening of one row
         ]
         facts.question = Question(id=str(question.id), text=question.text or "", choices=choices)
     facts.consolidation_needed = bool(row.get("runtime.consolidationNeeded"))
+    facts.paused = bool(row.get("runtime.paused"))
+    facts.overall_status = row.get("summary.overallStatus")
+    facts.memory_mb = row.get("summary.config.memorySizeMB")
+    facts.guest_memory_mb = row.get("summary.quickStats.guestMemoryUsage")
+    facts.ballooned_mb = row.get("summary.quickStats.balloonedMemory")
+    facts.swapped_mb = row.get("summary.quickStats.swappedMemory")
+    facts.compressed_kb = row.get("summary.quickStats.compressedMemory")
+    facts.alarms = [
+        {
+            "alarm": (alarms or {}).get(state.alarm._moId, state.alarm._moId),  # noqa: SLF001
+            "status": state.overallStatus,
+            "since": as_utc(state.time) if getattr(state, "time", None) else None,
+            "acknowledged": bool(getattr(state, "acknowledged", False)),
+        }
+        for state in row.get("triggeredAlarmState") or []
+        if getattr(state, "alarm", None) is not None
+    ]
+    facts.tools_status = row.get("guest.toolsStatus")
     facts.tools_running = row.get("guest.toolsRunningStatus")
     facts.tools_version_status = row.get("guest.toolsVersionStatus2")
     facts.heartbeat = row.get("summary.quickStats.guestHeartbeatStatus")
@@ -476,6 +569,9 @@ def vm_facts(  # noqa: C901, PLR0912, PLR0915 - one flattening of one row
             facts.host = host.name
             facts.host_core_mhz = host.core_mhz
             facts.cluster = host.cluster
+            facts.host_connection_state = host.connection_state
+            facts.host_maintenance = host.maintenance
+            facts.host_memory_percent = host.memory_percent
     facts.datastores = [
         datastores.get(ref._moId, {}).get("name") or ref._moId  # noqa: SLF001
         for ref in row.get("datastore") or []
