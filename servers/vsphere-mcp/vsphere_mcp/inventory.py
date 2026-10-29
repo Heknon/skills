@@ -465,6 +465,40 @@ def describe_devices(
     return described, findings, blocking
 
 
+DEVICE_QUERY_PATHS = ("name", "parent", "config.template", "config.hardware.device")
+
+
+def read_vm_devices(session: VCenterSession, folders: dict[str, FolderFacts]) -> list[dict[str, Any]]:
+    """Every VM with the set of device categories and kinds it has — a lean device query.
+
+    Reads only identity and the device list (the one heavy property), for a
+    fleet question like "which VMs have, or lack, a sound card". Templates are
+    kept and marked, since a missing device on the template is usually the root
+    of a missing device on its clones.
+    """
+    rows = session.retrieve(vim.VirtualMachine, DEVICE_QUERY_PATHS)
+    result = []
+    for row in rows:
+        devices = row.get("config.hardware.device") or []
+        categories = sorted({_device_category(device) for device in devices})
+        kinds = sorted({type(device).__name__.removeprefix("Virtual") for device in devices})
+        parent = row.get("parent")
+        folder = folders.get(parent._moId) if parent is not None else None  # noqa: SLF001
+        result.append(
+            {
+                "vcenter": session.vcenter.name,
+                "moref": row["moref"],
+                "name": row.get("name", row["moref"]),
+                "template": bool(row.get("config.template")),
+                "folder": folder.path if folder else None,
+                "environment": folder.name if folder else None,
+                "categories": categories,
+                "kinds": kinds,
+            }
+        )
+    return result
+
+
 def read_folders(session: VCenterSession) -> dict[str, FolderFacts]:
     """Every folder with its path from its datacenter, read in two calls."""
     datacenters = session.retrieve(vim.Datacenter, DATACENTER_PATHS)

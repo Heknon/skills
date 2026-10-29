@@ -124,6 +124,7 @@ read, and diagnostics (host logs).
 | `get_vm_console` | the screen in words: black, frozen or changing, blue screen, OCR text and the boot screen it shows |
 | `get_vm_events` | a VM's events, by moref (a destroyed VM is reported as such) |
 | `get_vm_hardware` | the VM's virtual devices (adapters, controllers, disks, CD-ROM, sound, serial, USB, video) and vCenter's connection view; flags a down boot NIC, a mounted ISO or a device error |
+| `find_vms_by_device` | every VM across the vCenters that has, or lacks, a device — by category (sound, ethernet, usb, ...) or a kind substring (Vmxnet3, HdAudioCard); scoped with vcenters/under |
 | `get_host_health` | a host's CPU demand against capacity, its storage, its VMs |
 | `get_datastore_health` | a datastore's latency and IOPS from every host mounting it, its VMs |
 | `read_host_log` | `vmkernel` / `hostd` / `vpxa` lines, filtered |

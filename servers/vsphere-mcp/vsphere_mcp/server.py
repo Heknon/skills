@@ -31,7 +31,7 @@ from PIL import Image
 from pyVmomi import vim, vmodl
 from starlette.responses import JSONResponse
 
-from vsphere_mcp import ages
+from vsphere_mcp import ages, hardware
 from vsphere_mcp import scan as scanning
 from vsphere_mcp.checks import classify, count_states
 from vsphere_mcp.config import Settings
@@ -362,6 +362,47 @@ def _register_fleet_tools(  # noqa: C901 - one closure per tool
             resolved,
             names,
             older_than_hours=max(0.0, older_than_hours),
+            under=[term for term in (under or []) if term.strip("/ ")],
+            limit=max(1, min(limit, MAX_LIMIT)),
+        )
+
+    @tool()
+    async def find_vms_by_device(
+        *,
+        device: str,
+        present: bool = True,
+        vcenters: list[str] | None = None,
+        under: list[str] | None = None,
+        include_templates: bool = True,
+        limit: int = 200,
+    ) -> dict[str, Any]:
+        """VMs across the vCenters that have, or lack, a given virtual device.
+
+        For a production issue that turns on a device: find every VM with (or
+        without) a sound card, a VMXNET3 adapter, a USB controller, a mounted
+        CD-ROM, and so on. `device` is a category — ethernet, disk, cdrom,
+        serial, sound, usb, controller, video, input — or a kind substring such
+        as "Vmxnet3" or "HdAudioCard". This reads each VM's device list, the one
+        heavy property, so scope it with `vcenters`/`under` on a large fleet.
+
+        Args:
+            device: a device category or a kind substring to match.
+            present: True for VMs that have it, False for VMs that lack it.
+            vcenters: vCenter names; all when empty.
+            under: folder path segments to look under; everywhere when empty.
+            include_templates: also consider template VMs (a bare template is
+                usually why its clones lack a device).
+            limit: how many matching VMs to list (the count covers all).
+
+        """
+        names = _names(fleet, vcenters)
+        return await hardware.find_vms_by_device(
+            fleet,
+            resolved,
+            names,
+            device=device,
+            present=present,
+            include_templates=include_templates,
             under=[term for term in (under or []) if term.strip("/ ")],
             limit=max(1, min(limit, MAX_LIMIT)),
         )

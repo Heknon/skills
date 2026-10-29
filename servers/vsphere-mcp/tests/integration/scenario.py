@@ -145,6 +145,7 @@ class Machine:
     question: str | None = None
     base_disk: str | None = None
     serial: bool = False
+    sound: bool = False
     vmware_log: str | None = None
     previous_log: str | None = None
     serial_text: str | None = None
@@ -240,6 +241,12 @@ def build(container: str, folders: list[str], machines: list[Machine], *, work: 
                             ),
                             yieldOnPoll=True,
                         ),
+                    )
+                )
+            if machine.sound:
+                changes.append(
+                    vim.vm.device.VirtualDeviceSpec(
+                        operation="add", device=vim.vm.device.VirtualHdAudioCard(key=-1)
                     )
                 )
             wait(
@@ -633,6 +640,7 @@ def fleet(work: Path) -> tuple[World, World]:
             "LocalDS_1",
             serial=True,
             serial_text="",
+            sound=True,
             tools="guestToolsRunning",
             heartbeat="green",
             cpu_mhz=200,

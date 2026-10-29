@@ -210,3 +210,29 @@ def test_check_vcenters_reports_reachability_and_sessions(server: MCPServer) -> 
     reachable = next(row for row in result["vcenters"] if row["name"] == "vc-a")
     assert "login_seconds" in reachable
     assert reachable["sessions"]["visible"] in ("all", "own_only")
+
+
+def test_find_vms_with_and_without_a_sound_card(server: MCPServer) -> None:
+    with_sound = call(
+        server, "find_vms_by_device", {"device": "sound", "present": True, "vcenters": ["vc-a"]}
+    )
+    without_sound = call(
+        server, "find_vms_by_device", {"device": "sound", "present": False, "vcenters": ["vc-a"]}
+    )
+
+    names_with = {vm["name"] for vm in with_sound["matched"]}
+    assert "ok-01" in names_with  # the one VM given a sound card
+    names_without = {vm["name"] for vm in without_sound["matched"]}
+    assert "web-01" in names_without
+    assert "ok-01" not in names_without
+    # every VM is in exactly one of the two sets
+    assert with_sound["matched_total"] + without_sound["matched_total"] >= with_sound["vcenters_read"]["vc-a"]
+
+
+def test_find_vms_by_device_matches_a_kind_substring(server: MCPServer) -> None:
+    result = call(
+        server, "find_vms_by_device", {"device": "E1000", "present": True, "vcenters": ["vc-a"], "limit": 5}
+    )
+
+    assert result["matched_total"] > 0
+    assert all("E1000" in " ".join(vm["kinds"]) for vm in result["matched"])
