@@ -69,6 +69,16 @@ silent miss. Instead:
 - **Thresholds are defaults, and the raw values always come back.** A
   check that says "CPU starvation" also returns the demand and ready time
   it judged on, so the model, and the person reading, can disagree.
+- **The VMs are linked clones.** Each VM's disk is a thin delta on top
+  of a shared, read-only base disk (the template's or a replica's). Every
+  VM cloned from one base reads that same base disk while it boots. So
+  the unit that is shared, and can be the cause, is often **the base disk**,
+  not only the host or the datastore: fifty clones booting at once all
+  read one disk on one PowerFlex volume. The MCP reads each VM's disk
+  chain (the delta and its parents) from its configuration, read-only, and
+  groups by base disk the same way it groups by host and datastore. The
+  base disk's identity is discovered from the chain, never assumed from a
+  template name.
 - **Once found, the key is `(vcenter, moref)`**, with `instanceUuid` and
   `config.createDate` alongside. Every later call uses that key. If the
   VM has since been destroyed, the tool says *destroyed* and does not fall
@@ -195,7 +205,7 @@ The checks, with thresholds in config:
 | `blocked_on_question` | a pending VM question |
 | `lost_heartbeat` | Tools were running, heartbeat now gray or red |
 | `tools_flapping` | Tools running and not running in turn, from events and `vmware.log`: the "Tools keeps crashing" symptom |
-| `customization_failed` | a guest customization (Sysprep on Windows) started and did not succeed, from events |
+| `shared_base_busy` | many VMs on one linked-clone base disk booting in the same minutes, with that disk's datastore slow |
 | `inaccessible` | disconnected, inaccessible, orphaned or invalid |
 | `overcommitted_host` | a host above the CPU demand threshold, with the VMs on it |
 | `slow_datastore` | a datastore above the latency threshold, with the VMs on it |
@@ -315,8 +325,8 @@ kernel's own error.
    warnings and path errors for the datastore's device, at the minute the
    timeline stopped.
 
-**Windows first.** Most of the fleet is Windows, and it causes most of
-the trouble. What that changes:
+**Windows first.** Most of the fleet is Windows, from Vista up to the
+current versions, and it causes most of the trouble. What that changes:
 
 - **The console says more on Windows than on Linux.** Windows draws its
   state on the screen, and OCR reads it: the spinning boot dots, "Working
@@ -324,18 +334,19 @@ the trouble. What that changes:
   "Scanning and repairing drive", a Windows Boot Manager error with its
   code, a blue screen with its stop code. Each is a different diagnosis,
   and the screenshot is often the single most useful piece of evidence
-  for a Windows VM that did not come back. The OCR engine must handle
-  these screens; that is tested in phase 0 on real captures.
+  for a Windows VM that did not come back. The screens differ by version
+  (Vista and 7 show "Starting Windows" and a progress bar, 8 and later the
+  spinning dots; the blue screen's layout changed too), so the OCR and the
+  skill must recognise each generation's screens; that is tested in phase
+  0 on real captures from several versions.
 - **A black screen on Windows** is usually early boot before the display
   is initialised, or a hang before the logon screen; two captures and the
   VM's CPU and disk counters separate a slow boot from a hang.
-- **Not every "did not come back" is a fault.** A cloned Windows VM may
-  run guest customization (Sysprep) with reboots of its own, and Windows
-  Update may run on the way up. Both take minutes and can outlast the
-  timeout that raises the Tools error. vCenter logs customization start,
-  success and failure as events; the console shows updates. A slow
-  customization on a CPU-starved host is the CPU cause showing up as a
-  Windows symptom.
+- **Not every "did not come back" is a fault.** Windows Update, a disk
+  check or driver setup may run on the way up, take minutes, and outlast
+  the timeout that raises the Tools error; the console shows which. On a
+  CPU-starved host or a saturated base disk, these slow Windows steps are
+  where the starvation shows.
 - **"Tools keeps crashing."** Tools on Windows is a service started late
   in boot. vCenter cannot see why the service died (that is in the guest's
   event log), but it can see the pattern: Tools running, then not, then
@@ -347,11 +358,13 @@ to the templates on theirs:
 
 - **Windows: Emergency Management Services on a virtual serial port**
   that writes to a file in the VM's datastore folder (`bcdedit /ems on`
-  and `/emssettings`, set in the template). With EMS on, Windows writes
-  its boot and, on a bugcheck, its stop information to that port, so a
-  blue screen lands in a file the MCP reads like `vmware.log`, even when
-  nobody saw the console. What exactly it writes on your Windows versions
-  is checked in the lab before relying on it.
+  and `/emssettings`, set in the template). With EMS on, Windows can write
+  its stop information on a blue screen to that port, so it lands in a
+  file the MCP reads like `vmware.log`, even when nobody saw the console.
+  EMS is a Windows Server feature first; whether it does this on the
+  desktop versions in the fleet (Vista to 11) is unknown and checked in
+  the lab. If it does not, the screenshot is the evidence for those
+  versions. Optional either way.
 - **Linux: the kernel console on the same kind of serial port**
   (`console=ttyS0` alongside the normal one), and no `quiet` or graphical
   splash, so every kernel line, timeouts and panics included, is in the
@@ -445,7 +458,8 @@ carries more of the reasoning:
    | Pending VM question | `runtime.question` set | none |
    | Guest hang in early boot | CPU near zero; console black and frozen across captures; `vmware.log` reset then nothing from the guest; host and storage healthy | console changing; Tools came up |
    | Guest booted, Tools did not start | console at a login prompt or guest IPs reported; Tools not running; host and storage healthy | Tools running |
-   | Windows still working (customization, updates, disk check) | customization started and not finished in events; the console shows updates, "Getting devices ready" or a disk scan; CPU and disk busy | customization succeeded; console at the logon screen |
+   | Linked-clone boot storm | many clones of one base disk booting in the same minutes; latency on the base disk's datastore high; clones of other bases fine | clones of the same base booted fine at the same time |
+   | Windows still working (updates, disk check, driver setup) | the console shows updates, "Getting devices ready" or a disk scan; CPU and disk busy | console at the logon screen |
    | Windows crashed or cannot boot | the console or the EMS serial log shows a stop code, Automatic Repair, or a Boot Manager error | console at the logon screen |
    | Tools flapping | Tools running and not running in turn; check whether the host was starved at those moments | Tools steady |
    | Something else reset or moved it | HA, migration or reset events not from Sims | none |
@@ -461,8 +475,9 @@ carries more of the reasoning:
    folder path or log field and missing the env when the layout differs;
    blaming the guest while its host sits at 120%; blaming the host while
    the environment's VMs on other hosts are equally stuck; calling a
-   slowly booting VM hung, or a Windows VM still in customization or
-   updates broken; trusting one black screenshot without a second.
+   slowly booting VM hung, or a Windows VM still installing updates
+   broken; blaming one host or datastore when the stuck VMs share a
+   linked-clone base disk; trusting one black screenshot without a second.
 
 ## 9. Security
 
@@ -509,10 +524,9 @@ carries more of the reasoning:
 7. **Does your GLM 5.3 client pass image content** from an MCP result to
    the model? *Default: no; the text form of the screenshot carries it.*
 8. **Will the bare metal team grant the read-only accounts?**
-9. **The Windows versions** in the templates (most of the fleet, and most
-   of the trouble), and whether the clones run guest customization
-   (Sysprep) on first boot.
-10. **Can the templates get a serial port to a file**, with EMS on for
-    Windows and the kernel console on it for Linux (section 6.5)? That is
-    the difference between "the boot stopped after the drivers loaded" and
-    the guest's own stop code or timeout message.
+9. **Linked clones**: are the base disks per template, or replicas per
+   datastore? How many clones share one base at peak? Answerable from the
+   lab data in phase 0; nothing waits on it.
+10. **Later, optional**: a serial port writing to a file in the templates,
+    with EMS for Windows and the kernel console for Linux (section 6.5),
+    once the lab shows what EMS writes on the desktop versions.
