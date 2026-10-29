@@ -12,7 +12,7 @@ import re
 from statistics import fmean
 from typing import TYPE_CHECKING, Any
 
-from vsphere_mcp.checks import host_pressure, ready_percent
+from vsphere_mcp.checks import ready_percent
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -43,6 +43,9 @@ VM_DISK = (
     "virtualDisk.numberWriteAveraged.average",
 )
 VOLUME_UUID = re.compile(r"/volumes/([^/]+)/?")
+# Usage at or above this share of capacity is a weak "near capacity" hint; only
+# demand can prove overcommit, since usage caps at capacity.
+USAGE_NEAR_CAPACITY_PERCENT = 90.0
 
 
 def summarize(samples: list[tuple[datetime, float]]) -> dict[str, Any] | None:
@@ -136,34 +139,61 @@ def vm_cpu(
 def host_cpu_from_series(
     host: HostFacts, series: dict[str, PerfSeries], thresholds: Thresholds
 ) -> dict[str, Any]:
-    """A host's CPU demand over the window, against its capacity."""
+    """A host's CPU demand over the window, against its capacity.
+
+    Demand is authoritative: over 100% means overcommit. Usage alone cannot show
+    overcommit (it caps at capacity), so a usage-only window is reported with
+    overcommit unknown, never as evidence either way. With no window series at
+    all, only the current quickStats value is reported, clearly labelled as
+    current rather than the window's peak.
+    """
     demand = summarize(_aggregate(series.get("cpu.demand.average")))
     usage = summarize(_aggregate(series.get("cpu.usagemhz.average")))
-    peak = host_pressure(
-        host.capacity_mhz,
-        demand["max"] if demand else None,
-        usage["max"] if usage else host.cpu_usage_mhz,
-        thresholds,
-    )
-    mean = host_pressure(
-        host.capacity_mhz,
-        demand["mean"] if demand else None,
-        usage["mean"] if usage else host.cpu_usage_mhz,
-        thresholds,
-    )
-    return {
+    capacity = host.capacity_mhz
+    base = {
         "name": host.name,
         "moref": host.moref,
         "cluster": host.cluster,
-        "capacity_mhz": host.capacity_mhz,
-        "basis": peak["basis"],
-        "peak_percent_of_capacity": peak["percent_of_capacity"],
-        "mean_percent_of_capacity": mean["percent_of_capacity"],
-        "peak_at": (demand or usage or {}).get("peak_at"),
-        "overcommitted": peak["overcommitted"],
-        "near_capacity": peak["near_capacity"],
+        "capacity_mhz": capacity,
         "threshold_percent": thresholds.host_cpu_demand_percent,
+        "overcommitted": None,
+        "near_capacity": None,
+        "window_series": demand is not None or usage is not None,
     }
+    if demand is not None:
+        over = capacity and demand["max"] >= capacity * thresholds.host_cpu_demand_percent / 100
+        return base | {
+            "basis": "demand",
+            "peak_percent_of_capacity": _percent(demand["max"], capacity),
+            "mean_percent_of_capacity": _percent(demand["mean"], capacity),
+            "peak_at": demand["peak_at"],
+            "overcommitted": bool(over),
+        }
+    if usage is not None:
+        peak_pct = _percent(usage["max"], capacity)
+        return base | {
+            "basis": "usage",
+            "peak_percent_of_capacity": peak_pct,
+            "mean_percent_of_capacity": _percent(usage["mean"], capacity),
+            "peak_at": usage["peak_at"],
+            # Usage cannot exceed capacity, so it cannot prove overcommit; a high
+            # value is a weak hint, and demand would be needed to be sure.
+            "near_capacity": bool(peak_pct is not None and peak_pct >= USAGE_NEAR_CAPACITY_PERCENT),
+            "note": "only CPU usage was available for the window, not demand, so overcommit cannot be judged",
+        }
+    return base | {
+        "basis": "current",
+        "peak_percent_of_capacity": None,
+        "current_percent_of_capacity": _percent(host.cpu_usage_mhz, capacity),
+        "peak_at": None,
+        "note": "no CPU series for the window; only the host's current usage is known, not the window's peak",
+    }
+
+
+def _percent(value: float | None, capacity: float | None) -> float | None:
+    if value is None or not capacity:
+        return None
+    return round(value / capacity * 100, 1)
 
 
 def hosts_cpu(

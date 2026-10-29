@@ -27,9 +27,7 @@ from pyVmomi import vim
 from vsphere_mcp.checks import (
     ABNORMAL,
     BLOCKED_ON_QUESTION,
-    BOOTING,
     BUSY_NOT_UP,
-    HEALTHY,
     HEARTBEAT_INTERMITTENT,
     HOST_MEMORY_PRESSURE,
     HOST_NOT_CONNECTED,
@@ -412,8 +410,12 @@ def read_host_storage_log(session: VCenterSession, host: HostFacts) -> dict[str,
 
 def environment_pattern(vm: VmFacts, peers: list[tuple[VmFacts, Verdict]]) -> dict[str, Any]:
     """How the rest of the VM's environment is doing, and where its healthy VMs are."""
+    # Healthy is the complement of abnormal, not a separate HEALTHY/BOOTING test:
+    # a VM that is HEALTHY but carries an attention flag (long_running, an alarm)
+    # is abnormal, and must not also be counted among the healthy, or one VM lands
+    # on both sides and "5 of 5 abnormal" hides the "only this one is stuck" signal.
     abnormal = [(peer, verdict) for peer, verdict in peers if verdict.abnormal]
-    healthy = [(peer, verdict) for peer, verdict in peers if verdict.state in (HEALTHY, BOOTING)]
+    healthy = [(peer, verdict) for peer, verdict in peers if not verdict.abnormal]
     result: dict[str, Any] = {
         "folder": vm.folder_path,
         "vms": len(peers),
@@ -521,7 +523,7 @@ def conclude(  # noqa: C901, PLR0912, PLR0915 - one ordered list of causes, kept
                 against=True,
                 text=f"ready time peaked at only {ready['max']:.1f}% per vCPU",
             )
-        if host.get("peak_percent_of_capacity") is not None and not host.get("overcommitted"):
+        if host.get("basis") == "demand" and host.get("overcommitted") is False:
             evidence(
                 CPU,
                 weight=1,

@@ -314,8 +314,18 @@ def summary(scan: Scan, *, states: Sequence[str] = FLAGGED, limit: int) -> dict[
     ]
     findings = []
     considered = sum(1 for _, verdict in everything if verdict.state != OFF)
+    # A powered-off leftover can carry an attention flag (long_running), so it is
+    # flagged but not among the powered-on: count the two separately rather than
+    # reporting "N abnormal of M powered-on" with N larger than M.
+    abnormal_on = sum(1 for _, verdict in flagged if verdict.state != OFF)
+    flagged_off = len(flagged) - abnormal_on
     findings.append(
-        f"{len(flagged)} abnormal of {considered} powered-on VMs across {len(scan.vcenters)} vCenter(s)"
+        f"{abnormal_on} abnormal of {considered} powered-on VMs across {len(scan.vcenters)} vCenter(s)"
+        + (
+            f"; {flagged_off} powered-off VM(s) also flagged (e.g. long-running leftovers)"
+            if flagged_off
+            else ""
+        )
     )
     findings.extend(
         f"{row['abnormal']} of {row['population']} VMs on {row['dimension']} {row['value']!r} are abnormal "
@@ -556,6 +566,11 @@ def window_on_vcenter(
         end=end,
         thresholds=thresholds,
     )
+    # Did the window actually have perf data? Below statistics level 3, or for a
+    # window older than vCenter keeps fine data, the series come back empty — and
+    # empty must not read as "no pressure".
+    cpu_window_read = any(host.get("window_series") for host in cpu.values())
+    storage_matched = any(entry.get("matched_instance") for entry in disk.get("datastores", []))
     return {
         "events_read": len(events),
         "events_capped": len(events) >= QUERY_EVENTS_CAP,
@@ -568,6 +583,8 @@ def window_on_vcenter(
             host for host in cpu.values() if host.get("overcommitted") or host.get("near_capacity")
         ],
         "cpu_counters_unavailable": unknown,
+        "cpu_window_read": cpu_window_read,
+        "storage_window_read": storage_matched,
         "storage": disk,
     }
 
@@ -610,8 +627,31 @@ async def diagnose_window(
             for host in result["hosts_over_cpu_threshold"]
         )
         findings.extend(f"{name}: {finding}" for finding in result["storage"].get("findings", [])[:8])
-    if not findings:
-        findings.append("no resets, failures, CPU or storage pressure found in the window")
+        # Say when CPU or storage could not be read, so an empty series is not
+        # mistaken for a healthy one.
+        if not result.get("cpu_window_read"):
+            findings.append(
+                f"{name}: host CPU for this window could not be read (counters not kept this far back "
+                "or below statistics level 3); not evidence of no CPU pressure"
+            )
+        if not result.get("storage_window_read"):
+            findings.append(
+                f"{name}: datastore latency for this window could not be read; "
+                "not evidence of healthy storage"
+            )
+    pressure = any(
+        result.get("hosts_over_cpu_threshold") or result.get("storage", {}).get("findings")
+        for result in per_vcenter.values()
+        if not isinstance(result, dict) or result.get("available", True)
+    )
+    if not pressure and all(
+        r.get("cpu_window_read") and r.get("storage_window_read")
+        for r in per_vcenter.values()
+        if isinstance(r, dict)
+    ):
+        findings.insert(0, "no resets, failures, CPU or storage pressure found in the window (all data read)")
+    elif not findings:
+        findings.append("nothing found, but some CPU or storage data for the window could not be read")
     return {
         "window": {"from": begin, "to": end},
         "findings": findings,

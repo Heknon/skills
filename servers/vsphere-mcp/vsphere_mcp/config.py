@@ -71,15 +71,25 @@ class VCenter(BaseModel):
     """Per-vCenter credentials, when they differ from the shared ones."""
 
     def answers_to(self, spelling: str) -> bool:
-        """Whether a name an upstream system used refers to this vCenter."""
+        """Whether a name an upstream system used refers to this vCenter.
+
+        A full name (exact match against the configured name, host or an alias)
+        always counts. A bare first label (``vcsa``) also matches the host's
+        first label — but only when the spelling given is itself a bare label,
+        so ``vcsa.site1.corp`` does not match a host ``vcsa.site2.corp`` and two
+        vCenters that share a first label stay distinct.
+        """
         wanted = spelling.strip().lower().rstrip(".")
         if not wanted:
             return False
         for known in (self.name, self.host, *self.aliases):
-            candidate = known.lower()
-            if wanted in (candidate, candidate.split(".", 1)[0]):
+            if wanted == known.lower():
                 return True
-        return wanted.split(".", 1)[0] == self.host.lower().split(".", 1)[0]
+        if "." not in wanted:
+            for known in (self.name, self.host, *self.aliases):
+                if wanted == known.lower().split(".", 1)[0]:
+                    return True
+        return False
 
 
 class Thresholds(BaseModel):

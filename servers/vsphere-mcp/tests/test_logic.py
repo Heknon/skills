@@ -48,11 +48,23 @@ def vm(**fields: object) -> VmFacts:
 def test_a_vcenter_answers_to_its_name_host_short_host_and_aliases() -> None:
     vcenter = VCenter(name="vc-04", host="vc04.lab.example", aliases=("Datacenter-4",))
 
+    # Exact name, host and alias (any case), and a bare first label.
     assert all(
-        vcenter.answers_to(name)
-        for name in ("vc-04", "VC04.lab.example", "vc04", "datacenter-4", "vc04.other")
+        vcenter.answers_to(name) for name in ("vc-04", "VC04.lab.example", "vc04", "datacenter-4")
     )
+    # A different FQDN that only shares the first label must NOT match, or two
+    # vCenters like vcsa.site1 and vcsa.site2 would be confused.
+    assert not vcenter.answers_to("vc04.other")
     assert not vcenter.answers_to("vc-05")
+
+
+def test_two_vcenters_sharing_a_first_label_stay_distinct_by_fqdn() -> None:
+    a = VCenter(name="site1", host="vcsa.site1.corp")
+    b = VCenter(name="site2", host="vcsa.site2.corp")
+
+    assert a.answers_to("vcsa.site1.corp")
+    assert not a.answers_to("vcsa.site2.corp")
+    assert not b.answers_to("vcsa.site1.corp")
 
 
 def test_settings_read_vcenters_and_thresholds_from_json() -> None:
@@ -140,14 +152,45 @@ def test_ready_time_is_a_percent_per_vcpu() -> None:
     assert checks.ready_percent(6000, 20, 2) == pytest.approx(15.0)
 
 
-def test_host_usage_is_never_called_overcommitted() -> None:
-    by_demand = checks.host_pressure(4000, 4800, None, LIMITS)
-    by_usage = checks.host_pressure(4000, None, 4000, LIMITS)
+def _host(**kw: object):
+    from vsphere_mcp.inventory import HostFacts
 
-    assert by_demand["overcommitted"] is True
-    assert by_demand["percent_of_capacity"] == 120.0
-    assert by_usage["overcommitted"] is False
-    assert by_usage["near_capacity"] is True
+    base = {"moref": "host-1", "name": "esx-1", "cluster": "c", "connection_state": "connected",
+            "maintenance": False, "core_mhz": 2000.0, "cores": 2, "cpu_usage_mhz": None}
+    return HostFacts(**(base | kw))  # type: ignore[arg-type]
+
+
+def _series(counter: str, value: float):
+    from vsphere_mcp.vcenter import PerfSeries
+
+    return PerfSeries(counter=counter, unit="megaHertz", interval_seconds=20,
+                      samples={"": [(NOW, value)]})
+
+
+def test_host_cpu_demand_over_capacity_is_overcommit() -> None:
+    result = contention.host_cpu_from_series(_host(), {"cpu.demand.average": _series("cpu.demand.average", 4800)}, LIMITS)
+
+    assert result["basis"] == "demand"
+    assert result["peak_percent_of_capacity"] == 120.0
+    assert result["overcommitted"] is True
+
+
+def test_host_usage_only_cannot_prove_overcommit() -> None:
+    result = contention.host_cpu_from_series(_host(), {"cpu.usagemhz.average": _series("cpu.usagemhz.average", 3960)}, LIMITS)
+
+    assert result["basis"] == "usage"
+    assert result["peak_percent_of_capacity"] == 99.0
+    assert result["overcommitted"] is None  # unknown from usage alone
+    assert result["near_capacity"] is True
+
+
+def test_no_host_series_reports_current_not_a_window_peak() -> None:
+    result = contention.host_cpu_from_series(_host(cpu_usage_mhz=3960.0), {}, LIMITS)
+
+    assert result["basis"] == "current"
+    assert result["peak_percent_of_capacity"] is None
+    assert result["current_percent_of_capacity"] == 99.0
+    assert result["overcommitted"] is None
 
 
 # -- inventory concepts --------------------------------------------------------------

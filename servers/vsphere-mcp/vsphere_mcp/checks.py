@@ -268,34 +268,6 @@ def _flags(vm: VmFacts, thresholds: Thresholds, resets_in_window: int) -> list[s
     return flags
 
 
-def host_pressure(
-    capacity_mhz: float | None,
-    demand_mhz: float | None,
-    usage_mhz: float | None,
-    thresholds: Thresholds,
-) -> dict[str, Any]:
-    """A host's CPU demand against its capacity, from perf when it has it.
-
-    Demand is what the VMs asked for; usage is what they got. Above 100% demand
-    the host is overcommitted and its VMs wait (ready time). When only usage is
-    known it is reported as such, since usage cannot exceed capacity and so
-    understates exactly the case this check exists for.
-    """
-    basis = "demand" if demand_mhz is not None else "usage" if usage_mhz is not None else None
-    value = demand_mhz if demand_mhz is not None else usage_mhz
-    percent = (value / capacity_mhz * 100) if value is not None and capacity_mhz else None
-    over = percent is not None and percent >= thresholds.host_cpu_demand_percent
-    return {
-        "basis": basis,
-        "percent_of_capacity": _round(percent, 1),
-        "capacity_mhz": capacity_mhz,
-        "mhz": value,
-        "overcommitted": bool(over and basis == "demand"),
-        "near_capacity": bool(over and basis == "usage"),
-        "threshold_percent": thresholds.host_cpu_demand_percent,
-    }
-
-
 def ready_percent(ready_ms: float, interval_seconds: int, vcpus: int) -> float:
     """CPU ready as a percent of the sample, per vCPU.
 
