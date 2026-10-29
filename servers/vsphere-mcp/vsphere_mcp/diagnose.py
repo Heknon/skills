@@ -1,0 +1,853 @@
+"""The composite diagnoses: one call that runs every check, in a fixed order, and says why.
+
+The order is the one a person would follow once they have learned it the hard
+way, and the server follows it so the model does not have to remember it:
+
+1. the machine: power, Tools, heartbeat, a pending question, CPU use;
+2. CPU: the VM's ready time and the host's demand against its capacity;
+3. storage: the datastores' latency, and whether the device or the host's queue;
+4. the rest of the environment: are the healthy VMs elsewhere?;
+5. the guest: how far the boot got (`vmware.log`), the serial console (EMS),
+   and the screen.
+
+Each piece that cannot be read says so and the rest go on; a diagnosis never
+fails because the console endpoint or a counter is missing. All of it is
+blocking and runs in one worker thread per vCenter call.
+"""
+
+from __future__ import annotations
+
+import time
+from collections import Counter
+from datetime import datetime, timedelta
+from typing import TYPE_CHECKING, Any
+
+from pyVmomi import vim
+
+from vsphere_mcp.checks import (
+    ABNORMAL,
+    BLOCKED_ON_QUESTION,
+    BOOTING,
+    BUSY_NOT_UP,
+    HEALTHY,
+    HUNG,
+    INACCESSIBLE,
+    TOOLS_FLAPPING,
+    Verdict,
+    classify,
+    count_states,
+    resets_by_vm,
+)
+from vsphere_mcp.console import read_captures
+from vsphere_mcp.contention import hosts_cpu, storage, vm_cpu
+from vsphere_mcp.inventory import (
+    DEVICE_PATH,
+    VM_PATHS,
+    FolderFacts,
+    HostFacts,
+    VmFacts,
+    find_environment,
+    read_datastores,
+    read_folders,
+    read_hosts,
+    vm_facts,
+)
+from vsphere_mcp.vcenter import REALTIME_SPAN, VSphereError, parse_datastore_path
+from vsphere_mcp.vmlog import boot_timeline, grep, parse_lines, read_serial
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from vsphere_mcp.config import Settings
+    from vsphere_mcp.vcenter import VCenterSession
+
+# The causes a diagnosis weighs. Results name them by these exact strings.
+CPU = "CPU starvation (ESXi overcommit)"
+STORAGE = "storage latency (datastore / PowerFlex)"
+BOOT_STORM = "linked-clone boot storm on a shared base disk"
+WINDOWS_CRASH = "Windows crashed (stop error)"
+KERNEL_ERROR = "the guest kernel reported an error"
+STILL_WORKING = "Windows still working through boot (slow, not hung)"
+CANNOT_BOOT = "the guest cannot boot"
+TOOLS_DID_NOT_START = "the guest booted; Tools did not start"
+EARLY_HANG = "the guest hung early in boot"
+VM_FAULT = "the virtual machine faulted"
+TOOLS_FLAPPING_CAUSE = "Tools flapping"
+INACCESSIBLE_CAUSE = "vCenter cannot reach the VM"
+QUESTION = "a pending VM question blocks it"
+
+DIAGNOSE_PATHS = (*VM_PATHS, DEVICE_PATH, "config.files.vmPathName", "config.files.logDirectory")
+LAYOUT_TTL_SECONDS = 60.0
+EVENTS_KEPT = 40
+HOST_LOG_LINES = 2000
+SERIAL_BYTES = 256 * 1024
+ROTATED_LOG_BYTES = 512 * 1024
+STORAGE_HOST_LOG = (
+    r"(?i)(performance has deteriorated|latency|apd|pdl|all paths down|permanent device loss|"
+    r"lost access|scsi.*(abort|reset|fail)|path.*(dead|down|fail)|nmp.*fail|i/o error)"
+)
+
+
+# -- reading ---------------------------------------------------------------------
+
+
+class Layout:
+    """Folders, hosts and datastores of one vCenter, read once a minute at most."""
+
+    _cache: dict[str, tuple[float, Layout]] = {}  # noqa: RUF012 - a process-wide cache by design
+
+    def __init__(self, session: VCenterSession) -> None:
+        """Read the three, now."""
+        self.folders: dict[str, FolderFacts] = read_folders(session)
+        self.hosts: dict[str, HostFacts] = read_hosts(session)
+        self.datastores: dict[str, dict[str, Any]] = read_datastores(session)
+
+    @classmethod
+    def of(cls, session: VCenterSession) -> Layout:
+        """The cached layout of this session's vCenter, re-read when older than a minute."""
+        key = f"{session.vcenter.name}:{id(session)}"
+        hit = cls._cache.get(key)
+        if hit and time.monotonic() - hit[0] < LAYOUT_TTL_SECONDS:
+            return hit[1]
+        layout = cls(session)
+        cls._cache[key] = (time.monotonic(), layout)
+        return layout
+
+
+def read_vms(
+    session: VCenterSession,
+    layout: Layout,
+    *,
+    objects: list[Any] | None = None,
+    root: Any = None,
+) -> list[tuple[VmFacts, dict[str, Any]]]:
+    """VMs with everything a diagnosis reads, and the raw rows for file paths."""
+    now = session.now()
+    rows = session.retrieve(vim.VirtualMachine, DIAGNOSE_PATHS, objects=objects, root=root)
+    return [
+        (
+            vm_facts(
+                session.vcenter.name,
+                row,
+                now,
+                layout.folders,
+                layout.hosts,
+                layout.datastores,
+                with_devices=True,
+            ),
+            row,
+        )
+        for row in rows
+    ]
+
+
+def locate(  # noqa: C901, PLR0911 - one lookup, each way it can fail beside it
+    session: VCenterSession,
+    settings: Settings,
+    *,
+    env_id: str | None,
+    vm_name: str | None,
+    moref: str | None,
+) -> dict[str, Any]:
+    """Find one VM by moref, or by its environment and its name inside it.
+
+    Never by name alone: the name is reused by later environments. Returns the
+    VM, or why it could not be found and what was found instead.
+    """
+    layout = Layout.of(session)
+    if moref:
+        found = read_vms(session, layout, objects=[session.reference("VirtualMachine", moref)])
+        if not found:
+            return {
+                "found": False,
+                "reason": f"{moref} does not exist on {session.vcenter.name} (destroyed?)",
+            }
+        vm, row = found[0]
+        if vm_name and vm.name != vm_name:
+            vm.notes.append(f"asked for {vm_name!r} but {moref} is named {vm.name!r}")
+        return {"found": True, "vm": vm, "row": row, "layout": layout}
+    if not env_id or not vm_name:
+        return {"found": False, "reason": "give either a moref, or both env_id and vm_name"}
+    folders = find_environment(layout.folders, env_id, settings.env_parent_hints)
+    if not folders:
+        return {
+            "found": False,
+            "reason": f"no folder on {session.vcenter.name} is named {env_id!r} or contains it "
+            "(the environment may have been destroyed, or be on another vCenter)",
+        }
+    exact = [folder for folder in folders if folder.name.lower() == env_id.strip().lower()]
+    candidates = exact or folders
+    matches = []
+    for folder in candidates:
+        root = session.reference("Folder", folder.moref)
+        for vm, row in read_vms(session, layout, root=root):
+            if vm.name == vm_name or vm.name.lower() == vm_name.lower():
+                matches.append((folder, vm, row))
+    if len(matches) == 1:
+        folder, vm, row = matches[0]
+        if len(candidates) > 1:
+            vm.notes.append(f"{len(candidates)} folders match {env_id!r}; the VM was found in {folder.path}")
+        return {"found": True, "vm": vm, "row": row, "layout": layout, "folder": folder}
+    if len(matches) > 1:
+        return {
+            "found": False,
+            "reason": f"{len(matches)} VMs named {vm_name!r} under folders matching {env_id!r}; "
+            "pass the moref of the one meant",
+            "candidates": [vm.identity() for _, vm, _ in matches],
+        }
+    names = []
+    for folder in candidates[:3]:
+        root = session.reference("Folder", folder.moref)
+        names.extend(vm.name for vm, _ in read_vms(session, layout, root=root))
+    return {
+        "found": False,
+        "reason": f"no VM named {vm_name!r} in the environment folder(s) "
+        + ", ".join(folder.path for folder in candidates[:3]),
+        "vms_in_environment": sorted(names)[:50],
+    }
+
+
+def window(now: datetime, boot: datetime | None) -> tuple[datetime, datetime]:
+    """The window a VM's boot is judged over: from just before it booted.
+
+    Inside vCenter's realtime hour the window runs to now; a boot older than
+    that is judged on its first half-hour, from the historical rollup.
+    """
+    if boot is None:
+        return now - timedelta(minutes=30), now
+    if now - boot <= REALTIME_SPAN - timedelta(minutes=2):
+        return boot - timedelta(minutes=2), now
+    return boot - timedelta(minutes=5), min(now, boot + timedelta(minutes=30))
+
+
+def piece(name: str, work: Callable[[], dict[str, Any]]) -> dict[str, Any]:
+    """Run one part of a diagnosis; if it fails, say what failed and go on."""
+    try:
+        return work()
+    except VSphereError as error:
+        return {"available": False, "reason": str(error)}
+    except Exception as error:  # noqa: BLE001 - a missing piece must not fail the whole
+        return {"available": False, "reason": f"{name} not read: {type(error).__name__}: {error}"}
+
+
+def summarize_events(events: list[Any]) -> list[dict[str, Any]]:
+    """Events as a reader needs them: when, what, who, the message."""
+    return [
+        {
+            "time": event.createdTime,
+            "type": type(event).__name__.rsplit(".", 1)[-1],
+            "user": getattr(event, "userName", None) or None,
+            "message": (getattr(event, "fullFormattedMessage", None) or "").strip()[:300],
+        }
+        for event in events[-EVENTS_KEPT:]
+    ]
+
+
+def vm_folder(row: dict[str, Any], vm: VmFacts) -> str | None:
+    """The datastore folder holding the VM's `.vmx` and logs."""
+    log_directory = row.get("config.files.logDirectory")
+    if log_directory:
+        return str(log_directory).rstrip("/")
+    vmx = row.get("config.files.vmPathName")
+    if vmx and "/" in vmx:
+        return vmx.rsplit("/", 1)[0]
+    if vm.disk_chain:
+        own = vm.disk_chain[0][0]
+        return own.rsplit("/", 1)[0] if "/" in own else None
+    return None
+
+
+def read_logs(
+    session: VCenterSession, settings: Settings, vm: VmFacts, row: dict[str, Any]
+) -> dict[str, Any]:
+    """The current `vmware.log` (its end), the boot timeline from it, and the previous log."""
+    folder = vm_folder(row, vm)
+    if folder is None or vm.datacenter is None:
+        return {"available": False, "reason": "the VM's datastore folder or datacenter is not known"}
+    current = session.read_datastore_file(vm.datacenter, f"{folder}/vmware.log", settings.max_log_bytes)
+    if current.status != 200:  # noqa: PLR2004
+        return {
+            "available": False,
+            "reason": f"vmware.log not readable (HTTP {current.status}) at {folder}/vmware.log",
+        }
+    lines = parse_lines(current.text)
+    timeline = boot_timeline(lines)
+    tools_changes = timeline.get("annotations", {}).get("tools_state", {}).get("count", 0)
+    rotated = piece("log listing", lambda: {"files": _list_logs(session, folder)})
+    previous = session.read_datastore_file(vm.datacenter, f"{folder}/vmware-1.log", ROTATED_LOG_BYTES)
+    previous_lines = parse_lines(previous.text) if previous.status == 200 else []  # noqa: PLR2004
+    previous_matches, previous_total = grep(previous_lines, None, limit=20)
+    relevant, total = grep(lines, None, limit=40)
+    return {
+        "available": True,
+        "path": f"{folder}/vmware.log",
+        "bytes": current.size,
+        "read_only_the_end": current.truncated,
+        "timeline": timeline,
+        "relevant_lines": [line.as_dict() for line in relevant],
+        "relevant_lines_total": total,
+        "tools_state_changes": tools_changes,
+        "log_files": rotated.get("files", rotated),
+        "previous_log": {
+            "path": f"{folder}/vmware-1.log",
+            "available": previous.status == 200,  # noqa: PLR2004
+            "relevant_lines": [line.as_dict() for line in previous_matches],
+            "relevant_lines_total": previous_total,
+        },
+    }
+
+
+def _list_logs(session: VCenterSession, folder: str) -> list[dict[str, Any]]:
+    """The VM's log files, newest first: vmware.log, then vmware-1.log and older."""
+    datastore, _ = parse_datastore_path(folder)
+    stores = [store for store in Layout.of(session).datastores.values() if store.get("name") == datastore]
+    if not stores:
+        return []
+    files = session.list_folder(stores[0]["_ref"], folder, ["vmware*.log"])
+    return sorted(files, key=lambda item: (item["name"] != "vmware.log", item["name"]))
+
+
+def read_serial_files(session: VCenterSession, vm: VmFacts, *, tail_lines: int = 40) -> dict[str, Any]:
+    """The VM's serial console files: Windows EMS or a Linux kernel console, if it has one."""
+    if not vm.serial_files:
+        return {
+            "available": False,
+            "reason": "the VM has no serial port writing to a file, so there is no EMS or "
+            "kernel console output to read; the console screenshot is the guest's evidence",
+        }
+    if vm.datacenter is None:
+        return {"available": False, "reason": "the VM's datacenter is not known"}
+    files = []
+    for path in vm.serial_files:
+        try:
+            parse_datastore_path(path)
+        except ValueError:
+            files.append({"path": path, "available": False, "reason": "not a datastore path"})
+            continue
+        read = session.read_datastore_file(vm.datacenter, path, SERIAL_BYTES)
+        if read.status != 200:  # noqa: PLR2004
+            files.append({"path": path, "available": False, "reason": f"HTTP {read.status}"})
+            continue
+        files.append(
+            {"path": path, "available": True, "truncated": read.truncated}
+            | read_serial(read.text, tail_lines=tail_lines)
+        )
+    return {"available": any(item.get("available") for item in files), "files": files}
+
+
+def read_console(
+    session: VCenterSession, settings: Settings, vm: VmFacts, *, captures: int, interval_seconds: float
+) -> dict[str, Any]:
+    """Screenshots of the console, reduced to words."""
+    if not vm.powered_on:
+        return {"available": False, "reason": "the VM is not powered on; there is no console"}
+    images = []
+    for index in range(max(1, captures)):
+        if index:
+            time.sleep(interval_seconds)
+        status, body, _ = session.screenshot(vm.moref)
+        if status != 200:  # noqa: PLR2004
+            return {
+                "available": False,
+                "reason": f"the console endpoint answered HTTP {status}"
+                + (" (a simulator has none)" if status == 404 else ""),  # noqa: PLR2004
+            }
+        images.append(body)
+    thresholds = settings.thresholds
+    return {"available": True, "interval_seconds": interval_seconds} | read_captures(
+        images,
+        black_fraction=thresholds.console_black_fraction,
+        frozen_difference=thresholds.console_frozen_difference,
+    )
+
+
+def read_host_storage_log(session: VCenterSession, host: HostFacts) -> dict[str, Any]:
+    """The storage lines of a host's `vmkernel` log, from its last few thousand lines."""
+    log = session.host_log(session.reference("HostSystem", host.moref), "vmkernel", HOST_LOG_LINES)
+    if not log.get("available"):
+        return log
+    lines = parse_lines("\n".join(log["lines"]), first_number=log["line_start"])
+    matched, total = grep(lines, STORAGE_HOST_LOG, limit=30)
+    return {
+        "available": True,
+        "host": host.name,
+        "lines_read": len(lines),
+        "storage_lines_total": total,
+        "storage_lines": [line.as_dict() for line in matched],
+    }
+
+
+# -- judging ---------------------------------------------------------------------
+
+
+def environment_pattern(vm: VmFacts, peers: list[tuple[VmFacts, Verdict]]) -> dict[str, Any]:
+    """How the rest of the VM's environment is doing, and where its healthy VMs are."""
+    abnormal = [(peer, verdict) for peer, verdict in peers if verdict.abnormal]
+    healthy = [(peer, verdict) for peer, verdict in peers if verdict.state in (HEALTHY, BOOTING)]
+    result: dict[str, Any] = {
+        "folder": vm.folder_path,
+        "vms": len(peers),
+        "counts_by_state": count_states({peer.moref: verdict for peer, verdict in peers}),
+        "abnormal_hosts": dict(Counter(peer.host for peer, _ in abnormal)),
+        "healthy_hosts": dict(Counter(peer.host for peer, _ in healthy)),
+        "abnormal_datastores": dict(Counter(ds for peer, _ in abnormal for ds in peer.datastores)),
+        "healthy_datastores": dict(Counter(ds for peer, _ in healthy for ds in peer.datastores)),
+        "abnormal_base_disks": dict(Counter(peer.base_disk for peer, _ in abnormal if peer.base_disk)),
+        "healthy_base_disks": dict(Counter(peer.base_disk for peer, _ in healthy if peer.base_disk)),
+        "vm_list": [
+            {
+                "name": peer.name,
+                "moref": peer.moref,
+                "state": verdict.state,
+                "host": peer.host,
+                "datastores": peer.datastores,
+            }
+            for peer, verdict in peers
+        ][:50],
+    }
+    findings = []
+    signals: list[dict[str, Any]] = []
+    if len(abnormal) > 1:
+        findings.append(f"{len(abnormal)} of {len(peers)} VMs in this environment are abnormal")
+        for dimension, bad, good in (
+            ("host", result["abnormal_hosts"], result["healthy_hosts"]),
+            ("datastore", result["abnormal_datastores"], result["healthy_datastores"]),
+            ("base_disk", result["abnormal_base_disks"], result["healthy_base_disks"]),
+        ):
+            only_bad = sorted(name for name in bad if name and name not in good)
+            if only_bad and good:
+                signals.append({"kind": "only_abnormal_on", "dimension": dimension, "values": only_bad})
+                findings.append(
+                    f"the abnormal VMs are on {dimension.replace('_', ' ')} {', '.join(only_bad)}; "
+                    "the healthy ones are not"
+                )
+            elif len(bad) == 1 and next(iter(bad)) in good:
+                shared = next(iter(bad))
+                signals.append({"kind": "shared_with_healthy", "dimension": dimension, "values": [shared]})
+                findings.append(
+                    f"abnormal and healthy VMs share {dimension.replace('_', ' ')} {shared}, "
+                    "which argues against it"
+                )
+    elif len(peers) > 1:
+        signals.append({"kind": "alone", "dimension": None, "values": []})
+        findings.append("this VM is the only abnormal one in its environment")
+    result["findings"] = findings
+    result["signals"] = signals
+    return result
+
+
+def conclude(  # noqa: C901, PLR0912, PLR0915 - one ordered list of causes, kept together
+    verdict: Verdict,
+    *,
+    cpu: dict[str, Any],
+    disk: dict[str, Any],
+    environment: dict[str, Any],
+    logs: dict[str, Any],
+    serial: dict[str, Any],
+    console: dict[str, Any],
+    host_log: dict[str, Any],
+) -> dict[str, Any]:
+    """Weigh the evidence into causes, strongest first, with what argues against each."""
+    causes: dict[str, dict[str, Any]] = {}
+
+    def evidence(cause: str, *, weight: int, text: str, against: bool = False) -> None:
+        entry = causes.setdefault(cause, {"cause": cause, "for": [], "against": [], "score": 0})
+        entry["against" if against else "for"].append(text)
+        entry["score"] += -weight if against else weight
+
+    if verdict.state == INACCESSIBLE:
+        evidence(INACCESSIBLE_CAUSE, weight=4, text=verdict.reasons[0])
+    if verdict.state == BLOCKED_ON_QUESTION:
+        evidence(QUESTION, weight=5, text=verdict.reasons[0])
+
+    if cpu.get("available", True):
+        for text in cpu.get("findings", []):
+            evidence(CPU, weight=2, text=text)
+        host = cpu.get("host") or {}
+        ready = cpu.get("vm_ready_percent_per_vcpu")
+        if ready and not cpu.get("starved"):
+            evidence(
+                CPU,
+                weight=1,
+                against=True,
+                text=f"ready time peaked at only {ready['max']:.1f}% per vCPU",
+            )
+        if host.get("peak_percent_of_capacity") is not None and not host.get("overcommitted"):
+            evidence(
+                CPU,
+                weight=1,
+                against=True,
+                text=f"host {host.get('name')} CPU {host.get('basis')} peaked at "
+                f"{host['peak_percent_of_capacity']}% of capacity",
+            )
+    if disk.get("available", True):
+        for text in disk.get("findings", []):
+            evidence(STORAGE, weight=2, text=text)
+        if not disk.get("slow") and any(
+            entry.get("matched_instance") for entry in disk.get("datastores", [])
+        ):
+            evidence(
+                STORAGE,
+                weight=1,
+                against=True,
+                text="datastore latency stayed under the threshold in the window",
+            )
+    if host_log.get("available") and host_log.get("storage_lines_total"):
+        evidence(
+            STORAGE,
+            weight=1,
+            text=f"{host_log['storage_lines_total']} storage warnings in {host_log['host']}'s vmkernel log",
+        )
+
+    for signal in environment.get("signals", []):
+        where = f"{(signal['dimension'] or '').replace('_', ' ')} {', '.join(signal['values'])}".strip()
+        if signal["kind"] == "only_abnormal_on":
+            text = f"in its environment, only the abnormal VMs are on {where}"
+            if signal["dimension"] == "host":
+                evidence(CPU, weight=1, text=text)
+            else:
+                evidence(STORAGE, weight=1, text=text)
+            if signal["dimension"] == "base_disk":
+                evidence(BOOT_STORM, weight=2, text=text)
+        elif signal["kind"] == "shared_with_healthy":
+            text = f"healthy VMs in its environment are on the same {where}"
+            target = CPU if signal["dimension"] == "host" else STORAGE
+            evidence(target, weight=1, against=True, text=text)
+
+    for item in serial.get("files", []):
+        for code in item.get("windows_stop_codes", []):
+            label = f"{code['code']} {code['name'] or ''}".strip()
+            evidence(WINDOWS_CRASH, weight=4, text=f"serial console: stop code {label}")
+            hint = code.get("points_at") or ""
+            if hint.startswith("storage"):
+                evidence(STORAGE, weight=1, text=f"{label} usually means {hint}")
+            if hint.startswith("CPU"):
+                evidence(CPU, weight=1, text=f"{label} usually means {hint}")
+        for finding in item.get("linux_findings", []):
+            evidence(
+                KERNEL_ERROR, weight=3, text=f"serial console: {finding['kind']}: {finding['examples'][0]}"
+            )
+            hint = finding.get("points_at") or ""
+            if hint.startswith("storage"):
+                evidence(STORAGE, weight=1, text=f"{finding['kind']}: {hint}")
+            if hint.startswith("CPU"):
+                evidence(CPU, weight=1, text=f"{finding['kind']}: {hint}")
+
+    if console.get("available"):
+        for state in console.get("screen_states", []):
+            name = state["state"]
+            if name == "blue_screen":
+                evidence(WINDOWS_CRASH, weight=4, text=f"console: {state['meaning']}")
+            elif name in ("windows_updating", "device_setup", "disk_check", "windows_starting"):
+                evidence(STILL_WORKING, weight=3, text=f"console: {state['meaning']}")
+            elif name in (
+                "automatic_repair",
+                "boot_manager_error",
+                "no_boot_device",
+                "linux_emergency",
+                "linux_panic",
+            ):
+                evidence(CANNOT_BOOT, weight=4, text=f"console: {state['meaning']}")
+            elif name in ("windows_logon", "linux_login"):
+                evidence(TOOLS_DID_NOT_START, weight=4, text=f"console: {state['meaning']}")
+        if console.get("frozen") and console.get("black"):
+            evidence(EARLY_HANG, weight=2, text="console black and unchanged across captures")
+        if console.get("frozen") is False:
+            evidence(EARLY_HANG, weight=2, against=True, text="the console changed between captures")
+            evidence(STILL_WORKING, weight=1, text="the console changed between captures")
+        for code in console.get("stop_codes", []):
+            evidence(WINDOWS_CRASH, weight=3, text=f"console: stop code {code['code']} {code['name'] or ''}")
+
+    timeline = logs.get("timeline") or {}
+    if timeline.get("boot_found"):
+        last = timeline.get("last_stage")
+        if last in ("power_on_or_reset", "firmware", "guest_disk_io"):
+            evidence(
+                EARLY_HANG,
+                weight=1,
+                text=f"vmware.log: the boot got as far as {last}, then nothing further was logged",
+            )
+        if timeline.get("annotations", {}).get("fault"):
+            evidence(VM_FAULT, weight=3, text="vmware.log reports a fault during boot")
+        if timeline.get("annotations", {}).get("storage"):
+            evidence(STORAGE, weight=1, text="vmware.log reports storage trouble during boot")
+    if logs.get("tools_state_changes", 0) >= 3:  # noqa: PLR2004
+        evidence(
+            TOOLS_FLAPPING_CAUSE,
+            weight=2,
+            text=f"{logs['tools_state_changes']} Tools state changes in vmware.log",
+        )
+        verdict.flags.append(TOOLS_FLAPPING)
+
+    if verdict.state == HUNG:
+        evidence(EARLY_HANG, weight=1, text=verdict.reasons[-1])
+        evidence(CPU, weight=1, against=True, text="the VM uses almost no CPU")
+    if verdict.state == BUSY_NOT_UP:
+        evidence(STILL_WORKING, weight=1, text=verdict.reasons[-1])
+
+    ranked = sorted(causes.values(), key=lambda entry: entry["score"], reverse=True)
+    for entry in ranked:
+        support, opposed = len(entry["for"]), len(entry["against"])
+        entry["confidence"] = (
+            "high"
+            if entry["score"] >= 4 and not opposed  # noqa: PLR2004
+            else "medium"
+            if entry["score"] >= 2  # noqa: PLR2004
+            else "low"
+        )
+        entry["evidence_count"] = support + opposed
+    likely = [entry for entry in ranked if entry["score"] > 0]
+    starved_not_hung = verdict.state == BUSY_NOT_UP and cpu.get("starved")
+    not_checked = [
+        name
+        for name, part in (
+            ("CPU counters", cpu),
+            ("storage counters", disk),
+            ("vmware.log", logs),
+            ("serial console", serial),
+            ("console screen", console),
+            ("host vmkernel log", host_log),
+        )
+        if not part.get("available", True)
+    ]
+    headline = (
+        f"likely cause: {likely[0]['cause']} ({likely[0]['confidence']} confidence)"
+        if likely
+        else "no cause stands out from the evidence read"
+    )
+    if starved_not_hung:
+        headline += "; the VM is busy, so it is more likely booting slowly than hung"
+    return {
+        "headline": headline,
+        "causes": likely,
+        "argued_against": [entry for entry in ranked if entry["score"] <= 0],
+        "not_checked": not_checked,
+        "vm_state": verdict.state,
+    }
+
+
+def next_checks(conclusion: dict[str, Any], vm: VmFacts) -> list[str]:
+    """The checks that would separate the leading causes."""
+    leading = {entry["cause"] for entry in conclusion["causes"][:2]}
+    steps = []
+    if CPU in leading:
+        steps.append(f"explain_group on host {vm.host!r} from a scan: are other VMs on it starved too?")
+        steps.append("vROps: the host's or cluster's CPU demand over the past days at this hour")
+    if leading & {STORAGE, BOOT_STORM}:
+        steps.append("get_datastore_health on the VM's datastores over a wider window")
+        steps.append("PowerFlex (if available): the pool behind the datastore, its IOPS and any rebuild")
+    if leading & {EARLY_HANG, CANNOT_BOOT, VM_FAULT}:
+        steps.append("does the same base disk boot fine on another host or datastore right now?")
+    if leading & {WINDOWS_CRASH, KERNEL_ERROR}:
+        steps.append("the stop code or kernel message: does it point at storage or CPU (points_at)?")
+    if STILL_WORKING in leading:
+        steps.append("take the console again in a few minutes: is it still progressing?")
+    if not leading:
+        steps.append("scan the vCenter: is this VM alone, or part of a group?")
+    steps.append("Sahara and Sims logs: when the reboot was asked for, and how long Sims waited")
+    return steps
+
+
+# -- the composites --------------------------------------------------------------
+
+
+def diagnose_vm(
+    session: VCenterSession,
+    settings: Settings,
+    *,
+    env_id: str | None,
+    vm_name: str | None,
+    moref: str | None,
+    console_captures: int = 2,
+    console_interval_seconds: float = 10.0,
+) -> dict[str, Any]:
+    """Everything about one VM, in the fixed order, ending in the likely cause."""
+    located = locate(session, settings, env_id=env_id, vm_name=vm_name, moref=moref)
+    if not located["found"]:
+        return {"found": False} | {key: value for key, value in located.items() if key != "found"}
+    vm: VmFacts = located["vm"]
+    row = located["row"]
+    layout: Layout = located["layout"]
+    thresholds = settings.thresholds
+    now = session.now()
+    host = layout.hosts.get(vm.host_moref or "")
+    begin, end = window(now, vm.boot_time)
+
+    events = piece(
+        "events",
+        lambda: {
+            "events": session.events(
+                entity=session.reference("VirtualMachine", vm.moref),
+                begin=(vm.boot_time or now) - timedelta(minutes=30),
+                end=now,
+            )
+        },
+    )
+    raw_events = events.get("events", [])
+    resets = resets_by_vm(raw_events, thresholds.boot_loop_window_minutes, now).get(vm.moref, 0)
+    verdict = classify(vm, thresholds, resets_in_window=resets)
+
+    peers: list[tuple[VmFacts, Verdict]] = []
+    if vm.folder_moref:
+        siblings = read_vms(session, layout, root=session.reference("Folder", vm.folder_moref))
+        peers = [
+            (peer, classify(peer, thresholds)) for peer, _ in siblings if peer.folder_moref == vm.folder_moref
+        ]
+    environment = environment_pattern(vm, peers) if peers else {"vms": 0, "findings": []}
+    cpu = piece("CPU", lambda: vm_cpu(session, vm, host, begin=begin, end=end, thresholds=thresholds))
+    stores = [store for store in layout.datastores.values() if store.get("name") in vm.datastores]
+    disk = piece(
+        "storage",
+        lambda: storage(
+            session,
+            {host.moref: host.name} if host else {},
+            stores,
+            begin=begin,
+            end=end,
+            thresholds=thresholds,
+            vm_moref=vm.moref,
+        ),
+    )
+    host_log = (
+        piece("host log", lambda: read_host_storage_log(session, host))
+        if host
+        else {"available": False, "reason": "the VM's host is not known"}
+    )
+    logs = piece("vmware.log", lambda: read_logs(session, settings, vm, row))
+    serial = piece("serial console", lambda: read_serial_files(session, vm))
+    console = (
+        piece(
+            "console",
+            lambda: read_console(
+                session, settings, vm, captures=console_captures, interval_seconds=console_interval_seconds
+            ),
+        )
+        if console_captures > 0
+        else {"available": False, "reason": "not asked for"}
+    )
+
+    conclusion = conclude(
+        verdict,
+        cpu=cpu,
+        disk=disk,
+        environment=environment,
+        logs=logs,
+        serial=serial,
+        console=console,
+        host_log=host_log,
+    )
+    return {
+        "found": True,
+        "finding": conclusion["headline"],
+        "conclusion": conclusion,
+        "next_checks": next_checks(conclusion, vm),
+        "vm": vm.identity() | {"notes": vm.notes, "read_at": now},
+        "machine": verdict.as_dict()
+        | {
+            "question": vm.question.__dict__ if vm.question else None,
+            "boot_time": vm.boot_time,
+            "tools_version_status": vm.tools_version_status,
+            "guest_state": vm.guest_state,
+            "ip_address": vm.ip_address,
+            "num_cpu": vm.num_cpu,
+            "disk_chain": vm.disk_chain,
+        },
+        "window": {"from": begin, "to": end},
+        "cpu": cpu,
+        "storage": disk,
+        "environment": environment,
+        "boot": logs,
+        "serial_console": serial,
+        "console": console,
+        "host_log": host_log,
+        "events": summarize_events(raw_events) if "events" in events else events,
+    }
+
+
+def diagnose_environment(session: VCenterSession, settings: Settings, *, env_id: str) -> dict[str, Any]:
+    """Every VM of an environment judged, grouped, and checked for CPU and storage."""
+    layout = Layout.of(session)
+    folders = find_environment(layout.folders, env_id, settings.env_parent_hints)
+    if not folders:
+        return {
+            "found": False,
+            "reason": f"no folder on {session.vcenter.name} is named {env_id!r} or contains it",
+        }
+    exact = [folder for folder in folders if folder.name.lower() == env_id.strip().lower()]
+    if len(exact) != 1:
+        return {
+            "found": False,
+            "reason": f"{len(exact) or len(folders)} folders match {env_id!r}; none is unambiguous",
+            "candidates": [{"path": folder.path, "parent": folder.parent_name} for folder in folders[:20]],
+        }
+    folder = exact[0]
+    thresholds = settings.thresholds
+    vms = [vm for vm, _ in read_vms(session, layout, root=session.reference("Folder", folder.moref))]
+    now = session.now()
+    verdicts = [(vm, classify(vm, thresholds)) for vm in vms]
+    if not vms:
+        return {
+            "found": True,
+            "folder": folder.path,
+            "vms": 0,
+            "finding": "the environment folder holds no VMs",
+        }
+    boots = [vm.boot_time for vm in vms if vm.boot_time]
+    begin, end = window(now, min(boots) if boots else None)
+    env_hosts = [
+        layout.hosts[moref]
+        for moref in {vm.host_moref for vm in vms if vm.host_moref}
+        if moref in layout.hosts
+    ]
+    cpu = piece(
+        "CPU",
+        lambda: dict(
+            zip(
+                ("hosts", "counters_unavailable"),
+                hosts_cpu(session, env_hosts, begin=begin, end=end, thresholds=thresholds),
+                strict=True,
+            )
+        ),
+    )
+    names = {name for vm in vms for name in vm.datastores}
+    stores = [store for store in layout.datastores.values() if store.get("name") in names]
+    disk = piece(
+        "storage",
+        lambda: storage(
+            session,
+            {host.moref: host.name for host in env_hosts},
+            stores,
+            begin=begin,
+            end=end,
+            thresholds=thresholds,
+        ),
+    )
+    pattern = environment_pattern(vms[0], verdicts)
+    findings = list(pattern["findings"])
+    over = [host for host in (cpu.get("hosts") or {}).values() if host.get("overcommitted")]
+    findings.extend(
+        f"host {host['name']} CPU demand peaked at {host['peak_percent_of_capacity']}% of capacity"
+        for host in over
+    )
+    findings.extend(disk.get("findings", []))
+    abnormal = [(vm, verdict) for vm, verdict in verdicts if verdict.state in ABNORMAL]
+    if not findings:
+        findings.append(
+            "no abnormal VMs"
+            if not abnormal
+            else "abnormal VMs, but no shared host or storage cause stands out"
+        )
+    return {
+        "found": True,
+        "folder": folder.path,
+        "folder_parent": folder.parent_name,
+        "finding": findings[0],
+        "findings": findings,
+        "counts_by_state": pattern["counts_by_state"],
+        "vms": [vm.identity() | {"verdict": verdict.as_dict()} for vm, verdict in verdicts],
+        "window": {"from": begin, "to": end},
+        "hosts_cpu": cpu,
+        "storage": disk,
+        "pattern": pattern,
+        "next": "diagnose_vm on one abnormal VM for its console, vmware.log and serial console",
+    }

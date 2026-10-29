@@ -1,6 +1,9 @@
 # Plan: vSphere and vROps for incident diagnosis (an MCP and a skill)
 
-Status: proposal. Nothing is built. Section 11 lists the open questions.
+Status: the MCP is built in `servers/vsphere-mcp/` (see its README) and tested
+against two simulated vCenters in Docker; section 12 says what was built and
+what was not. The `vm-incident` skill and the PowerFlex adapter are not built
+yet. Section 11 lists the open questions.
 
 ## 1. What it is
 
@@ -544,3 +547,41 @@ carries more of the reasoning:
 10. **Later, optional**: a serial port writing to a file in the templates,
     with EMS for Windows and the kernel console for Linux (section 6.5),
     once the lab shows what EMS writes on the desktop versions.
+
+## 12. What was built
+
+`servers/vsphere-mcp/`, in the Sahara MCP's style (pydantic-settings, stdio and
+Streamable HTTP, bounded results, ruff with every rule):
+
+- **Read-only by construction.** `ReadOnlyStub` refuses any vSphere method off
+  a 13-method list before sending it; HTTP is GET only; the console is read
+  through `/screen`, never `CreateScreenshot_Task`. A test proves every call
+  the tools make is on the list, and another tries six kinds of write through
+  a live session and sees each refused.
+- **Both ways in.** `diagnose_vm` from a Sahara error (vCenter by any spelling,
+  env id, machine name inside its folder); `scan` / `explain_group` /
+  `diagnose_window` from a question about the fleet.
+- **Discovery, not constants.** Environment folders found by name under any
+  parent and reported with their path; ambiguity reported; group values
+  qualified by vCenter.
+- **The two known causes checked first**: CPU ready per vCPU and host demand
+  against capacity; datastore, device and queue latency. The healthy VMs
+  beside a stuck one are used as evidence for or against each cause.
+- **Linked clones**: disk chains read, VMs grouped by base disk.
+- **The boot**: a timeline from `vmware.log` (ESXi 6 and 7+ formats), rotated
+  logs listed, EMS and Linux serial consoles read when present (stop codes
+  mapped to the layer they usually point at), the console reduced to words.
+- **vROps** (when configured): find, stat keys, stats, window against previous
+  days, alerts.
+
+Tested: 65 unit tests, 35 integration tests against `vmware/vcsim` built
+into an environments-kind and a projects-kind vCenter (linked clones, hung
+and busy Windows VMs, a question, a boot loop, an EMS stop code, a Linux soft
+lockup, an env id on both vCenters, names reused across environments). The
+simulator's random counters are replaced by controlled ones; it has no
+`/screen` and no host logs, so those paths are tested as unavailable.
+
+Not built: the PowerFlex adapter (section 6.7; no simulator, and its API
+version is question 5), and the skill (section 8). `get_environment` became
+part of `find_environment` and `diagnose_environment`.
+
