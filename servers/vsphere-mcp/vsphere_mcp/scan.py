@@ -532,15 +532,20 @@ def window_on_vcenter(
     by_host: Counter[str] = Counter()
     by_type: Counter[str] = Counter()
     by_folder_vm: Counter[str] = Counter()
+    vm_names: dict[str, str] = {}
     for event in events:
         kind = type(event).__name__.rsplit(".", 1)[-1]
         by_type[kind] += 1
         host = getattr(getattr(event, "host", None), "name", None)
         if host:
             by_host[host] += 1
-        vm = getattr(getattr(event, "vm", None), "name", None)
-        if vm:
-            by_folder_vm[vm] += 1
+        vm_arg = getattr(event, "vm", None)
+        vm_ref = getattr(vm_arg, "vm", None)
+        if vm_ref is not None:
+            # By moref, not name: names are reused across short-lived environments.
+            moref = vm_ref._moId  # noqa: SLF001
+            by_folder_vm[moref] += 1
+            vm_names[moref] = getattr(vm_arg, "name", None) or moref
     hosts = [host for host in _hosts(session) if host.connection_state in (None, "connected")]
     cpu, unknown = hosts_cpu(session, hosts, begin=begin, end=end, thresholds=thresholds)
     disk = storage(
@@ -556,7 +561,9 @@ def window_on_vcenter(
         "events_capped": len(events) >= QUERY_EVENTS_CAP,
         "events_by_type": dict(by_type),
         "events_by_host": dict(by_host.most_common(15)),
-        "vms_with_most_events": dict(by_folder_vm.most_common(15)),
+        "vms_with_most_events": {
+            f"{vm_names.get(moref, moref)} ({moref})": count for moref, count in by_folder_vm.most_common(15)
+        },
         "hosts_over_cpu_threshold": [
             host for host in cpu.values() if host.get("overcommitted") or host.get("near_capacity")
         ],

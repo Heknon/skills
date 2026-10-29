@@ -843,3 +843,51 @@ def test_latest_reboot_picks_the_most_recent_event_per_vm() -> None:
     assert latest["vm-1"] == NOW - timedelta(minutes=5)
     assert latest["vm-2"] == NOW - timedelta(minutes=10)
     assert "vm-3" not in latest
+
+
+# -- session re-login and concurrency ---------------------------------------------------------
+
+
+def test_reconnect_is_a_no_op_when_another_caller_already_relogged(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = Settings.from_environment(
+        {"VSPHERE_VCENTERS": '[{"name": "vc-a", "host": "a"}]', "VSPHERE_USERNAME": "u", "VSPHERE_PASSWORD": "p"}
+    )
+    session = VCenterSession(settings.vcenters[0], settings)
+    logins = {"n": 0}
+
+    def fake_login() -> None:
+        logins["n"] += 1
+        session._content = object()
+        session.generation += 1
+
+    monkeypatch.setattr(session, "_login", fake_login)
+
+    session.connect()  # first login
+    assert session.generation == 1
+    seen = session.generation
+
+    # Two callers both saw generation 1 and try to reconnect; only the first does.
+    session.reconnect(seen)
+    session.reconnect(seen)  # generation moved to 2, so this is a no-op
+
+    assert logins["n"] == 2  # connect + one reconnect, not two reconnects
+    assert session.generation == 2
+
+
+def test_connect_logs_in_once_under_contention(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = Settings.from_environment(
+        {"VSPHERE_VCENTERS": '[{"name": "vc-a", "host": "a"}]', "VSPHERE_USERNAME": "u", "VSPHERE_PASSWORD": "p"}
+    )
+    session = VCenterSession(settings.vcenters[0], settings)
+    logins = {"n": 0}
+
+    def fake_login() -> None:
+        logins["n"] += 1
+        session._content = object()
+        session.generation += 1
+
+    monkeypatch.setattr(session, "_login", fake_login)
+    session.connect()
+    session.connect()  # already connected
+
+    assert logins["n"] == 1

@@ -18,6 +18,7 @@ import collections
 import contextlib
 import logging
 import ssl
+import threading
 import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -135,11 +136,17 @@ class VCenterSession:
         self._stub: ReadOnlyStub | None = None
         self._http: httpx.Client | None = None
         self._counters: dict[str, Any] | None = None
+        self._raw: Any = None
+        # Guards every login and logout, so concurrent worker threads cannot open
+        # two sessions or stomp each other's. `generation` rises on each login, so
+        # a caller can tell whether the session it used has since been replaced.
+        self._lock = threading.Lock()
+        self.generation = 0
 
     # -- the session ---------------------------------------------------------
 
-    def connect(self) -> None:
-        """Log in and put the read-only stub between this session and vCenter."""
+    def _login(self) -> None:
+        """Open a fresh session, disconnecting any old one first. Call under `_lock`."""
         username, password = self.settings.credentials_for(self.vcenter)
         try:
             raw = SmartConnect(
@@ -149,6 +156,10 @@ class VCenterSession:
                 pwd=password,
                 sslContext=ssl_context(self.settings),
                 connectionPoolTimeout=int(self.settings.timeout_seconds),
+                # A read timeout on the SOAP socket: a vCenter that stalls mid-reply
+                # raises instead of blocking the worker thread forever, which would
+                # otherwise leak threads until every tool queues behind them.
+                httpConnectionTimeout=self.settings.timeout_seconds,
             )
         except vim.fault.InvalidLogin as error:
             msg = f"vCenter {self.vcenter.name}: login refused for {username!r}"
@@ -156,6 +167,7 @@ class VCenterSession:
         except (OSError, ssl.SSLError) as error:
             msg = f"vCenter {self.vcenter.name} ({self.vcenter.host}) unreachable: {error}"
             raise VSphereError(msg) from error
+        self._teardown()
         self._stub = ReadOnlyStub(raw._stub)  # noqa: SLF001 - wrapping is the point
         self._service = vim.ServiceInstance("ServiceInstance", self._stub)
         self._content = self._service.RetrieveContent()
@@ -169,18 +181,45 @@ class VCenterSession:
             # attaches another credential to it.
             trust_env=False,
         )
+        self.generation += 1
 
-    def close(self) -> None:
-        """Log out and drop the HTTP client; safe to call twice."""
+    def _teardown(self) -> None:
+        """Close the HTTP client and log the current session out. Call under `_lock`."""
         if self._http is not None:
-            self._http.close()
+            with contextlib.suppress(Exception):
+                self._http.close()
             self._http = None
-        if self._service is not None:
+        if self._raw is not None:
             with contextlib.suppress(Exception):
                 Disconnect(self._raw)
+            self._raw = None
         self._service = None
         self._content = None
         self._counters = None
+
+    def connect(self) -> None:
+        """Log in if not already connected. Safe to call from several threads."""
+        if self._content is not None:
+            return
+        with self._lock:
+            if self._content is None:
+                self._login()
+
+    def reconnect(self, seen_generation: int) -> None:
+        """Log in afresh after a session expiry, unless another caller already did.
+
+        `seen_generation` is the generation the caller was using; if it has moved,
+        someone has already reconnected and this is a no-op, so concurrent callers
+        do not log each other's new sessions out.
+        """
+        with self._lock:
+            if self.generation == seen_generation:
+                self._login()
+
+    def close(self) -> None:
+        """Log out and drop the HTTP client; safe to call twice."""
+        with self._lock:
+            self._teardown()
 
     @property
     def content(self) -> Any:
@@ -350,8 +389,12 @@ class VCenterSession:
         have come back in the second element instead of failing the read.
         """
         known = self.counters()
-        wanted = [name for name in counter_names if name in known]
-        unknown = [name for name in counter_names if name not in known]
+        # Dedupe while keeping order: a caller may pass a counter in two groups
+        # (cpu.usagemhz is in both the VM and host sets), and naming it twice in
+        # one QuerySpec is wrong.
+        requested = list(dict.fromkeys(counter_names))
+        wanted = [name for name in requested if name in known]
+        unknown = [name for name in requested if name not in known]
         if not wanted or not entities:
             return {}, unknown
         now = self.now()
@@ -413,6 +456,8 @@ class VCenterSession:
             last = header.lineEnd
             start = max(1, last - lines + 1)
             body = manager.BrowseDiagnosticLog(host=host, key=key, start=start, lines=lines)
+        except vim.fault.NotAuthenticated:
+            raise  # let run() reconnect and retry, rather than hiding it as "no log"
         except (vmodl.fault.NotSupported, vmodl.MethodFault, vmodl.RuntimeFault) as fault:
             descriptions = []
             with contextlib.suppress(Exception):
@@ -581,7 +626,6 @@ class VCenterPool:
         self.settings = settings
         self._sessions: dict[str, VCenterSession] = {}
         self._limits: dict[str, asyncio.Semaphore] = {}
-        self._connect_locks: dict[str, asyncio.Lock] = {}
 
     def names(self) -> list[str]:
         """The configured vCenters, by the name tools use."""
@@ -596,22 +640,20 @@ class VCenterPool:
         if name not in self._sessions:
             self._sessions[name] = VCenterSession(self.settings.vcenter(name), self.settings)
             self._limits[name] = asyncio.Semaphore(self.settings.max_concurrent_per_vcenter)
-            self._connect_locks[name] = asyncio.Lock()
         return self._sessions[name]
 
     async def run(self, name: str, work: Callable[[VCenterSession], T]) -> T:
         """Run one blocking read against a vCenter, bounded and with one re-login."""
         session = self.session(name)
         async with self._limits[name]:
-            if session._content is None:  # noqa: SLF001 - connect once, not per call
-                async with self._connect_locks[name]:
-                    if session._content is None:  # noqa: SLF001
-                        await self._bounded(session.connect)
+            await self._bounded(session.connect)
+            generation = session.generation
             try:
                 return await self._bounded(lambda: work(session))
             except vim.fault.NotAuthenticated:
-                session.close()
-                await self._bounded(session.connect)
+                # The session expired. Reconnect (a no-op if a sibling call already
+                # did, so we never log its new session out), then retry once.
+                await self._bounded(lambda: session.reconnect(generation))
                 return await self._bounded(lambda: work(session))
 
     async def _bounded(self, work: Callable[[], T]) -> T:

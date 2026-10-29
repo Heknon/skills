@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import http.client
 import io
 import logging
 import re
@@ -21,11 +22,12 @@ from datetime import UTC, datetime, timedelta
 from functools import wraps
 from typing import TYPE_CHECKING, Any
 
+import httpx
 from mcp.server import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from PIL import Image
-from pyVmomi import vim
+from pyVmomi import vim, vmodl
 from starlette.responses import JSONResponse
 
 from vsphere_mcp import ages
@@ -61,7 +63,17 @@ if TYPE_CHECKING:
 
 # Failures a caller can act on: a bad argument, an unreachable or slow vCenter,
 # a vROps refusal, a refused write. Their message reaches the model.
-ANTICIPATED = (ValueError, re.error, VSphereError, VropsError, ReadOnlyViolationError)
+ANTICIPATED = (
+    ValueError,
+    re.error,
+    VSphereError,
+    VropsError,
+    ReadOnlyViolationError,
+    vmodl.MethodFault,
+    httpx.HTTPError,
+    http.client.HTTPException,
+    OSError,
+)
 
 READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True)
 MAX_LIMIT = 500
@@ -600,7 +612,7 @@ def _register_piece_tools(  # noqa: C901 - one closure per tool
 
         Args:
             vcenter: the VM's vCenter.
-            moref: the VM's moref; works for a destroyed VM too.
+            moref: the VM's moref, while the VM exists; for a destroyed VM use diagnose_window.
             minutes: how far back.
 
         """
@@ -608,11 +620,22 @@ def _register_piece_tools(  # noqa: C901 - one closure per tool
 
         def run(session: VCenterSession) -> dict[str, Any]:
             now = session.now()
-            events = session.events(
-                entity=session.reference("VirtualMachine", moref),
-                begin=now - timedelta(minutes=max(1, minutes)),
-                end=now,
-            )
+            try:
+                events = session.events(
+                    entity=session.reference("VirtualMachine", moref),
+                    begin=now - timedelta(minutes=max(1, minutes)),
+                    end=now,
+                )
+            except vmodl.fault.ManagedObjectNotFound:
+                return {
+                    "vcenter": name,
+                    "moref": moref,
+                    "found": False,
+                    "reason": (
+                        f"{moref} no longer exists, so its events cannot be queried by entity; use "
+                        "diagnose_window over the time it existed to see what happened to the environment"
+                    ),
+                }
             return {"vcenter": name, "moref": moref, "count": len(events), "events": summarize_events(events)}
 
         return await fleet.run(name, run)

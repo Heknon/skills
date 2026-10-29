@@ -118,7 +118,7 @@ class Layout:
     @classmethod
     def of(cls, session: VCenterSession) -> Layout:
         """The cached layout of this session's vCenter, re-read when older than a minute."""
-        key = f"{session.vcenter.name}:{id(session)}"
+        key = f"{session.vcenter.name}:{id(session)}:{session.generation}"
         hit = cls._cache.get(key)
         if hit and time.monotonic() - hit[0] < LAYOUT_TTL_SECONDS:
             return hit[1]
