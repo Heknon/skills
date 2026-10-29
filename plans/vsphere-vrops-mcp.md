@@ -481,11 +481,25 @@ carries more of the reasoning:
 
 ## 9. Security
 
-- **Read-only accounts, one per vCenter**, with a custom role: read
-  inventory, console screen read, datastore browse and file read,
-  diagnostics (host logs). No other privilege. The exact privilege per
-  tool, and that the console route needs nothing that writes, are
-  confirmed in the lab.
+- **Read-only by construction, whatever the account can do.** The
+  accounts available can write. The server therefore enforces read-only
+  itself and does not rely on the account: it calls only an allowlist of
+  read methods (`PropertyCollector` retrieval, `QueryEvents`, task
+  history, `QueryPerf`, `BrowseDiagnosticLog`, `SearchDatastore_Task` and
+  HTTPS `GET` on `/folder` and `/screen`), and a test fails if any other
+  vSphere method is reachable from a tool. `SearchDatastore_Task` is a
+  task but writes nothing; no method that changes a VM, a host, a folder
+  or a datastore file is in the list.
+- **And, where possible, a read-only role too.** With a write account a
+  dedicated service account with a custom read-only role (read inventory,
+  console screen read, datastore browse and file read, diagnostics) can
+  be created, so the guarantee holds twice: in code and in vCenter. The
+  exact privilege per tool, and that the console route needs nothing that
+  writes, are confirmed in the lab.
+- **Why the agent never gets `govc` with these credentials**: a model
+  with a shell and a write account can run any command, read-only skill
+  or not. The skill's `govc` recipes are for a person in phase 0; the
+  agent's access goes through the MCP.
 - **The same for vROps and PowerFlex**: read-only API users.
 - **TLS verified** against your internal CA, never turned off.
 - **Credentials only in the server's environment**, never in tool
@@ -523,7 +537,7 @@ carries more of the reasoning:
    where starved becomes an error.
 7. **Does your GLM 5.3 client pass image content** from an MCP result to
    the model? *Default: no; the text form of the screenshot carries it.*
-8. **Will the bare metal team grant the read-only accounts?**
+8. ~~Accounts~~: available, with write access; read-only is enforced by the server (section 9), and a read-only role created where possible.
 9. **Linked clones**: are the base disks per template, or replicas per
    datastore? How many clones share one base at peak? Answerable from the
    lab data in phase 0; nothing waits on it.
