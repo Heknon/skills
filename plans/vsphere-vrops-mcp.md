@@ -131,13 +131,51 @@ All read-only. Every result names the vCenter, the moref, the
 | `find_environment(env_id)` | which vCenter holds the environment, when the log did not say | the env folder looked up on each vCenter |
 | `get_vm(vcenter, env_id, vm_name)` | the VM's key | inside the env folder only |
 
-### 6.2 The composite diagnoses
+### 6.2 Scanning: the other way in
+
+Not every investigation starts from a Sahara error. "Look at `vc-04` and
+find anything abnormal", "are there machines on these three vCenters that
+booted more than 10 minutes ago and never came up?" are first-class
+questions, answered on demand and read-only.
 
 | Tool | Answers |
 | --- | --- |
-| **`diagnose_vm(vcenter, env_id, vm_name)`** | the flow of section 3, step 2: machine, console, `vmware.log`, host, datastore, the rest of the environment, a finding |
-| **`diagnose_environment(vcenter, env_id)`** | every VM of the environment classified (healthy, starved, stuck, blocked on a question, off), grouped by host and datastore, the CPU and storage checks for each group, a finding |
-| `diagnose_window(vcenters, since, until)` | the fleet view for when many environments failed at once: the env folders with affected VMs, grouped by host, cluster and datastore, with the CPU and storage checks |
+| **`scan(vcenters=[...] or all, checks=all, min_uptime_min=10)`** | every VM on the vCenters asked for, classified; the abnormal ones returned with their class, env folder, host and datastore, and grouped by vCenter, cluster, host, datastore and env, each group against its population ("29 of 210 VMs on `ds-17`") |
+| `explain_group(scan_id, group)` | runs the CPU and storage checks for one group and compares it with the healthy VMs around it: what the stuck ones share that the rest do not |
+| `diagnose_window(vcenters, since, until)` | the same for a past window, from events and counters, when the VMs may already be gone |
+
+One `PropertyCollector` call per vCenter over a `ContainerView`, asking
+only for what the checks need (`runtime.powerState`, `runtime.bootTime`,
+`runtime.question`, `runtime.connectionState`, `guest.toolsRunningStatus`,
+`guestHeartbeatStatus`, `guest.ipAddress`, `summary.quickStats`,
+`runtime.host`, `datastore`, `parent`), so a scan of nine vCenters is
+nine cheap calls, not thousands.
+
+The checks, with thresholds in config:
+
+| Check | Rule |
+| --- | --- |
+| `booted_not_up` | powered on, booted more than N minutes ago, Tools not running |
+| `hung` | booted not up, CPU near zero |
+| `busy_not_up` | booted not up, CPU busy: starved, spinning or boot-looping; the CPU and storage checks decide which |
+| `boot_loop` | several resets or guest reboots in the last N minutes, from events |
+| `blocked_on_question` | a pending VM question |
+| `lost_heartbeat` | Tools were running, heartbeat now gray or red |
+| `inaccessible` | disconnected, inaccessible, orphaned or invalid |
+| `overcommitted_host` | a host above the CPU demand threshold, with the VMs on it |
+| `slow_datastore` | a datastore above the latency threshold, with the VMs on it |
+
+A scan answers "what is wrong and where"; `explain_group` and
+`diagnose_vm` on two or three representatives answer "why". The scan
+picks the representatives, so the model does not diagnose 40 VMs one by
+one.
+
+### 6.3 The composite diagnoses
+
+| Tool | Answers |
+| --- | --- |
+| **`diagnose_vm(vcenter, env_id, vm_name)`** or `diagnose_vm(key)` | the flow of section 3, step 2: machine, console, boot timeline (6.5), host, datastore, the rest of the environment, a finding |
+| **`diagnose_environment(vcenter, env_id)`** | every VM of the environment classified, grouped by host and datastore, the CPU and storage checks for each group, a finding |
 
 Each composite runs the checks in a fixed order, with thresholds in
 config tuned on past incidents, so the answer does not depend on the
@@ -162,7 +200,7 @@ model remembering what to look at:
 
 A third recurring cause, once found, becomes a sixth check.
 
-### 6.3 The pieces, to drill into one finding
+### 6.4 The pieces, to drill into one finding
 
 | Tool | Answers | API |
 | --- | --- | --- |
@@ -192,7 +230,80 @@ Ready time is reported as a percentage per vCPU, not raw milliseconds.
 vCenter keeps 20-second samples for about an hour and coarser rollups
 after that; for older windows the checks use vROps and say so.
 
-### 6.4 vROps
+### 6.5 The boot timeline: what the logs can and cannot show
+
+The question "did the machine try to boot and then the kernel timed out?"
+has a precise answer, and it is "partly, and fully only if the template
+cooperates".
+
+**What `vmware.log` is.** The log of the VMX, the hypervisor process that
+*runs* the VM, not of the guest. It sees the virtual hardware from the
+outside. It does not see the guest kernel's messages: a kernel's "timed
+out waiting for device", a hung task warning, a panic's text, a dracut
+emergency shell, a Windows stop code go to the guest's screen and the
+guest's own logs, never to `vmware.log`.
+
+**What it does show, and what that lets you infer.** The guest's
+progress through boot leaves marks on the virtual hardware, and the VMX
+logs some of them. A timeline built from those marks says *how far* the
+boot got:
+
+| Stage | Mark in `vmware.log` (exact lines to confirm on your logs) | If the timeline stops here |
+| --- | --- | --- |
+| Power-on or reset | the power-on or reset itself, with a timestamp | the VM never started: the events and the host say why |
+| Firmware (BIOS/EFI) | firmware messages, boot device attempts | no bootable disk, or the firmware stalled on storage |
+| Bootloader and kernel start | the first disk reads and writes after the reset | the bootloader or the early kernel stalled: compare with the datastore latency at that minute |
+| Kernel drivers loading | the guest's paravirtual drivers announcing themselves (VMXNET3 network, PVSCSI storage, SVGA graphics resolution change) | the kernel ran far enough to load drivers, then stopped: root filesystem, a device timeout, a panic |
+| Tools start | Tools state and version reported, the guest RPC channel opening | Tools started: the problem is after boot, or a timeout upstream |
+| Faults | a triple fault, a monitor panic, a guest-requested reset | the guest crashed hard enough for the hypervisor to see it |
+| Storage trouble | SCSI resets, aborted commands, long stuns | the I/O path stalled under the guest |
+
+So `vmware.log` can say "the kernel loaded its drivers at 02:14:40 and
+then Tools never started", and with the datastore latency at that minute
+and the console, the diagnosis is usually clear. It cannot quote the
+kernel's own error.
+
+**Four sources together give the full picture:**
+
+1. **`vmware.log`**: the stages above, and the rotated `vmware-N.log` for
+   the boot before the reboot.
+2. **The console**: if the guest prints text, the last screen *is* the
+   kernel's or the bootloader's last message, and OCR turns it into text
+   (a dracut timeout, a panic, "waiting for root device"). A black screen
+   is weaker: it may be a hang, a graphical splash hiding the messages, or
+   a blanked display. Two captures show frozen or changing.
+3. **The VM's own counters for its short life**: disk reads and CPU over
+   the boot. Busy CPU and steady I/O is a slow boot; CPU near zero and no
+   I/O after the bootloader is a guest waiting on something that will not
+   come.
+4. **The host's `vmkernel` log**: "performance has deteriorated" latency
+   warnings and path errors for the datastore's device, at the minute the
+   timeline stopped.
+
+**Getting the kernel's own words**, read-only on our side, with one
+change to the templates on theirs:
+
+- **A virtual serial port that writes to a file** in the VM's datastore
+  folder, and the guest kernel booted with its console on that port
+  (`console=ttyS0` alongside the normal one, for Linux). Then every
+  kernel line, timeouts and panics included, lands in a file that
+  `read_vm_log` can read like `vmware.log`. This is the only way to see
+  the guest kernel's messages from vCenter without the guest running.
+- **No graphical splash and no `quiet`** on the kernel command line, so
+  the console shows text and the screenshot OCR has something to read.
+- For **Windows** guests, the equivalent is boot logging and a serial
+  debug port; less useful, and to be checked against the guest versions.
+
+Both are template changes owned by whoever builds the templates; the MCP
+only reads what they produce. Without them, the timeline and the console
+are what there is, and the diagnosis says so.
+
+| Tool | Answers |
+| --- | --- |
+| **`get_boot_timeline(key)`** | the stages reached, with times, from `vmware.log`, the VM's counters, the console and, if present, the serial log; the last stage reached and what was happening on the host and datastore at that minute |
+| `read_serial_log(key, grep, tail)` | the guest's serial console file, when the template has one |
+
+### 6.6 vROps
 
 For the long-lived things (hosts, clusters, datastores); a 30-minute VM
 barely registers.
@@ -203,7 +314,7 @@ barely registers.
 | `vrops_compare_window(resource, window, baseline_days)` | the incident window against the same window on previous days: spike, or normal for this cluster? |
 | `vrops_get_alerts(resource, since)` | alerts and symptoms on it and its parents |
 
-### 6.5 PowerFlex (optional)
+### 6.7 PowerFlex (optional)
 
 vCenter sees PowerFlex only as a slow device. Which pool or storage node
 was saturated, whether a rebuild or rebalance was running, and which
@@ -239,8 +350,11 @@ carries more of the reasoning:
 
 ## 8. The skill: `vm-incident`
 
-1. **The ladder**: Sahara Tools error (vCenter, machine, env id, time) →
-   `diagnose_vm` → if the rest of the environment is affected,
+1. **Two entries.** From a Sahara error: the error's vCenter, machine and
+   env id → `diagnose_vm`. From a question about the fleet: `scan` → the
+   groups → `explain_group` → `diagnose_vm` on the representatives.
+   **The ladder** from a Sahara error: Sahara Tools error (vCenter,
+   machine, env id, time) → `diagnose_vm` → if the rest of the environment is affected,
    `diagnose_environment` → if many environments failed in the same
    window, `diagnose_window` → vROps for the history of the hosts or
    datastores named → PowerFlex if storage was named → Sims logs for what
@@ -296,8 +410,8 @@ carries more of the reasoning:
 | Phase | Builds | Done when |
 | --- | --- | --- |
 | **0. Collect** (days) | read-only `govc` runs against an affected environment during a real incident, plus the logs of the two past ones | the thresholds and the `vmware.log` / `vmkernel` lines of a starved and a hung boot are on file |
-| **1. Lookup + `diagnose_vm`** | 6.1, 6.2 (`diagnose_vm`, `diagnose_environment`), 6.3 | a Sahara Tools error taken to the right machine and a correct finding, on the next live incident |
-| **2. vROps + PowerFlex + `diagnose_window`** | 6.4, 6.5, the fleet view | the CPU incident and the PowerFlex incident each named, including for windows older than an hour |
+| **1. Scan, lookup, diagnose** | 6.1–6.5 (`scan`, `diagnose_vm`, `diagnose_environment`, `get_boot_timeline`) | a Sahara Tools error taken to the right machine, and a scan of the nine vCenters, each ending in a correct finding on the next live incident |
+| **2. vROps + PowerFlex + `diagnose_window`** | 6.6, 6.7, past windows | the CPU incident and the PowerFlex incident each named, including for windows older than an hour |
 | **3. Skill, full** | section 8 with evals | evals pass with GLM 5.3 in your client |
 
 ## 11. Open questions
@@ -320,3 +434,8 @@ carries more of the reasoning:
 7. **Does your GLM 5.3 client pass image content** from an MCP result to
    the model? *Default: no; the text form of the screenshot carries it.*
 8. **Will the bare metal team grant the read-only accounts?**
+9. **The guests**: Linux, Windows, or both, and which versions? It decides
+   what the console shows and how a serial log is set up.
+10. **Can the templates get a serial port to a file and a text console**
+    (section 6.5)? That is the difference between "the kernel stopped
+    after loading its drivers" and the kernel's own timeout message.
