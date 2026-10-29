@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 import httpx
 import pytest
 from PIL import Image
-from pyVmomi import vmodl
+from pyVmomi import vim, vmodl
 
 from vsphere_mcp import ages, checks, console, contention, diagnose, formatting, scan, vmlog
 from vsphere_mcp.config import Settings, Thresholds, VCenter
@@ -20,6 +20,7 @@ from vsphere_mcp.inventory import (
     Inventory,
     Question,
     VmFacts,
+    describe_devices,
     find_environment,
     os_family,
     set_effective_boot,
@@ -495,7 +496,7 @@ def conclude(**parts: dict) -> dict:
     }
     defaults.update(parts)
     machine = vm(cpu_mhz=3600.0)
-    return diagnose.conclude(checks.classify(machine, LIMITS), **defaults)
+    return diagnose.conclude(checks.classify(machine, LIMITS), vm=machine, **defaults)
 
 
 def test_cpu_evidence_from_three_places_is_high_confidence() -> None:
@@ -975,3 +976,61 @@ def test_connect_logs_in_once_under_contention(monkeypatch: pytest.MonkeyPatch) 
     session.connect()  # already connected
 
     assert logins["n"] == 1
+
+
+# -- virtual hardware --------------------------------------------------------------------------
+
+
+class _Connectable:
+    def __init__(self, connected: bool, *, start: bool = True, status: str = "ok") -> None:
+        self.connected = connected
+        self.startConnected = start
+        self.status = status
+
+
+def _dev(
+    cls_name: str, label: str, connectable: _Connectable | None = None, backing: object = None
+) -> object:
+    device = getattr(vim.vm.device, cls_name)()
+    device.deviceInfo = vim.Description(label=label, summary="")
+    if connectable is not None:
+        device.connectable = vim.vm.device.VirtualDevice.ConnectInfo(
+            connected=connectable.connected,
+            startConnected=connectable.startConnected,
+            status=connectable.status,
+        )
+    if backing is not None:
+        device.backing = backing
+    return device
+
+
+def test_hardware_classifies_devices_and_flags_a_down_boot_nic() -> None:
+    iso = vim.vm.device.VirtualCdrom.IsoBackingInfo(fileName="[ds] images/win.iso")
+    devices = [
+        _dev("ParaVirtualSCSIController", "pvscsi-0"),
+        _dev("VirtualE1000", "ethernet-0", _Connectable(connected=False, start=True)),
+        _dev("VirtualCdrom", "cdrom-0", _Connectable(connected=True), backing=iso),
+        _dev("VirtualHdAudioCard", "sound-0"),
+    ]
+
+    described, findings, blocking = describe_devices(devices, powered_on=True)
+
+    categories = {entry["label"]: entry["category"] for entry in described}
+    assert categories == {
+        "pvscsi-0": "controller",
+        "ethernet-0": "ethernet",
+        "cdrom-0": "cdrom",
+        "sound-0": "sound",
+    }
+    assert any("ethernet-0" in finding and "not connected" in finding for finding in blocking)
+    assert any("ISO" in finding for finding in findings)
+    assert not any("ISO" in finding for finding in blocking)  # a mounted ISO is a note, not blocking
+
+
+def test_hardware_ignores_connection_state_when_powered_off() -> None:
+    devices = [_dev("VirtualE1000", "ethernet-0", _Connectable(connected=False, start=True))]
+
+    _, findings, blocking = describe_devices(devices, powered_on=False)
+
+    assert findings == []
+    assert blocking == []

@@ -32,6 +32,8 @@ One VM has exactly one state. The state is the symptom; the cause is below it.
 | **Linked-clone boot storm** | many clones of one base disk stuck together, while clones of other bases are fine; the shared datastore slow | clones of the same base booted fine at the same time |
 | **Host memory pressure** | the VM's host near memory capacity; the VM ballooned, swapped or compressed (`memory_reclaimed` flag) | host memory healthy; nothing reclaimed |
 | **Pending VM question** | `runtime.question` set, with its choices | no question |
+| **A virtual device blocks the boot** | `get_vm_hardware` / `diagnose_vm`'s hardware findings: a disconnected boot NIC (PXE/DHCP fails), a stale ISO mounted on the CD-ROM, a device in an error state | every device connected and healthy |
+| **The vCenter is exhausted** (not a VM) | SSL EOF / resets / timeouts across callers; `check_vcenters` shows a high or climbing session count or a slow login | the vCenter's sessions and login are normal |
 | **Windows crashed (stop error)** | a stop code on the EMS serial console, or a blue screen on the console | the console shows the logon screen |
 | **Windows still working (slow, not hung)** | CPU busy; the console changes; on screen: updates, "Getting devices ready", a disk check | the console is frozen; CPU near zero |
 | **Guest hung early in boot** | near-zero CPU; console black and unchanged across two captures; `vmware.log` stops after the firmware or the first disk I/O; host and storage healthy | the console changes; the boot reached the drivers or Tools |

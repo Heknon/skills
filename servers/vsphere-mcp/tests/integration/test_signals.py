@@ -186,3 +186,27 @@ def test_vms_outside_any_environment_are_marked(server: MCPServer) -> None:
     assert all(
         not entry["root_vm_folder"] for entry in result["environments"] if entry["folder"] != "/DC0/vm"
     )
+
+
+# -- virtual hardware and vCenter health -----------------------------------------------------
+
+
+def test_get_vm_hardware_lists_the_virtual_devices(server: MCPServer, worlds: tuple[Any, ...]) -> None:
+    moref = worlds[0].moref("environments/env-1001", "web-01")
+
+    result = call(server, "get_vm_hardware", {"vcenter": "vc-a", "moref": moref})
+
+    categories = {entry["category"] for entry in result["devices"]}
+    assert "ethernet" in categories
+    assert "disk" in categories
+    assert "findings" in result
+
+
+def test_check_vcenters_reports_reachability_and_sessions(server: MCPServer) -> None:
+    result = call(server, "check_vcenters")
+
+    names = {row["name"] for row in result["vcenters"] if row.get("reachable")}
+    assert names == {"vc-a", "vc-b"}
+    reachable = next(row for row in result["vcenters"] if row["name"] == "vc-a")
+    assert "login_seconds" in reachable
+    assert reachable["sessions"]["visible"] in ("all", "own_only")

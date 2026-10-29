@@ -1,14 +1,21 @@
 ---
 name: vm-incident
-description: Diagnose why a Sahara test environment's machines did not come back, from a VMware Tools error after a reboot to a named cause, across the four layers Sahara, Sims/Twix, vCenter and vROps. Use when Sahara reports VMware Tools errors, a reboot step failed, a test hangs waiting for its environment, an environment will not come up, machines are stuck after a reboot, or someone asks to find stuck, hung or leftover VMs across the vCenters and understand why. Covers the recurring causes seen here - ESXi CPU overcommit and PowerFlex storage saturation - and tells a VM that is booting slowly from one that is hung. It reads; it changes nothing. Written so the answer comes from a ladder and a cause table, not from judgment.
+description: Diagnose why a Sahara test environment's machines are stuck or unreachable, from the symptom to a named cause, across the four layers Sahara, Sims/Twix, vCenter and vROps. Use when Sahara reports VMware Tools errors, a machine is stuck on boot or after a reboot, hung mid-run, slow to come up, an environment will not come up, a test hangs waiting for its environment, a machine is blocked on a VM question or wedged by a virtual device (a disconnected adapter, a stuck ISO), or someone asks to find stuck, hung or leftover VMs across the vCenters and understand why. Also when the vCenter API itself is failing - SSL EOF errors, connection resets or timeouts, often connection or session exhaustion. Covers the recurring causes seen here - ESXi CPU overcommit and PowerFlex storage saturation - and tells a VM that is booting slowly from one that is hung. It reads; it changes nothing. Written so the answer comes from a ladder and a cause table, not from judgment.
 ---
 
 # VM incident
 
-An environment's machines did not come back. This skill is the fixed route
-from that symptom to a cause you can name, with the evidence for it and the
-evidence against. You follow a ladder and read a table; you do not diagnose
-from principles.
+An environment's machines are stuck — not booting, not coming back after a
+reboot, hung mid-run, or unreachable — or the vCenters themselves are refusing
+connections. This skill is the fixed route from that symptom to a cause you can
+name, with the evidence for it and the evidence against. You follow a ladder
+and read a table; you do not diagnose from principles.
+
+"Stuck" is not only "stuck after a reboot": a machine that never finished its
+first boot, one that hangs hours into a run, one slow to come up, one blocked
+on a VM question, and one wedged by a disconnected adapter or a stuck ISO are
+all this skill's work. So is a vCenter that is throwing SSL EOF errors or
+resetting connections — see "When the vCenter is the problem" below.
 
 The machines are short-lived (minutes to a day), their names are reused by the
 next environment, and they are spread by load across nine vCenters. So the
@@ -48,6 +55,25 @@ which rungs of the ladder you cannot climb, and work the ones you can.
 
 Climb the whole ladder from where you enter. Do not start at the bottom: a
 VM's counters mean nothing without the time and the symptom from the top.
+
+## When the vCenter is the problem, not a VM
+
+Sometimes the symptom is the vCenter API itself: SSL EOF errors, connection
+resets, or timeouts, hitting Sims, Sahara and this server alike. That is not a
+stuck VM — it is usually the vCenter at its connection or session limit, and no
+amount of looking at one machine explains it.
+
+Start with **`check_vcenters`**. A high or climbing open-session count, or a
+slow login, on the vCenter that is throwing errors is the cause. The verdict
+then names the vCenter and its session pressure, and the action — shedding
+sessions, raising the limit — is for the bare-metal team, not something this
+server does. If the session count is not visible (the read-only account may not
+be allowed the global list, and `check_vcenters` says so), the login time and
+the pattern of resets across callers are still the signal, and vROps' vCenter
+session metrics are the history.
+
+A VM diagnosis that keeps failing with a dropped-connection error is the same
+story from below: run `check_vcenters` before trusting any one VM's result.
 
 ## The steps
 

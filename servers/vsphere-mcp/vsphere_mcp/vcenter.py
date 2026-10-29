@@ -22,6 +22,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from http.client import HTTPException
 from typing import TYPE_CHECKING, Any, TypeVar
 from urllib.parse import quote
 
@@ -245,6 +246,34 @@ class VCenterSession:
             "api_version": about.apiVersion,
             "instance_uuid": getattr(about, "instanceUuid", None),
             "clock": as_utc(self._service.CurrentTime()),
+        }
+
+    def session_count(self) -> dict[str, Any]:
+        """How many sessions this vCenter has open, from SessionManager.
+
+        A read-only role may not be allowed the global session list; then only
+        this server's own session is visible and the result says so. The count
+        is the signal for connection/session exhaustion that causes SSL EOFs and
+        resets for every client, this MCP, Sims and Sahara alike.
+        """
+        manager = self.content.sessionManager
+        current = getattr(manager.currentSession, "userName", None) if manager.currentSession else None
+        try:
+            sessions = manager.sessionList or []
+        except vim.fault.NoPermission:
+            return {
+                "visible": "own_only",
+                "note": "the account may not list all sessions; grant Sessions.View to see the global count",
+                "current_user": current,
+            }
+        by_user: dict[str, int] = {}
+        for entry in sessions:
+            by_user[entry.userName] = by_user.get(entry.userName, 0) + 1
+        return {
+            "visible": "all",
+            "total": len(sessions),
+            "by_user": dict(sorted(by_user.items(), key=lambda kv: kv[1], reverse=True)[:15]),
+            "current_user": current,
         }
 
     def now(self) -> datetime:
@@ -643,7 +672,7 @@ class VCenterPool:
         return self._sessions[name]
 
     async def run(self, name: str, work: Callable[[VCenterSession], T]) -> T:
-        """Run one blocking read against a vCenter, bounded and with one re-login."""
+        """Run one blocking read against a vCenter, bounded, with one re-login or reconnect."""
         session = self.session(name)
         async with self._limits[name]:
             await self._bounded(session.connect)
@@ -655,6 +684,20 @@ class VCenterPool:
                 # did, so we never log its new session out), then retry once.
                 await self._bounded(lambda: session.reconnect(generation))
                 return await self._bounded(lambda: work(session))
+            except (ssl.SSLError, ConnectionError, HTTPException):
+                # A dropped or reset connection — under load often the vCenter at
+                # its connection or session limit. Reconnect and retry once; if it
+                # happens again, say so plainly rather than as a bare socket error.
+                try:
+                    await self._bounded(lambda: session.reconnect(generation))
+                    return await self._bounded(lambda: work(session))
+                except (ssl.SSLError, ConnectionError, HTTPException) as again:
+                    msg = (
+                        f"vCenter {name} dropped the connection twice ({type(again).__name__}: {again}). "
+                        "Under load this is often the vCenter at its connection or session limit; "
+                        "check_vcenters reports its session count, and vROps has its session history."
+                    )
+                    raise VSphereError(msg) from again
 
     async def _bounded(self, work: Callable[[], T]) -> T:
         try:

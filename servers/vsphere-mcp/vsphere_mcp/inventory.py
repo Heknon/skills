@@ -157,6 +157,9 @@ class VmFacts:
     datastores: list[str] = field(default_factory=list)
     datastore_morefs: list[str] = field(default_factory=list)
     disk_chain: list[list[str]] = field(default_factory=list)
+    devices: list[dict[str, Any]] = field(default_factory=list)
+    device_findings: list[str] = field(default_factory=list)
+    device_blocks: list[str] = field(default_factory=list)
     base_disk: str | None = None
     serial_files: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
@@ -350,6 +353,116 @@ def serial_files(devices: Iterable[Any]) -> list[str]:
         if isinstance(backing, vim.vm.device.VirtualSerialPort.FileBackingInfo) and backing.fileName:
             files.append(backing.fileName)
     return files
+
+
+def _device_category(device: Any) -> str:  # noqa: PLR0911 - one classification
+    """Which kind of virtual device this is."""
+    d = vim.vm.device
+    if isinstance(device, d.VirtualEthernetCard):
+        return "ethernet"
+    if isinstance(device, d.VirtualDisk):
+        return "disk"
+    if isinstance(device, d.VirtualCdrom):
+        return "cdrom"
+    if isinstance(device, d.VirtualSerialPort):
+        return "serial"
+    if isinstance(device, d.VirtualSoundCard):
+        return "sound"
+    if isinstance(device, (d.VirtualUSB, d.VirtualUSBController, d.VirtualUSBXHCIController)):
+        return "usb"
+    if isinstance(device, d.VirtualController):
+        return "controller"
+    if isinstance(device, d.VirtualVideoCard):
+        return "video"
+    if isinstance(device, (d.VirtualKeyboard, d.VirtualPointingDevice)):
+        return "input"
+    return "other"
+
+
+def _backing_summary(device: Any) -> str | None:  # noqa: PLR0911 - one backing per type
+    """A short description of what a device is backed by, where that matters."""
+    backing = getattr(device, "backing", None)
+    if backing is None:
+        return None
+    name = type(backing).__name__
+    if "Iso" in name or "CdromIso" in name:
+        return f"ISO {getattr(backing, 'fileName', '?')}"
+    if "RemotePassthrough" in name or "RemoteAtapi" in name:
+        return "client device"
+    if "AtapiBacking" in name or "Passthrough" in name:
+        return "host device"
+    if isinstance(device, vim.vm.device.VirtualEthernetCard):
+        info = getattr(backing, "deviceName", None) or getattr(
+            getattr(backing, "port", None), "portgroupKey", None
+        )
+        return f"network {info}" if info else "network (opaque)"
+    if isinstance(device, vim.vm.device.VirtualSerialPort):
+        return f"file {getattr(backing, 'fileName', '')}" if getattr(backing, "fileName", None) else name
+    return None
+
+
+def describe_devices(
+    devices: Iterable[Any], *, powered_on: bool = True
+) -> tuple[list[dict[str, Any]], list[str], list[str]]:
+    """The VM's virtual hardware and each device's connection state, with findings.
+
+    Returns the devices, all findings (for display), and the subset of findings
+    that can actually stop a boot (a disconnected boot adapter, a device in an
+    error state) — a mounted ISO is shown but not counted as blocking, since a
+    cloned template often carries one on purpose.
+
+    This is the *virtual* hardware vCenter presents to the guest and vCenter's own
+    view of each device's connection — readable with no Tools. Whether the guest's
+    driver for a device loaded is inside the guest (needs Tools); the boot timeline
+    reads the paravirtual drivers announcing themselves in vmware.log as the
+    outside-in proxy for that.
+    """
+    described: list[dict[str, Any]] = []
+    findings: list[str] = []
+    blocking: list[str] = []
+    for device in devices or []:
+        category = _device_category(device)
+        info = getattr(device, "deviceInfo", None)
+        label = getattr(info, "label", None) or type(device).__name__
+        connectable = getattr(device, "connectable", None)
+        entry: dict[str, Any] = {
+            "label": label,
+            "kind": type(device).__name__.removeprefix("Virtual"),
+            "category": category,
+            "backing": _backing_summary(device),
+        }
+        if connectable is not None:
+            entry["connected"] = connectable.connected
+            entry["start_connected"] = connectable.startConnected
+            entry["status"] = getattr(connectable, "status", None)
+            # Connection state only means something on a running VM; a powered-off
+            # or freshly cloned VM shows everything disconnected.
+            check = powered_on
+            if (
+                check
+                and category == "ethernet"
+                and connectable.connected is False
+                and connectable.startConnected
+            ):
+                finding = f"network adapter {label!r} is not connected (no link; PXE/DHCP would fail)"
+                findings.append(finding)
+                blocking.append(finding)
+            if (
+                check
+                and category == "cdrom"
+                and connectable.connected
+                and (entry["backing"] or "").startswith("ISO")
+            ):
+                findings.append(
+                    f"CD-ROM {label!r} has an ISO mounted ({entry['backing']}); "
+                    "usually intended, but a stale mount can stall boot"
+                )
+            if check and entry["status"] in ("recoverableError", "unrecoverableError"):
+                finding = f"device {label!r} reports connection status {entry['status']}"
+                findings.append(finding)
+                blocking.append(finding)
+        described.append(entry)
+    return described, findings, blocking
 
 
 def read_folders(session: VCenterSession) -> dict[str, FolderFacts]:
@@ -622,6 +735,9 @@ def vm_facts(  # noqa: C901, PLR0913, PLR0915 - one flattening of one row
     if with_devices:
         devices = row.get(DEVICE_PATH) or []
         facts.disk_chain = disk_chains(devices)
+        facts.devices, facts.device_findings, facts.device_blocks = describe_devices(
+            devices, powered_on=facts.power_state == "poweredOn"
+        )
         bases = sorted({chain[-1] for chain in facts.disk_chain if len(chain) > 1})
         if bases:
             facts.base_disk = bases[0]

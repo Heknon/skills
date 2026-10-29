@@ -17,6 +17,7 @@ import http.client
 import io
 import logging
 import re
+import time
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from functools import wraps
@@ -80,8 +81,15 @@ MAX_LIMIT = 500
 
 INSTRUCTIONS = """\
 Read-only access to the vCenters (and vROps, if configured), for diagnosing VMs
-that are stuck, did not come back after a reboot, or keep losing VMware Tools.
-Nothing here can change anything in vSphere.
+that are stuck — on first boot, after a reboot, or hung at any point — slow to
+come up, losing VMware Tools, blocked on a question, starved, or wedged by a
+virtual device; and for when the vCenter API itself is the problem (SSL EOF
+errors, resets, timeouts, often connection or session exhaustion). Nothing here
+can change anything in vSphere.
+
+When the symptom is SSL EOF / reset / timeout against the vCenters that Sims,
+Sahara and this server all hit, start with check_vcenters: a high session count
+or slow login points at the vCenter near its limit, not at any one VM.
 
 Concepts:
 - Environments are short-lived (minutes to a day) and each is a folder named by
@@ -206,7 +214,7 @@ def _registrar(server: MCPServer, resolved: Settings) -> Callable[[str | None], 
     return tool
 
 
-def _register_fleet_tools(
+def _register_fleet_tools(  # noqa: C901 - one closure per tool
     tool: Callable[..., Any],
     fleet: VCenterPool,
     resolved: Settings,
@@ -232,6 +240,49 @@ def _register_fleet_tools(
             else:
                 rows.append({"reachable": True, **result})
         return {"vcenters": rows, "vrops_configured": has_vrops}
+
+    @tool()
+    async def check_vcenters(*, vcenters: list[str] | None = None) -> dict[str, Any]:
+        """Each vCenter's reachability, login time, and open-session count.
+
+        For when the symptom is the vCenter API itself — SSL EOF errors, resets
+        or timeouts that Sims, Sahara and this server all hit. A high or climbing
+        session count, or a slow login, points at connection/session exhaustion
+        on the vCenter, which looks like a dropped connection to every client.
+        The session count needs the account to be allowed the global session
+        list; otherwise only this server's own session is visible and it says so.
+
+        Args:
+            vcenters: vCenter names; all when empty.
+
+        """
+        names = _names(fleet, vcenters)
+
+        def probe(session: VCenterSession) -> dict[str, Any]:
+            started = time.monotonic()
+            about = session.about()
+            login_seconds = round(time.monotonic() - started, 2)
+            return {
+                "reachable": True,
+                **about,
+                "login_seconds": login_seconds,
+                "sessions": session.session_count(),
+            }
+
+        results = await asyncio.gather(*(fleet.run(name, probe) for name in names), return_exceptions=True)
+        rows, findings = [], []
+        for name, result in zip(names, results, strict=True):
+            if isinstance(result, BaseException):
+                rows.append({"name": name, "reachable": False, "error": str(result)})
+                findings.append(f"{name}: not reachable — {result}")
+                continue
+            rows.append(result)
+            sessions = result.get("sessions", {})
+            if sessions.get("total") is not None:
+                findings.append(
+                    f"{result['name']}: {sessions['total']} open sessions, login {result['login_seconds']}s"
+                )
+        return {"vcenters": rows, "findings": findings or ["all configured vCenters reachable"]}
 
     @tool()
     async def scan(
@@ -409,19 +460,23 @@ def _register_machine_tools(tool: Callable[..., Any], fleet: VCenterPool, resolv
         console_captures: int = 2,
         console_interval_seconds: float = 10.0,
     ) -> dict[str, Any]:
-        """Why one VM is stuck: every check in order, ending in the likely cause.
+        """Why one VM is stuck, on boot or after a reboot or hung mid-run.
+
+        Every check in order, ending in the likely cause.
 
         Finds the VM by moref, or by env_id plus its name inside that
         environment (never by name alone). Then: machine state, CPU ready time
-        and host demand, datastore and device latency, the rest of its
-        environment, how far the boot got in vmware.log, the serial console
-        (EMS) if it has one, and the console screen (two captures).
+        and host demand, datastore and device latency, the virtual hardware and
+        its connection state, the rest of its environment, how far the boot got
+        in vmware.log, the serial console (EMS) if it has one, and the console
+        screen (two captures).
 
-        Pass rebooted_at (the time Sahara logged the reboot) when you have it: a
-        guest reboot does not move vCenter's power-on time, so without it a
-        warm-rebooted VM can look up for days and be misjudged as stuck. The
-        result's machine.values.boot_time_source says what uptime was measured
-        from (reported_reboot, reboot_event or power_on).
+        Pass rebooted_at (the time Sahara logged the reboot or power-on you are
+        investigating) when you have it: a guest reboot does not move vCenter's
+        power-on time, so without it a warm-rebooted VM can look up for days and
+        be misjudged as stuck. The result's machine.values.boot_time_source says
+        what uptime was measured from (reported_reboot, reboot_event or
+        power_on).
 
         Args:
             vcenter: any spelling of the vCenter's name (as Sahara logs it).
@@ -640,6 +695,34 @@ def _register_piece_tools(  # noqa: C901 - one closure per tool
             return {"vcenter": name, "moref": moref, "count": len(events), "events": summarize_events(events)}
 
         return await fleet.run(name, run)
+
+    @tool()
+    async def get_vm_hardware(*, vcenter: str, moref: str) -> dict[str, Any]:
+        """The VM's virtual hardware and each device's connection state.
+
+        Lists the virtual adapters, controllers, disks, CD-ROM, sound, serial,
+        USB and video the VM has, and vCenter's view of whether each connectable
+        device is connected — all read-only, with no Tools. Flags a disconnected
+        network adapter, a mounted ISO or a device in an error state, any of
+        which can stop a boot. This is the *virtual* hardware and vCenter's view;
+        whether the guest's driver for a device loaded is inside the guest (needs
+        Tools), and the boot timeline reads the drivers announcing themselves in
+        vmware.log as the outside-in proxy for that.
+
+        Args:
+            vcenter: the VM's vCenter.
+            moref: the VM's moref.
+
+        """
+
+        def work(_session: VCenterSession, vm: Any, _row: dict[str, Any]) -> dict[str, Any]:
+            return {
+                "devices": vm.devices,
+                "findings": vm.device_findings or ["no hardware issue stood out"],
+                "note": "virtual hardware and vCenter's connection view; guest driver status needs Tools",
+            }
+
+        return await _with_vm(vcenter, moref, work)
 
 
 def _register_infrastructure_tools(tool: Callable[..., Any], fleet: VCenterPool, resolved: Settings) -> None:

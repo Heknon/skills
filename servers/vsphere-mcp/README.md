@@ -110,6 +110,7 @@ read, and diagnostics (host logs).
 | Tool | Answers |
 | --- | --- |
 | `list_vcenters` | which vCenters, reachable, version, clock |
+| `check_vcenters` | reachability, login time and open-session count per vCenter, for when the vCenter API itself is failing (SSL EOF, resets) — the sign of connection/session exhaustion |
 | `scan` | abnormal VMs on some or all vCenters, grouped by what they share; hosts over the CPU threshold and slow storage right now |
 | `explain_group` | what a scan group's abnormal VMs share that the healthy ones beside them do not; CPU and storage over its boot window |
 | `find_old_environments` | environments older than N hours (the age of their oldest VM), optionally only under `projects`, `environments`, `projects/team-x` or any other path segments, oldest first, with their VMs' states |
@@ -121,7 +122,8 @@ read, and diagnostics (host logs).
 | `read_vm_log` | `vmware.log` / `vmware-N.log` lines, filtered on the server |
 | `read_serial_console` | Windows EMS or a Linux kernel console, when the VM has a serial port to a file; stop codes with the layer each points at |
 | `get_vm_console` | the screen in words: black, frozen or changing, blue screen, OCR text and the boot screen it shows |
-| `get_vm_events` | a VM's events, by moref, destroyed VMs too |
+| `get_vm_events` | a VM's events, by moref (a destroyed VM is reported as such) |
+| `get_vm_hardware` | the VM's virtual devices (adapters, controllers, disks, CD-ROM, sound, serial, USB, video) and vCenter's connection view; flags a down boot NIC, a mounted ISO or a device error |
 | `get_host_health` | a host's CPU demand against capacity, its storage, its VMs |
 | `get_datastore_health` | a datastore's latency and IOPS from every host mounting it, its VMs |
 | `read_host_log` | `vmkernel` / `hostd` / `vpxa` lines, filtered |

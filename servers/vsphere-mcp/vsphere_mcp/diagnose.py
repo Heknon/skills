@@ -83,6 +83,7 @@ VM_FAULT = "the virtual machine faulted"
 TOOLS_FLAPPING_CAUSE = "Tools flapping"
 INACCESSIBLE_CAUSE = "vCenter cannot reach the VM"
 QUESTION = "a pending VM question blocks it"
+HARDWARE = "a virtual device is blocking or breaking the boot"
 PAUSED_CAUSE = "the VM is paused"
 MEMORY = "memory pressure (the host ballooning or swapping the VM)"
 HOST_DISCONNECTED = "its ESXi host is not connected to vCenter"
@@ -475,9 +476,10 @@ def environment_pattern(vm: VmFacts, peers: list[tuple[VmFacts, Verdict]]) -> di
     return result
 
 
-def conclude(  # noqa: C901, PLR0912, PLR0915 - one ordered list of causes, kept together
+def conclude(  # noqa: C901, PLR0912, PLR0913, PLR0915 - one ordered list of causes, kept together
     verdict: Verdict,
     *,
+    vm: VmFacts,
     cpu: dict[str, Any],
     disk: dict[str, Any],
     environment: dict[str, Any],
@@ -498,6 +500,11 @@ def conclude(  # noqa: C901, PLR0912, PLR0915 - one ordered list of causes, kept
         evidence(INACCESSIBLE_CAUSE, weight=4, text=verdict.reasons[0])
     if verdict.state == BLOCKED_ON_QUESTION:
         evidence(QUESTION, weight=5, text=verdict.reasons[0])
+    for finding in vm.device_blocks:
+        # A hint: a disconnected NIC or a device error can matter (PXE, a stuck
+        # device), but rarely stops a boot from completing, so it is weighed
+        # below a CPU or storage cause rather than above it.
+        evidence(HARDWARE, weight=1, text=finding)
     if verdict.state == PAUSED:
         evidence(PAUSED_CAUSE, weight=5, text=verdict.reasons[0])
     values = verdict.values
@@ -822,6 +829,7 @@ def diagnose_vm(
 
     conclusion = conclude(
         verdict,
+        vm=vm,
         cpu=cpu,
         disk=disk,
         environment=environment,
@@ -847,6 +855,8 @@ def diagnose_vm(
             "ip_address": vm.ip_address,
             "num_cpu": vm.num_cpu,
             "disk_chain": vm.disk_chain,
+            "devices": vm.devices,
+            "device_findings": vm.device_findings,
         },
         "window": {"from": begin, "to": end},
         "cpu": cpu,
