@@ -216,3 +216,14 @@ What the simulator cannot do, and how the tests deal with it:
   its line.
 - What EMS writes to the serial port on the Windows versions in the fleet.
 - The vROps stat keys on your version. `vrops_list_stat_keys` reads them.
+- That a guest reboot in your fleet logs a reset or guest-reboot event (so
+  uptime is measured from the reboot, not power-on); if some reboots are
+  silent to vCenter, pass `rebooted_at` from Sahara. The simulator cannot
+  exercise this — the logic is covered by unit tests only.
+- The `dcPath` for a datacenter that sits inside a folder, and a datastore
+  name shared across two datacenters. The simulator has one flat datacenter,
+  so these paths (full datacenter inventory path, datastore identity by moref)
+  are correct by construction but unverified live.
+- Whether `/folder` honours a suffix `Range` request; when it does not, a log
+  larger than `VSPHERE_MAX_DOWNLOAD_BYTES` is reported as un-tailable rather
+  than pulled whole.
