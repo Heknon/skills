@@ -236,3 +236,16 @@ def test_find_vms_by_device_matches_a_kind_substring(server: MCPServer) -> None:
 
     assert result["matched_total"] > 0
     assert all("E1000" in " ".join(vm["kinds"]) for vm in result["matched"])
+
+
+def test_vcenter_sessions_groups_the_open_sessions(server: MCPServer) -> None:
+    result = call(server, "vcenter_sessions", {"vcenter": "vc-a"})
+
+    # The simulator permits the session list; on a locked-down real account this
+    # would be visible == "own_only" instead.
+    if result.get("visible") == "all":
+        assert result["total"] >= 1
+        assert isinstance(result["by_client"], dict)
+        assert "findings" in result
+    else:
+        assert result["visible"] == "own_only"

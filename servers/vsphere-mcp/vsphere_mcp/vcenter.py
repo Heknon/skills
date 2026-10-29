@@ -125,6 +125,35 @@ def _declared_size(response: httpx.Response, *, ranged: bool) -> int | None:
     return int(declared) if declared and declared.isdigit() else None
 
 
+def _session_row(entry: Any, now: datetime) -> dict[str, Any]:
+    """One UserSession flattened: who, from where, how old and how idle."""
+    login = as_utc(entry.loginTime) if getattr(entry, "loginTime", None) else None
+    active = as_utc(entry.lastActiveTime) if getattr(entry, "lastActiveTime", None) else None
+    agent = (getattr(entry, "userAgent", None) or "").split(" ", 1)[0] or "unknown"
+    return {
+        "user": entry.userName,
+        "ip": getattr(entry, "ipAddress", None),
+        "user_agent": agent,
+        "extension": bool(getattr(entry, "extensionSession", False)),
+        "call_count": getattr(entry, "callCount", None),
+        "login_time": login,
+        "age_minutes": round((now - login).total_seconds() / 60, 1) if login else None,
+        "idle_minutes": round((now - active).total_seconds() / 60, 1) if active else None,
+    }
+
+
+def _tally(rows: list[dict[str, Any]], key: Callable[[dict[str, Any]], str]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        name = key(row)
+        counts[name] = counts.get(name, 0) + 1
+    return dict(sorted(counts.items(), key=lambda kv: kv[1], reverse=True))
+
+
+def _top(counts: dict[str, int], keep: int = 15) -> dict[str, int]:
+    return dict(list(counts.items())[:keep])
+
+
 class VCenterSession:
     """A logged-in, read-only session on one vCenter. Not thread-safe to create."""
 
@@ -249,7 +278,7 @@ class VCenterSession:
         }
 
     def session_count(self) -> dict[str, Any]:
-        """How many sessions this vCenter has open, from SessionManager.
+        """How many sessions this vCenter has open, the headline for check_vcenters.
 
         A read-only role may not be allowed the global session list; then only
         this server's own session is visible and the result says so. The count
@@ -275,6 +304,79 @@ class VCenterSession:
             "by_user": dict(sorted(by_user.items(), key=lambda kv: kv[1], reverse=True)[:15]),
             "current_user": current,
         }
+
+    def sessions(self) -> dict[str, Any]:
+        """Every open API session grouped to show who is holding them, and likely leaks.
+
+        For diagnosing session/connection exhaustion: sessions grouped by user,
+        by source IP, and by (user, IP, client) with how many are idle and how
+        old they are. A single source holding a large share, or many idle
+        sessions from one client, is the usual cause — a client that opens
+        sessions and never closes them. Needs the account to be allowed the
+        global session list; otherwise only this server's own session shows.
+
+        Also reports the configured idle timeout and, where readable, the
+        session limit, so the count can be read against the ceiling.
+        """
+        manager = self.content.sessionManager
+        now = as_utc(self._service.CurrentTime())
+        try:
+            raw = manager.sessionList or []
+        except vim.fault.NoPermission:
+            return {
+                "visible": "own_only",
+                "note": (
+                    "this account may not list all sessions; grant the Sessions.View privilege (or a role "
+                    "that carries it) to diagnose exhaustion, or read the vCenter's session count from vROps"
+                ),
+                "current_user": getattr(manager.currentSession, "userName", None),
+            }
+        idle_cut = self._session_timeout_minutes()
+        rows = [_session_row(entry, now) for entry in raw]
+        by_user = _tally(rows, lambda row: row["user"])
+        by_ip = _tally(rows, lambda row: row["ip"] or "unknown")
+        by_client = _tally(rows, lambda row: f"{row['user']} @ {row['ip']} ({row['user_agent']})")
+        threshold = idle_cut or 30
+        idle = [row for row in rows if row["idle_minutes"] is not None and row["idle_minutes"] >= threshold]
+        findings = []
+        if rows:
+            top_source, top_count = max(by_client.items(), key=lambda kv: kv[1])
+            share = top_count / len(rows)
+            if share >= 0.5 and top_count >= 10:  # noqa: PLR2004
+                findings.append(
+                    f"{top_count} of {len(rows)} sessions ({share:.0%}) are {top_source} — "
+                    "one client holding most of them points at a session leak there"
+                )
+            if len(idle) >= 10:  # noqa: PLR2004
+                idle_sources = _tally(idle, lambda row: f"{row['user']} @ {row['ip']}")
+                worst = ", ".join(f"{src} ({count})" for src, count in list(idle_sources.items())[:3])
+                findings.append(
+                    f"{len(idle)} sessions idle past the {idle_cut or 30:g}-min timeout; most from {worst} — "
+                    "idle sessions that never close are the classic leak"
+                )
+        return {
+            "visible": "all",
+            "total": len(rows),
+            "idle_timeout_minutes": idle_cut,
+            "idle_sessions": len(idle),
+            "by_user": _top(by_user),
+            "by_source_ip": _top(by_ip),
+            "by_client": _top(by_client),
+            "findings": findings or ["no single client dominates the open sessions"],
+            "oldest": sorted(
+                (row for row in rows if row["age_minutes"] is not None),
+                key=lambda row: row["age_minutes"],
+                reverse=True,
+            )[:10],
+        }
+
+    def _session_timeout_minutes(self) -> float | None:
+        """The configured API idle-session timeout, if the setting is readable."""
+        with contextlib.suppress(Exception):
+            values = self.content.setting.QueryOptions("config.vmacore.soap.sessionTimeout")
+            if values and isinstance(values[0].value, (int, float)):
+                return float(values[0].value) / 60
+        return None
 
     def now(self) -> datetime:
         """VCenter's own clock, which every window on this vCenter is measured by."""

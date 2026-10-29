@@ -63,8 +63,11 @@ resets, or timeouts, hitting Sims, Sahara and this server alike. That is not a
 stuck VM — it is usually the vCenter at its connection or session limit, and no
 amount of looking at one machine explains it.
 
-Start with **`check_vcenters`**. A high or climbing open-session count, or a
-slow login, on the vCenter that is throwing errors is the cause. The verdict
+Start with **`check_vcenters`** for the counts, then **`vcenter_sessions`** on
+the vCenter that is throwing errors: it groups the open sessions by user, source
+IP and client and flags the one leaking them (many sessions from one client,
+many idle past the timeout). A high or climbing count is the symptom; the
+grouping names the culprit. The verdict
 then names the vCenter and its session pressure, and the action — shedding
 sessions, raising the limit — is for the bare-metal team, not something this
 server does. If the session count is not visible (the read-only account may not

@@ -214,7 +214,7 @@ def _registrar(server: MCPServer, resolved: Settings) -> Callable[[str | None], 
     return tool
 
 
-def _register_fleet_tools(  # noqa: C901 - one closure per tool
+def _register_fleet_tools(  # noqa: C901, PLR0915 - one closure per tool
     tool: Callable[..., Any],
     fleet: VCenterPool,
     resolved: Settings,
@@ -283,6 +283,27 @@ def _register_fleet_tools(  # noqa: C901 - one closure per tool
                     f"{result['name']}: {sessions['total']} open sessions, login {result['login_seconds']}s"
                 )
         return {"vcenters": rows, "findings": findings or ["all configured vCenters reachable"]}
+
+    @tool()
+    async def vcenter_sessions(*, vcenter: str) -> dict[str, Any]:
+        """Who is holding a vCenter's open sessions — for diagnosing exhaustion.
+
+        When a vCenter is refusing connections (SSL EOF, resets), this reads its
+        open API sessions and groups them by user, source IP and client, with
+        how many are idle past the timeout and the oldest ones. A single client
+        holding most of the sessions, or many idle sessions from one source, is
+        the usual cause: a client that opens sessions and never closes them.
+        Needs the account to be allowed the global session list; otherwise only
+        this server's own session is visible and the result says so (then read
+        the vCenter's session count from vROps instead).
+
+        Args:
+            vcenter: the vCenter to read.
+
+        """
+        name = fleet.resolve(vcenter)
+        sessions = await fleet.run(name, lambda session: session.sessions())
+        return {"vcenter": name, **sessions}
 
     @tool()
     async def scan(

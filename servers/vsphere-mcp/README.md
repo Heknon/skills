@@ -111,6 +111,7 @@ read, and diagnostics (host logs).
 | --- | --- |
 | `list_vcenters` | which vCenters, reachable, version, clock |
 | `check_vcenters` | reachability, login time and open-session count per vCenter, for when the vCenter API itself is failing (SSL EOF, resets) — the sign of connection/session exhaustion |
+| `vcenter_sessions` | a vCenter's open sessions grouped by user, source IP and client, with idle counts and the oldest — finds the client leaking sessions behind the exhaustion |
 | `scan` | abnormal VMs on some or all vCenters, grouped by what they share; hosts over the CPU threshold and slow storage right now |
 | `explain_group` | what a scan group's abnormal VMs share that the healthy ones beside them do not; CPU and storage over its boot window |
 | `find_old_environments` | environments older than N hours (the age of their oldest VM), optionally only under `projects`, `environments`, `projects/team-x` or any other path segments, oldest first, with their VMs' states |
