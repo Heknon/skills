@@ -429,6 +429,40 @@ def _register_fleet_tools(  # noqa: C901, PLR0915 - one closure per tool
         )
 
     @tool()
+    async def hardware_profile(
+        *,
+        vcenters: list[str] | None = None,
+        under: list[str] | None = None,
+        include_templates: bool = False,
+        limit: int = 100,
+    ) -> dict[str, Any]:
+        """The whole fleet's virtual hardware, and the VMs that differ from their environment.
+
+        Counts how many VMs carry each device category and each kind — NIC types,
+        controllers, sound, anything unusual — and, within each environment, names
+        the VMs whose hardware differs from their siblings (a different NIC type,
+        an extra adapter, a missing device). Use this to see the hardware picture
+        generically, without naming a device; find_vms_by_device is for when you
+        already know what to look for.
+
+        Args:
+            vcenters: vCenter names; all when empty.
+            under: folder path segments to look under; everywhere when empty.
+            include_templates: also include template VMs.
+            limit: how many environment outliers to list (the counts cover all).
+
+        """
+        names = _names(fleet, vcenters)
+        return await hardware.hardware_profile(
+            fleet,
+            resolved,
+            names,
+            under=[term for term in (under or []) if term.strip("/ ")],
+            include_templates=include_templates,
+            limit=max(1, min(limit, MAX_LIMIT)),
+        )
+
+    @tool()
     async def diagnose_window(
         *,
         vcenters: list[str] | None = None,

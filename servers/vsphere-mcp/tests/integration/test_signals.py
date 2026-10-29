@@ -249,3 +249,16 @@ def test_vcenter_sessions_groups_the_open_sessions(server: MCPServer) -> None:
         assert "findings" in result
     else:
         assert result["visible"] == "own_only"
+
+
+def test_hardware_profile_counts_devices_and_finds_outliers(server: MCPServer) -> None:
+    result = call(server, "hardware_profile", {"vcenters": ["vc-a"], "include_templates": True})
+
+    assert result["vms"] > 0
+    assert "ethernet" in result["category_counts"]
+    assert result["adapter_kinds"]  # at least one NIC type counted
+    # ok-01 has a sound card its env-1003 siblings lack, so it is an outlier.
+    outlier_names = {o["name"] for o in result["environment_outliers"]}
+    assert "ok-01" in outlier_names
+    ok = next(o for o in result["environment_outliers"] if o["name"] == "ok-01")
+    assert any("Audio" in extra or "Sound" in extra for extra in ok["extra"])

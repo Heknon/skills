@@ -480,8 +480,10 @@ def read_vm_devices(session: VCenterSession, folders: dict[str, FolderFacts]) ->
     result = []
     for row in rows:
         devices = row.get("config.hardware.device") or []
-        categories = sorted({_device_category(device) for device in devices})
-        kinds = sorted({type(device).__name__.removeprefix("Virtual") for device in devices})
+        by_category: dict[str, list[str]] = {}
+        for device in devices:
+            kind = type(device).__name__.removeprefix("Virtual")
+            by_category.setdefault(_device_category(device), []).append(kind)
         parent = row.get("parent")
         folder = folders.get(parent._moId) if parent is not None else None  # noqa: SLF001
         result.append(
@@ -492,8 +494,9 @@ def read_vm_devices(session: VCenterSession, folders: dict[str, FolderFacts]) ->
                 "template": bool(row.get("config.template")),
                 "folder": folder.path if folder else None,
                 "environment": folder.name if folder else None,
-                "categories": categories,
-                "kinds": kinds,
+                "categories": sorted(by_category),
+                "kinds": sorted({kind for kinds in by_category.values() for kind in kinds}),
+                "by_category": {category: sorted(kinds) for category, kinds in by_category.items()},
             }
         )
     return result
