@@ -202,6 +202,16 @@ class Settings(BaseSettings):
     max_log_bytes: PositiveInt = 4 * 1024 * 1024
     """How much of the end of a log file is read; older lines are said to be cut."""
 
+    max_download_bytes: PositiveInt = 128 * 1024 * 1024
+    """Absolute ceiling on bytes pulled for one datastore file when vCenter ignores a Range request.
+
+    A tail read first asks vCenter for only the last `max_log_bytes` with a Range
+    request. A vCenter that honors it transfers that much and no more. One that
+    ignores Range would otherwise stream the whole file to keep its end; this
+    caps that transfer, and a file past the cap is reported as un-tailable rather
+    than pulled whole.
+    """
+
     max_log_lines: PositiveInt = 400
     """The most log lines one result returns."""
 

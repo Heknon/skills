@@ -112,11 +112,13 @@ def _names(pool: VCenterPool, vcenters: list[str] | None) -> list[str]:
     return [pool.resolve(name) for name in vcenters]
 
 
-def _since(text: str | None, default: datetime) -> datetime:
-    if not text:
-        return default
+def _parse_time(text: str) -> datetime:
     value = datetime.fromisoformat(text.strip())
     return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+
+def _since(text: str | None, default: datetime) -> datetime:
+    return _parse_time(text) if text else default
 
 
 def build_server(settings: Settings | None = None, pool: VCenterPool | None = None) -> MCPServer:
@@ -391,6 +393,7 @@ def _register_machine_tools(tool: Callable[..., Any], fleet: VCenterPool, resolv
         env_id: str | None = None,
         vm_name: str | None = None,
         moref: str | None = None,
+        rebooted_at: str | None = None,
         console_captures: int = 2,
         console_interval_seconds: float = 10.0,
     ) -> dict[str, Any]:
@@ -402,11 +405,18 @@ def _register_machine_tools(tool: Callable[..., Any], fleet: VCenterPool, resolv
         environment, how far the boot got in vmware.log, the serial console
         (EMS) if it has one, and the console screen (two captures).
 
+        Pass rebooted_at (the time Sahara logged the reboot) when you have it: a
+        guest reboot does not move vCenter's power-on time, so without it a
+        warm-rebooted VM can look up for days and be misjudged as stuck. The
+        result's machine.values.boot_time_source says what uptime was measured
+        from (reported_reboot, reboot_event or power_on).
+
         Args:
             vcenter: any spelling of the vCenter's name (as Sahara logs it).
             env_id: the Twix environment id, with vm_name.
             vm_name: the machine's name inside its environment.
             moref: the VM's moref (vm-1234), instead of env_id and vm_name.
+            rebooted_at: when the reboot happened, ISO 8601, from Sahara.
             console_captures: screenshots to take (0 to skip the console).
             console_interval_seconds: seconds between screenshots.
 
@@ -414,6 +424,7 @@ def _register_machine_tools(tool: Callable[..., Any], fleet: VCenterPool, resolv
         name = fleet.resolve(vcenter)
         captures = max(0, min(console_captures, 4))
         interval = _console_interval(resolved, captures, console_interval_seconds)
+        rebooted = _parse_time(rebooted_at) if rebooted_at else None
         return await fleet.run(
             name,
             lambda session: diagnose_vm(
@@ -422,6 +433,7 @@ def _register_machine_tools(tool: Callable[..., Any], fleet: VCenterPool, resolv
                 env_id=env_id,
                 vm_name=vm_name,
                 moref=moref,
+                rebooted_at=rebooted,
                 console_captures=captures,
                 console_interval_seconds=interval,
             ),

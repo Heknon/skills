@@ -38,10 +38,12 @@ from vsphere_mcp.checks import (
     MEMORY_RECLAIMED,
     NO_TOOLS,
     PAUSED,
+    RESET_EVENTS,
     TOOLS_FLAPPING,
     Verdict,
     classify,
     count_states,
+    latest_reboot_by_vm,
     resets_by_vm,
 )
 from vsphere_mcp.console import read_captures
@@ -57,6 +59,7 @@ from vsphere_mcp.inventory import (
     read_datastores,
     read_folders,
     read_hosts,
+    set_effective_boot,
     vm_facts,
 )
 from vsphere_mcp.vcenter import REALTIME_SPAN, VSphereError, parse_datastore_path
@@ -269,6 +272,24 @@ def vm_folder(row: dict[str, Any], vm: VmFacts) -> str | None:
     return None
 
 
+def _read_reason(name: str, status: int, folder: str) -> str:
+    """Why a datastore file read did not return a body, worded for a reader."""
+    where = f" at {folder}/{name}" if folder else ""
+    if status == 416:  # noqa: PLR2004
+        return (
+            f"{name} is larger than VSPHERE_MAX_DOWNLOAD_BYTES and this vCenter did not honor a "
+            f"range request, so its end could not be read{where}; raise the cap to read it"
+        )
+    if 300 <= status < 400:  # noqa: PLR2004
+        return (
+            f"{name}: vCenter redirected the request (HTTP {status}){where}; not followed because it "
+            "leaves this vCenter's origin (a known real-vCenter behaviour to confirm)"
+        )
+    if status == 404:  # noqa: PLR2004
+        return f"{name} not found{where}"
+    return f"{name} not readable (HTTP {status}){where}"
+
+
 def read_logs(
     session: VCenterSession, settings: Settings, vm: VmFacts, row: dict[str, Any]
 ) -> dict[str, Any]:
@@ -278,10 +299,7 @@ def read_logs(
         return {"available": False, "reason": "the VM's datastore folder or datacenter is not known"}
     current = session.read_datastore_file(vm.datacenter, f"{folder}/vmware.log", settings.max_log_bytes)
     if current.status != 200:  # noqa: PLR2004
-        return {
-            "available": False,
-            "reason": f"vmware.log not readable (HTTP {current.status}) at {folder}/vmware.log",
-        }
+        return {"available": False, "reason": _read_reason("vmware.log", current.status, folder)}
     lines = parse_lines(current.text)
     timeline = boot_timeline(lines)
     tools_changes = timeline.get("annotations", {}).get("tools_state", {}).get("count", 0)
@@ -338,7 +356,7 @@ def read_serial_files(session: VCenterSession, vm: VmFacts, *, tail_lines: int =
             continue
         read = session.read_datastore_file(vm.datacenter, path, SERIAL_BYTES)
         if read.status != 200:  # noqa: PLR2004
-            files.append({"path": path, "available": False, "reason": f"HTTP {read.status}"})
+            files.append({"path": path, "available": False, "reason": _read_reason(path, read.status, "")})
             continue
         files.append(
             {"path": path, "available": True, "truncated": read.truncated}
@@ -691,6 +709,19 @@ def next_checks(conclusion: dict[str, Any], vm: VmFacts) -> list[str]:
 # -- the composites --------------------------------------------------------------
 
 
+def _env_reboots(
+    session: VCenterSession, now: datetime, peers: list[VmFacts], lookback_hours: float
+) -> dict[str, datetime]:
+    """The latest reboot event per VM for a set of peers, in one query over the folder's window."""
+    if not peers:
+        return {}
+    try:
+        events = session.events(begin=now - timedelta(hours=lookback_hours), end=now, types=RESET_EVENTS)
+    except VSphereError:
+        return {}
+    return latest_reboot_by_vm(events)
+
+
 def diagnose_vm(
     session: VCenterSession,
     settings: Settings,
@@ -698,6 +729,7 @@ def diagnose_vm(
     env_id: str | None,
     vm_name: str | None,
     moref: str | None,
+    rebooted_at: datetime | None = None,
     console_captures: int = 2,
     console_interval_seconds: float = 10.0,
 ) -> dict[str, Any]:
@@ -711,28 +743,41 @@ def diagnose_vm(
     thresholds = settings.thresholds
     now = session.now()
     host = layout.hosts.get(vm.host_moref or "")
-    begin, end = window(now, vm.boot_time)
 
+    # Find the reboot before judging uptime: a warm reboot does not move
+    # runtime.bootTime, so without this the VM looks up for days. Look back over
+    # the VM's life (capped), not from bootTime, since bootTime may be the stale
+    # power-on. The caller's rebooted_at (from Sahara) wins when given.
+    lookback = min(max(vm.age_hours or 24.0, 1.0), 24.0)
     events = piece(
         "events",
         lambda: {
             "events": session.events(
                 entity=session.reference("VirtualMachine", vm.moref),
-                begin=(vm.boot_time or now) - timedelta(minutes=30),
+                begin=now - timedelta(hours=lookback),
                 end=now,
             )
         },
     )
     raw_events = events.get("events", [])
+    reboots = latest_reboot_by_vm(raw_events)
+    set_effective_boot(vm, now, reboots=reboots, rebooted_at=rebooted_at)
+    begin, end = window(now, vm.boot_time)
     resets = resets_by_vm(raw_events, thresholds.boot_loop_window_minutes, now).get(vm.moref, 0)
     verdict = classify(vm, thresholds, resets_in_window=resets)
 
     peers: list[tuple[VmFacts, Verdict]] = []
     if vm.folder_moref:
         siblings = read_vms(session, layout, root=session.reference("Folder", vm.folder_moref))
-        peers = [
-            (peer, classify(peer, thresholds)) for peer, _ in siblings if peer.folder_moref == vm.folder_moref
-        ]
+        # The peers were read without reboot events; a mass reboot would make
+        # them all look long-stuck. Refine each from its own reset/reboot event.
+        peer_reboots = _env_reboots(session, now, [peer for peer, _ in siblings], lookback)
+        peers = []
+        for peer, _ in siblings:
+            if peer.folder_moref != vm.folder_moref:
+                continue
+            set_effective_boot(peer, now, reboots=peer_reboots)
+            peers.append((peer, classify(peer, thresholds)))
     environment = environment_pattern(vm, peers) if peers else {"vms": 0, "findings": []}
     cpu = piece("CPU", lambda: vm_cpu(session, vm, host, begin=begin, end=end, thresholds=thresholds))
     stores = [store for store in layout.datastores.values() if store.get("name") in vm.datastores]
@@ -786,6 +831,8 @@ def diagnose_vm(
         | {
             "question": vm.question.__dict__ if vm.question else None,
             "boot_time": vm.boot_time,
+            "boot_time_source": vm.boot_source,
+            "power_on_time": vm.power_on_time,
             "tools_version_status": vm.tools_version_status,
             "guest_state": vm.guest_state,
             "ip_address": vm.ip_address,

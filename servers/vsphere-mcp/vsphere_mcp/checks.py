@@ -155,6 +155,7 @@ def classify(  # noqa: C901, PLR0911, PLR0912 - one decision list, kept in one p
         "paused": vm.paused,
         "connection_state": vm.connection_state,
         "uptime_minutes": _round(vm.uptime_minutes),
+        "uptime_measured_from": vm.boot_source,
         "age_hours": _round(vm.age_hours, 2),
         "tools_status": vm.tools_status,
         "tools_running": vm.tools_running,
@@ -302,6 +303,27 @@ def ready_percent(ready_ms: float, interval_seconds: int, vcpus: int) -> float:
     over the interval and over the VM's vCPUs; raw, it misleads.
     """
     return ready_ms / (interval_seconds * 1000 * max(vcpus, 1)) * 100
+
+
+def latest_reboot_by_vm(events: list[Any]) -> dict[str, Any]:
+    """The most recent reset or guest-reboot event time per VM moref.
+
+    A warm reboot does not move runtime.bootTime, but it does log one of these
+    events, so this is how uptime is measured from the reboot rather than the
+    original power-on.
+    """
+    latest: dict[str, Any] = {}
+    for event in events:
+        if type(event).__name__.rsplit(".", 1)[-1] not in RESET_EVENTS:
+            continue
+        vm = getattr(getattr(event, "vm", None), "vm", None)
+        when = getattr(event, "createdTime", None)
+        if vm is None or when is None:
+            continue
+        moref = vm._moId  # noqa: SLF001
+        if moref not in latest or when > latest[moref]:
+            latest[moref] = when
+    return latest
 
 
 def resets_by_vm(events: list[Any], window_minutes: float, now: Any) -> dict[str, int]:

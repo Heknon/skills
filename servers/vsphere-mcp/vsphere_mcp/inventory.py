@@ -87,6 +87,10 @@ CLUSTER_PATHS = ("name",)
 RUNNING = "guestToolsRunning"
 STARTING = "guestToolsExecutingScripts"
 NOT_INSTALLED = "toolsNotInstalled"
+# Above this uptime, a power-on-based measurement is worth cautioning about on a
+# VM whose Tools is down: it may be a warm reboot vCenter did not see.
+NOTE_UPTIME_MINUTES = 60.0
+_BOOT_NOTE_PREFIX = "boot: "
 
 
 @dataclass
@@ -116,6 +120,9 @@ class VmFacts:
     power_state: str | None = None
     connection_state: str | None = None
     boot_time: datetime | None = None
+    power_on_time: datetime | None = None
+    boot_source: str | None = None
+    quickstats_uptime_seconds: int | None = None
     uptime_minutes: float | None = None
     question: Question | None = None
     consolidation_needed: bool = False
@@ -197,6 +204,8 @@ class VmFacts:
             "instance_uuid": self.instance_uuid,
             "created": self.created,
             "age_hours": None if self.age_hours is None else round(self.age_hours, 2),
+            "boot_time": self.boot_time,
+            "boot_time_source": self.boot_source,
             "folder": self.folder,
             "folder_path": self.folder_path,
             "host": self.host,
@@ -443,8 +452,15 @@ def read_inventory(
     *,
     with_devices: bool,
     vm_objects: Sequence[Any] | None = None,
+    reboots: dict[str, datetime] | None = None,
+    rebooted_at: datetime | None = None,
 ) -> Inventory:
-    """Read a vCenter's VMs (all, or the given ones) and what they sit on."""
+    """Read a vCenter's VMs (all, or the given ones) and what they sit on.
+
+    `reboots` maps a VM's moref to the most recent reboot/reset event vCenter
+    logged for it; `rebooted_at` is a reboot time the caller knows from Sahara.
+    Either overrides power-on time for the uptime judgement when it is newer.
+    """
     read_at = session.now()
     folders = read_folders(session)
     hosts = read_hosts(session)
@@ -462,6 +478,8 @@ def read_inventory(
             datastores,
             with_devices=with_devices,
             alarms=names,
+            reboots=reboots,
+            rebooted_at=rebooted_at,
         )
         for row in rows
     ]
@@ -476,7 +494,7 @@ def read_inventory(
     )
 
 
-def vm_facts(  # noqa: C901, PLR0912, PLR0915 - one flattening of one row
+def vm_facts(  # noqa: C901, PLR0913, PLR0915 - one flattening of one row
     vcenter: str,
     row: dict[str, Any],
     read_at: datetime,
@@ -486,6 +504,8 @@ def vm_facts(  # noqa: C901, PLR0912, PLR0915 - one flattening of one row
     *,
     with_devices: bool,
     alarms: dict[str, str] | None = None,
+    reboots: dict[str, datetime] | None = None,
+    rebooted_at: datetime | None = None,
 ) -> VmFacts:
     """Flatten one property-collector row into `VmFacts`, noting what disagrees."""
     facts = VmFacts(vcenter=vcenter, moref=row["moref"], name=row.get("name", row["moref"]), read_at=read_at)
@@ -512,16 +532,8 @@ def vm_facts(  # noqa: C901, PLR0912, PLR0915 - one flattening of one row
     boot = runtime_boot or summary_boot
     if runtime_boot and summary_boot and abs((runtime_boot - summary_boot).total_seconds()) > 60:  # noqa: PLR2004
         facts.notes.append("runtime.bootTime and summary.runtime.bootTime disagree; used runtime.bootTime")
-    if boot is not None:
-        facts.boot_time = as_utc(boot)
-        facts.uptime_minutes = max(0.0, (read_at - facts.boot_time).total_seconds() / 60)
-    elif facts.power_state == "poweredOn":
-        uptime = row.get("summary.quickStats.uptimeSeconds")
-        if isinstance(uptime, int) and uptime > 0:
-            facts.uptime_minutes = uptime / 60
-            facts.notes.append("no boot time reported; uptime taken from quickStats")
-        else:
-            facts.notes.append("powered on, but vCenter reports no boot time")
+    facts.power_on_time = as_utc(boot) if boot is not None else None
+    facts.quickstats_uptime_seconds = row.get("summary.quickStats.uptimeSeconds")
 
     question = row.get("runtime.question")
     if question is not None:
@@ -587,7 +599,63 @@ def vm_facts(  # noqa: C901, PLR0912, PLR0915 - one flattening of one row
         facts.serial_files = serial_files(devices)
     if row.get("_missing"):
         facts.notes.append("vCenter withheld: " + ", ".join(row["_missing"]))
+    set_effective_boot(facts, read_at, reboots=reboots, rebooted_at=rebooted_at)
     return facts
+
+
+def set_effective_boot(
+    facts: VmFacts,
+    read_at: datetime,
+    *,
+    reboots: dict[str, datetime] | None = None,
+    rebooted_at: datetime | None = None,
+) -> None:
+    """Measure uptime from the most recent reboot, not from power-on.
+
+    runtime.bootTime only moves on a power cycle, never on an in-guest reboot, so
+    for a warm-rebooted VM it is the original power-on, hours or days ago. The
+    reboot vCenter actually saw (a reset or guest-reboot event), or the reboot
+    time the caller knows from Sahara, is newer and is what the stuck/booting
+    judgement must rest on. Called again by `diagnose_vm` once it has fetched
+    the events, so a scan's power-on estimate is refined to the real reboot.
+    """
+    reported = as_utc(rebooted_at) if rebooted_at is not None else None
+    event_reboot = (reboots or {}).get(facts.moref)
+    candidates = [
+        (when, source)
+        for when, source in (
+            (reported, "reported_reboot"),
+            (event_reboot, "reboot_event"),
+            (facts.power_on_time, "power_on"),
+        )
+        if when is not None
+    ]
+    facts.notes = [note for note in facts.notes if not note.startswith(_BOOT_NOTE_PREFIX)]
+    if candidates:
+        facts.boot_time, facts.boot_source = max(candidates, key=lambda item: item[0])
+        facts.uptime_minutes = max(0.0, (read_at - facts.boot_time).total_seconds() / 60)
+        if (
+            facts.boot_source == "power_on"
+            and facts.power_state == "poweredOn"
+            and facts.tools_running != RUNNING
+            and facts.uptime_minutes > NOTE_UPTIME_MINUTES
+        ):
+            facts.notes.append(
+                _BOOT_NOTE_PREFIX
+                + "uptime is from power-on; vCenter does not see an in-guest reboot, so if this VM "
+                "was rebooted in the guest its uptime overstates how long it has been trying to "
+                "boot — pass the reboot time, or read a reset/reboot event, to judge it"
+            )
+    elif facts.power_state == "poweredOn":
+        uptime = facts.quickstats_uptime_seconds
+        if isinstance(uptime, int) and uptime > 0:
+            facts.uptime_minutes = uptime / 60
+            facts.boot_source = "quickstats"
+            facts.notes.append(
+                _BOOT_NOTE_PREFIX + "no boot time reported; uptime from quickStats (power-on based)"
+            )
+        else:
+            facts.notes.append(_BOOT_NOTE_PREFIX + "powered on, but vCenter reports no boot time")
 
 
 def find_environment(

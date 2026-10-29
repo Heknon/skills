@@ -766,3 +766,80 @@ def test_a_property_vcenter_rejects_is_dropped_not_fatal(monkeypatch: pytest.Mon
 
     assert asked == [["name", "runtime.paused"], ["name"]]
     assert rows == [{"moref": "vm-1", "name": "x", "_missing": ["runtime.paused"]}]
+
+
+# -- reboot time (a warm reboot does not move runtime.bootTime) --------------------------------
+
+
+def test_a_power_on_days_ago_with_a_recent_reboot_event_is_booting_not_hung() -> None:
+    from vsphere_mcp.inventory import set_effective_boot
+
+    machine = vm(
+        moref="vm-7",
+        power_on_time=NOW - timedelta(days=3),
+        boot_time=NOW - timedelta(days=3),
+        uptime_minutes=3 * 24 * 60,
+        read_at=NOW,
+        tools_running="guestToolsNotRunning",
+        cpu_mhz=1500.0,
+    )
+    # Without the reboot event: looks stuck for days.
+    assert checks.classify(machine, LIMITS).state in (checks.HUNG, checks.BUSY_NOT_UP, checks.BOOTED_NOT_UP)
+
+    set_effective_boot(machine, NOW, reboots={"vm-7": NOW - timedelta(minutes=3)})
+
+    assert machine.boot_source == "reboot_event"
+    assert machine.uptime_minutes == pytest.approx(3.0)
+    assert checks.classify(machine, LIMITS).state == checks.BOOTING
+
+
+def test_a_reported_reboot_time_wins_over_an_older_event() -> None:
+    from vsphere_mcp.inventory import set_effective_boot
+
+    machine = vm(moref="vm-7", power_on_time=NOW - timedelta(days=1), read_at=NOW)
+
+    set_effective_boot(
+        machine,
+        NOW,
+        reboots={"vm-7": NOW - timedelta(hours=2)},
+        rebooted_at=NOW - timedelta(minutes=12),
+    )
+
+    assert machine.boot_source == "reported_reboot"
+    assert machine.uptime_minutes == pytest.approx(12.0)
+
+
+def test_uptime_from_power_on_with_tools_down_carries_a_caution() -> None:
+    from vsphere_mcp.inventory import set_effective_boot
+
+    machine = vm(
+        moref="vm-7",
+        power_on_time=NOW - timedelta(hours=5),
+        read_at=NOW,
+        tools_running="guestToolsNotRunning",
+    )
+
+    set_effective_boot(machine, NOW, reboots={})
+
+    assert machine.boot_source == "power_on"
+    assert any("in-guest reboot" in note for note in machine.notes)
+
+
+def test_latest_reboot_picks_the_most_recent_event_per_vm() -> None:
+    def event(moref: str, when: datetime, kind: str) -> object:
+        vm_arg = type("M", (), {"_moId": moref})()
+        # The class name is what the code reads, so give each the real event type name.
+        return type(kind, (), {"vm": type("A", (), {"vm": vm_arg})(), "createdTime": when})()
+
+    events = [
+        event("vm-1", NOW - timedelta(minutes=30), "VmResettingEvent"),
+        event("vm-1", NOW - timedelta(minutes=5), "VmResettingEvent"),
+        event("vm-2", NOW - timedelta(minutes=10), "VmGuestRebootEvent"),
+        event("vm-3", NOW, "VmPoweredOnEvent"),  # not a reboot
+    ]
+
+    latest = checks.latest_reboot_by_vm(events)
+
+    assert latest["vm-1"] == NOW - timedelta(minutes=5)
+    assert latest["vm-2"] == NOW - timedelta(minutes=10)
+    assert "vm-3" not in latest

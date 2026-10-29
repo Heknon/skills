@@ -30,6 +30,7 @@ from vsphere_mcp.checks import (
     Verdict,
     classify,
     count_states,
+    latest_reboot_by_vm,
     resets_by_vm,
 )
 from vsphere_mcp.contention import hosts_cpu, storage
@@ -130,24 +131,29 @@ class ScanStore:
 def scan_vcenter(session: VCenterSession, settings: Settings) -> VCenterScan:
     """Read and judge one vCenter. Blocking: runs in a worker thread."""
     thresholds = settings.thresholds
-    inventory = read_inventory(session, with_devices=settings.scan_base_disks)
-    now = inventory.read_at
     notes = []
+    now = session.now()
+    # Events first: the latest reboot per VM measures uptime from the reboot, not
+    # from power-on (which a warm reboot leaves untouched). The window covers the
+    # recently rebooted VMs that would otherwise look long-stuck; a VM rebooted
+    # longer ago than this with Tools still down is correctly abnormal anyway.
+    reboot_window = max(thresholds.boot_loop_window_minutes, thresholds.booted_not_up_minutes * 3)
     try:
-        events = session.events(
-            begin=now - timedelta(minutes=thresholds.boot_loop_window_minutes),
-            end=now,
-            types=RESET_EVENTS,
-        )
+        events = session.events(begin=now - timedelta(minutes=reboot_window), end=now, types=RESET_EVENTS)
         resets = resets_by_vm(events, thresholds.boot_loop_window_minutes, now)
+        reboots = latest_reboot_by_vm(events)
         if len(events) >= QUERY_EVENTS_CAP:
             notes.append(
                 f"{len(events)} reset events in the window: vCenter returns at most "
-                f"{QUERY_EVENTS_CAP}, so boot-loop counts are low"
+                f"{QUERY_EVENTS_CAP}, so boot-loop counts are low and some reboots may be missed"
             )
     except Exception as error:  # noqa: BLE001 - a scan without events is still a scan
-        resets = {}
-        notes.append(f"reset events not read ({type(error).__name__}); boot loops not detected")
+        resets, reboots = {}, {}
+        notes.append(
+            f"reset events not read ({type(error).__name__}); boot loops not detected and uptime "
+            "is from power-on, which overstates it for warm-rebooted VMs"
+        )
+    inventory = read_inventory(session, with_devices=settings.scan_base_disks, reboots=reboots)
     verdicts = {
         vm.moref: classify(vm, thresholds, resets_in_window=resets.get(vm.moref, 0)) for vm in inventory.vms
     }

@@ -106,6 +106,23 @@ def parse_datastore_path(path: str) -> tuple[str, str]:
     return name.strip(), rest.strip()
 
 
+def _declared_size(response: httpx.Response, *, ranged: bool) -> int | None:
+    """The file's full size from the headers: `Content-Range` for a 206, else `Content-Length`.
+
+    A 206's `Content-Length` is the slice, not the file; its full size is the
+    number after the slash in `Content-Range: bytes START-END/TOTAL`.
+    """
+    if ranged:
+        content_range = response.headers.get("content-range", "")
+        if "/" in content_range:
+            whole = content_range.rsplit("/", 1)[1].strip()
+            if whole.isdigit():
+                return int(whole)
+        return None
+    declared = response.headers.get("content-length")
+    return int(declared) if declared and declared.isdigit() else None
+
+
 class VCenterSession:
     """A logged-in, read-only session on one vCenter. Not thread-safe to create."""
 
@@ -147,6 +164,10 @@ class VCenterSession:
             verify=ssl_context(self.settings),
             timeout=self.settings.timeout_seconds,
             follow_redirects=False,
+            # Deliberate transport: the session cookie is the only credential, and no
+            # ambient HTTPS_PROXY/NO_PROXY or ~/.netrc reroutes an internal read or
+            # attaches another credential to it.
+            trust_env=False,
         )
 
     def close(self) -> None:
@@ -437,7 +458,9 @@ class VCenterSession:
             for item in (info.result.file or [])
         ]
 
-    def _get_request(self, path: str, params: dict[str, str]) -> httpx.Request:
+    def _get_request(
+        self, path: str, params: dict[str, str], headers: dict[str, str] | None = None
+    ) -> httpx.Request:
         """A GET on this vCenter's HTTPS endpoints, carrying the SOAP session."""
         ensure_read_request("GET")
         _ = self.content
@@ -446,35 +469,57 @@ class VCenterSession:
             raise VSphereError(msg)
         url = f"https://{self.vcenter.host}:{self.vcenter.port}{path}"
         return self._http.build_request(
-            "GET", url, params=params, headers={"Cookie": session_cookie(self._stub.cookie)}
+            "GET",
+            url,
+            params=params,
+            headers={"Cookie": session_cookie(self._stub.cookie), **(headers or {})},
         )
 
     def read_datastore_file(self, datacenter: str, path: str, max_bytes: int) -> DatastoreFile:
         """The end of a datastore file, at most `max_bytes` of it, over HTTPS GET."""
         datastore, inside = parse_datastore_path(path)
+        # Ask for only the last `max_bytes` with a suffix Range. A vCenter that
+        # honors it answers 206 with the tail; one that ignores it answers 200
+        # with the whole file, which the stream below caps and tails itself.
         request = self._get_request(
             "/folder/" + quote(inside),
             {"dcPath": datacenter, "dsName": datastore},
+            headers={"Range": f"bytes=-{max_bytes}"},
         )
         assert self._http is not None  # noqa: S101 - set by _get_request
         tail: collections.deque[bytes] = collections.deque()
         kept = 0
         total = 0
+        capped = False
+        ceiling = max(self.settings.max_download_bytes, max_bytes)
         response = self._http.send(request, stream=True)
         try:
-            if response.status_code != 200:  # noqa: PLR2004
+            if response.is_redirect:
+                # vCenter can redirect /folder (e.g. to the host holding the datastore).
+                # Not followed: it would leave this origin, and the cookie with it.
                 return DatastoreFile(path, "", None, truncated=False, status=response.status_code)
-            declared = response.headers.get("content-length")
+            if response.status_code not in (200, 206):
+                return DatastoreFile(path, "", None, truncated=False, status=response.status_code)
+            ranged = response.status_code == 206  # noqa: PLR2004
+            declared = _declared_size(response, ranged=ranged)
             for chunk in response.iter_bytes():
                 total += len(chunk)
                 tail.append(chunk)
                 kept += len(chunk)
                 while kept - len(tail[0]) >= max_bytes:
                     kept -= len(tail.popleft())
+                if not ranged and total >= ceiling:
+                    capped = True
+                    break
         finally:
             response.close()
         data = b"".join(tail)
-        truncated = len(data) > max_bytes or total > len(data)
+        if capped:
+            # We streamed the ceiling from the front and vCenter ignored Range, so
+            # we never reached the end: the tail we hold is not the file's end.
+            size = declared if declared is not None else total
+            return DatastoreFile(path, "", size, truncated=True, status=416)
+        truncated = len(data) > max_bytes or (ranged and bool(declared) and declared > len(data))
         if len(data) > max_bytes:
             data = data[-max_bytes:]
         if truncated:
@@ -482,7 +527,7 @@ class VCenterSession:
             newline = data.find(b"\n")
             if newline >= 0:
                 data = data[newline + 1 :]
-        size = int(declared) if declared and declared.isdigit() else total
+        size = declared if declared is not None else total
         return DatastoreFile(path, data.decode("utf-8", errors="replace"), size, truncated, 200)
 
     def screenshot(self, moref: str) -> tuple[int, bytes, str | None]:
@@ -495,6 +540,7 @@ class VCenterSession:
         response = self._http.send(request, stream=True)
         try:
             if response.status_code != 200:  # noqa: PLR2004
+                # A redirect (is_redirect) is not followed: it would leave this origin.
                 return response.status_code, b"", response.headers.get("content-type")
             body = bytearray()
             for chunk in response.iter_bytes():
