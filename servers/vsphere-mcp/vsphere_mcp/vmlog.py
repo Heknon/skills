@@ -80,9 +80,12 @@ STAGES: tuple[tuple[str, str, re.Pattern[str]], ...] = (
     (
         "tools",
         "VMware Tools started talking to the host",
+        # Only Tools actually coming up, not the GuestRpc channel teardown or the
+        # guestinfo config dump that a reset also logs, which would otherwise mark
+        # a boot that never reached Tools as having reached it.
         re.compile(
-            r"(?i)(tools (are )?running|toolssetversion|tools version|guestrpc: (got|channel)|"
-            r"toolbox|vmtoolsd|guestinfo)"
+            r"(?i)(tools (are )?running|toolssetversion|tools: changing running status to .?(1|running)|"
+            r"guest operations agent|vmtoolsd)"
         ),
     ),
 )
@@ -107,10 +110,13 @@ ANNOTATIONS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ),
     ("question", re.compile(r"(?i)(msg_question|msg_hint|\bquestion\b)")),
     (
+        # Tools genuinely stopping or crashing after it was up — not the routine
+        # "Changing running status to 1" that every healthy boot logs, which
+        # would read as flapping.
         "tools_state",
         re.compile(
-            r"(?i)(tools.*(running status|state|heartbeat|stopped|not running)|"
-            r"guestrpc: channel \d+ (reinitialized|closed|reset))"
+            r"(?i)(tools.*(stopped (working|responding)|has stopped|not running, restarting|crashed)|"
+            r"changing running status to .?0\b|tools heartbeat timeout)"
         ),
     ),
 )
@@ -154,6 +160,10 @@ EMS_MARK = re.compile(
     r"(?i)(sac>|special administration console|computer is booting, sac started|"
     r"\bems\b|emergency management services)"
 )
+# EMS prints this line at the start of each boot, so the text after its last
+# occurrence is the current boot — used to keep a stop code from an earlier
+# crash in the same (appended) serial file out of this boot's reading.
+EMS_BOOT_BANNER = re.compile(r"(?i)computer is booting, sac started")
 LINUX_MARKS: tuple[tuple[str, str | None, re.Pattern[str]], ...] = (
     ("kernel_panic", None, re.compile(r"(?i)kernel panic")),
     (
@@ -342,13 +352,20 @@ def read_serial(text: str, *, tail_lines: int) -> dict[str, Any]:
         hits = [line for line in lines if pattern.search(line)]
         if hits:
             linux.append({"kind": name, "points_at": hint, "count": len(hits), "examples": hits[:3]})
-    codes = stop_codes(text)
+    # A serial file is appended across reboots, so a stop code earlier in it may
+    # be from a previous boot. When EMS marked the boots, read stop codes only
+    # from the current boot (after the last banner); otherwise read the whole
+    # file and say the code's boot is not certain.
+    banners = [match.start() for match in EMS_BOOT_BANNER.finditer(text)]
+    current = text[banners[-1] :] if banners else text
+    codes = stop_codes(current)
     return {
         "bytes": len(text.encode()),
         "lines": len(lines),
         "empty": not text.strip(),
         "ems_output_seen": ems,
         "windows_stop_codes": codes,
+        "stop_codes_scoped_to_current_boot": bool(banners),
         "linux_findings": linux,
         "tail": lines[-tail_lines:],
     }

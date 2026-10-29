@@ -534,10 +534,11 @@ def _register_piece_tools(  # noqa: C901 - one closure per tool
 
         def work(session: VCenterSession, vm: Any, row: dict[str, Any]) -> dict[str, Any]:
             folder = vm_folder(row, vm)
-            if folder is None or vm.datacenter is None:
+            datacenter = vm.datacenter_path or vm.datacenter
+            if folder is None or datacenter is None:
                 return {"available": False, "reason": "the VM's folder or datacenter is not known"}
             file = "vmware.log" if which == 0 else f"vmware-{which}.log"
-            read = session.read_datastore_file(vm.datacenter, f"{folder}/{file}", resolved.max_log_bytes)
+            read = session.read_datastore_file(datacenter, f"{folder}/{file}", resolved.max_log_bytes)
             if read.status != 200:  # noqa: PLR2004
                 return {"available": False, "reason": f"{file} not readable (HTTP {read.status})"}
             lines = parse_lines(read.text)

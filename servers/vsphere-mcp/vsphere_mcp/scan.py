@@ -60,7 +60,11 @@ DIMENSIONS: dict[str, Callable[[VmFacts], list[str]]] = {
     "vcenter": lambda vm: [vm.vcenter],
     "cluster": lambda vm: _on(vm, vm.cluster),
     "host": lambda vm: _on(vm, vm.host),
-    "datastore": lambda vm: [item for name in vm.datastores for item in _on(vm, name)],
+    "datastore": lambda vm: [
+        item
+        for name in vm.datastores
+        for item in _on(vm, f"{vm.datacenter}/{name}" if vm.datacenter else name)
+    ],
     "environment_folder": lambda vm: _on(vm, vm.folder_path),
     "base_disk": lambda vm: _on(vm, vm.base_disk),
     # These two are concepts, not objects: the same across vCenters on purpose.
@@ -176,6 +180,7 @@ def scan_vcenter(session: VCenterSession, settings: Settings) -> VCenterScan:
             begin=now - INFRASTRUCTURE_WINDOW,
             end=now,
             thresholds=thresholds,
+            with_devices=False,  # datastore-level only across the fleet; devices in explain_group
         )
     except Exception as error:  # noqa: BLE001
         notes.append(f"storage counters not read ({type(error).__name__})")
@@ -565,6 +570,7 @@ def window_on_vcenter(
         begin=begin,
         end=end,
         thresholds=thresholds,
+        with_devices=False,
     )
     # Did the window actually have perf data? Below statistics level 3, or for a
     # window older than vCenter keeps fine data, the series come back empty — and

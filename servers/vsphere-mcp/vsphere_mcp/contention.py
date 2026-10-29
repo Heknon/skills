@@ -255,22 +255,22 @@ def storage(  # noqa: C901, PLR0912, PLR0915 - one report over many counters
     end: datetime,
     thresholds: Thresholds,
     vm_moref: str | None = None,
+    with_devices: bool = True,
 ) -> dict[str, Any]:
     """Whether the datastores were slow in the window, and if so the device's side or the host's queue.
 
-    `hosts` maps the morefs of the hosts to read to their names.
+    `hosts` maps the morefs of the hosts to read to their names. `with_devices`
+    reads the per-device (per-LUN) counters that split the array's side from the
+    host's queue; a fleet scan turns it off, because reading every device
+    instance on every host across nine vCenters is a vast query, and leaves it
+    to diagnose_vm / explain_group to read devices for the one host in question.
     """
     host_morefs = list(hosts)
     entities = [session.reference("HostSystem", moref) for moref in host_morefs]
     if vm_moref is not None:
         entities.append(session.reference("VirtualMachine", vm_moref))
-    series, unknown = session.perf(
-        entities,
-        (*HOST_DATASTORE, *HOST_DISK, *(VM_DISK if vm_moref else ())),
-        begin=begin,
-        end=end,
-        instance="*",
-    )
+    counters = (*HOST_DATASTORE, *(HOST_DISK if with_devices else ()), *(VM_DISK if vm_moref else ()))
+    series, unknown = session.perf(entities, counters, begin=begin, end=end, instance="*")
     result: dict[str, Any] = {
         "window": {"from": begin, "to": end},
         "counters_unavailable": unknown,
@@ -330,7 +330,7 @@ def storage(  # noqa: C901, PLR0912, PLR0915 - one report over many counters
         result["datastores"].append(entry)
 
     device_slow = queue_slow = False
-    for moref in host_morefs:
+    for moref in host_morefs if with_devices else []:
         per_host = series.get(moref, {})
         devices: dict[str, dict[str, Any]] = {}
         for name in HOST_DISK:

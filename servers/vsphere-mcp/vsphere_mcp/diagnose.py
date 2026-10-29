@@ -293,16 +293,17 @@ def read_logs(
 ) -> dict[str, Any]:
     """The current `vmware.log` (its end), the boot timeline from it, and the previous log."""
     folder = vm_folder(row, vm)
-    if folder is None or vm.datacenter is None:
+    datacenter = vm.datacenter_path or vm.datacenter
+    if folder is None or datacenter is None:
         return {"available": False, "reason": "the VM's datastore folder or datacenter is not known"}
-    current = session.read_datastore_file(vm.datacenter, f"{folder}/vmware.log", settings.max_log_bytes)
+    current = session.read_datastore_file(datacenter, f"{folder}/vmware.log", settings.max_log_bytes)
     if current.status != 200:  # noqa: PLR2004
         return {"available": False, "reason": _read_reason("vmware.log", current.status, folder)}
     lines = parse_lines(current.text)
     timeline = boot_timeline(lines)
     tools_changes = timeline.get("annotations", {}).get("tools_state", {}).get("count", 0)
-    rotated = piece("log listing", lambda: {"files": _list_logs(session, folder)})
-    previous = session.read_datastore_file(vm.datacenter, f"{folder}/vmware-1.log", ROTATED_LOG_BYTES)
+    rotated = piece("log listing", lambda: {"files": _list_logs(session, vm, folder)})
+    previous = session.read_datastore_file(datacenter, f"{folder}/vmware-1.log", ROTATED_LOG_BYTES)
     previous_lines = parse_lines(previous.text) if previous.status == 200 else []  # noqa: PLR2004
     previous_matches, previous_total = grep(previous_lines, None, limit=20)
     relevant, total = grep(lines, None, limit=40)
@@ -325,13 +326,18 @@ def read_logs(
     }
 
 
-def _list_logs(session: VCenterSession, folder: str) -> list[dict[str, Any]]:
-    """The VM's log files, newest first: vmware.log, then vmware-1.log and older."""
+def _list_logs(session: VCenterSession, vm: VmFacts, folder: str) -> list[dict[str, Any]]:
+    """The VM's log files, newest first: vmware.log, then vmware-1.log and older.
+
+    The datastore is chosen from the VM's own datastores by name — a tiny set,
+    so the datastore-name collision across datacenters does not bite here.
+    """
     datastore, _ = parse_datastore_path(folder)
-    stores = [store for store in Layout.of(session).datastores.values() if store.get("name") == datastore]
-    if not stores:
+    stores = Layout.of(session).datastores
+    own = [stores[m] for m in vm.datastore_morefs if m in stores and stores[m].get("name") == datastore]
+    if not own:
         return []
-    files = session.list_folder(stores[0]["_ref"], folder, ["vmware*.log"])
+    files = session.list_folder(own[0]["_ref"], folder, ["vmware*.log"])
     return sorted(files, key=lambda item: (item["name"] != "vmware.log", item["name"]))
 
 
@@ -343,7 +349,8 @@ def read_serial_files(session: VCenterSession, vm: VmFacts, *, tail_lines: int =
             "reason": "the VM has no serial port writing to a file, so there is no EMS or "
             "kernel console output to read; the console screenshot is the guest's evidence",
         }
-    if vm.datacenter is None:
+    datacenter = vm.datacenter_path or vm.datacenter
+    if datacenter is None:
         return {"available": False, "reason": "the VM's datacenter is not known"}
     files = []
     for path in vm.serial_files:
@@ -352,7 +359,7 @@ def read_serial_files(session: VCenterSession, vm: VmFacts, *, tail_lines: int =
         except ValueError:
             files.append({"path": path, "available": False, "reason": "not a datastore path"})
             continue
-        read = session.read_datastore_file(vm.datacenter, path, SERIAL_BYTES)
+        read = session.read_datastore_file(datacenter, path, SERIAL_BYTES)
         if read.status != 200:  # noqa: PLR2004
             files.append({"path": path, "available": False, "reason": _read_reason(path, read.status, "")})
             continue
@@ -782,7 +789,7 @@ def diagnose_vm(
             peers.append((peer, classify(peer, thresholds)))
     environment = environment_pattern(vm, peers) if peers else {"vms": 0, "findings": []}
     cpu = piece("CPU", lambda: vm_cpu(session, vm, host, begin=begin, end=end, thresholds=thresholds))
-    stores = [store for store in layout.datastores.values() if store.get("name") in vm.datastores]
+    stores = [layout.datastores[m] for m in vm.datastore_morefs if m in layout.datastores]
     disk = piece(
         "storage",
         lambda: storage(
@@ -898,8 +905,8 @@ def diagnose_environment(session: VCenterSession, settings: Settings, *, env_id:
             )
         ),
     )
-    names = {name for vm in vms for name in vm.datastores}
-    stores = [store for store in layout.datastores.values() if store.get("name") in names]
+    morefs = {moref for vm in vms for moref in vm.datastore_morefs}
+    stores = [layout.datastores[m] for m in morefs if m in layout.datastores]
     disk = piece(
         "storage",
         lambda: storage(

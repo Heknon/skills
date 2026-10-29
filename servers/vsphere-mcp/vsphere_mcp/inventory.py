@@ -114,6 +114,7 @@ class VmFacts:
     folder_path: str | None = None
     folder_parent: str | None = None
     datacenter: str | None = None
+    datacenter_path: str | None = None
     instance_uuid: str | None = None
     created: datetime | None = None
     template: bool = False
@@ -154,6 +155,7 @@ class VmFacts:
     host_memory_percent: float | None = None
     cluster: str | None = None
     datastores: list[str] = field(default_factory=list)
+    datastore_morefs: list[str] = field(default_factory=list)
     disk_chain: list[list[str]] = field(default_factory=list)
     base_disk: str | None = None
     serial_files: list[str] = field(default_factory=list)
@@ -257,6 +259,7 @@ class FolderFacts:
     path: str
     parent_name: str | None
     datacenter: str | None
+    datacenter_path: str | None = None
 
 
 @dataclass
@@ -354,8 +357,34 @@ def read_folders(session: VCenterSession) -> dict[str, FolderFacts]:
     datacenters = session.retrieve(vim.Datacenter, DATACENTER_PATHS)
     rows = session.retrieve(vim.Folder, FOLDER_PATHS)
     raw = {row["moref"]: row for row in rows}
+
+    def datacenter_inventory_path(dc_row: dict[str, Any]) -> str:
+        """The path the /folder endpoint's dcPath needs: the datacenter and any folders above it.
+
+        A datacenter at the root is just its name ("DC0"); one inside a folder is
+        "Prod/DC1". The hidden root folder is excluded, as dcPath requires.
+        """
+        segments = [dc_row["name"]]
+        parent = dc_row.get("parent")
+        moref = parent._moId if parent is not None else None  # noqa: SLF001
+        seen: set[str] = set()
+        while moref in raw and moref not in seen:
+            seen.add(moref)
+            folder_row = raw[moref]
+            grandparent = folder_row.get("parent")
+            if grandparent is None:  # the root folder: stop, do not include it
+                break
+            segments.append(folder_row["name"])
+            moref = grandparent._moId  # noqa: SLF001
+        return "/".join(reversed(segments))
+
     datacenter_of_folder = {
         row["vmFolder"]._moId: row["name"]  # noqa: SLF001
+        for row in datacenters
+        if row.get("vmFolder") is not None
+    }
+    datacenter_path_of_folder = {
+        row["vmFolder"]._moId: datacenter_inventory_path(row)  # noqa: SLF001
         for row in datacenters
         if row.get("vmFolder") is not None
     }
@@ -370,12 +399,14 @@ def read_folders(session: VCenterSession) -> dict[str, FolderFacts]:
         parent = row.get("parent")
         parent_moref = parent._moId if parent is not None else None  # noqa: SLF001
         datacenter = datacenter_of_folder.get(moref)
+        datacenter_path = datacenter_path_of_folder.get(moref)
         parent_facts = build(parent_moref, depth + 1) if parent_moref in raw else None
         if datacenter is not None:
             path = f"/{datacenter}/{row['name']}"
         elif parent_facts is not None:
             path = f"{parent_facts.path}/{row['name']}"
             datacenter = parent_facts.datacenter
+            datacenter_path = parent_facts.datacenter_path
         else:
             path = f"/{row['name']}"
         facts = FolderFacts(
@@ -385,6 +416,7 @@ def read_folders(session: VCenterSession) -> dict[str, FolderFacts]:
             path=path,
             parent_name=parent_facts.name if parent_facts else None,
             datacenter=datacenter,
+            datacenter_path=datacenter_path,
         )
         folders[moref] = facts
         return facts
@@ -518,6 +550,7 @@ def vm_facts(  # noqa: C901, PLR0913, PLR0915 - one flattening of one row
             facts.folder_path = folder.path
             facts.folder_parent = folder.parent_name
             facts.datacenter = folder.datacenter
+            facts.datacenter_path = folder.datacenter_path
     elif parent is None:
         facts.notes.append("vCenter reports no parent folder for this VM (it may belong to a vApp)")
     facts.instance_uuid = row.get("config.instanceUuid")
@@ -584,10 +617,8 @@ def vm_facts(  # noqa: C901, PLR0913, PLR0915 - one flattening of one row
             facts.host_connection_state = host.connection_state
             facts.host_maintenance = host.maintenance
             facts.host_memory_percent = host.memory_percent
-    facts.datastores = [
-        datastores.get(ref._moId, {}).get("name") or ref._moId  # noqa: SLF001
-        for ref in row.get("datastore") or []
-    ]
+    facts.datastore_morefs = [ref._moId for ref in row.get("datastore") or []]  # noqa: SLF001
+    facts.datastores = [datastores.get(moref, {}).get("name") or moref for moref in facts.datastore_morefs]
     if with_devices:
         devices = row.get(DEVICE_PATH) or []
         facts.disk_chain = disk_chains(devices)
