@@ -258,6 +258,21 @@ class Settings(BaseSettings):
     max_screenshot_bytes: PositiveInt = 16 * 1024 * 1024
     max_scans_kept: PositiveInt = 8
 
+    guest_username: str | None = None
+    guest_password: str | None = Field(default=None, repr=False)
+    """Default guest-OS credentials for `run_in_guest`, used when a call gives none.
+
+    This is the ONE capability that is not read-only: `run_in_guest` executes a
+    command inside a guest through VMware Tools. It needs guest credentials, and
+    the guest must have Tools running. Leave unset to require them per call.
+    """
+
+    guest_exec_timeout_seconds: PositiveFloat = 30.0
+    """How long `run_in_guest` waits for a command to finish before giving up on its exit code."""
+
+    guest_exec_max_output_bytes: PositiveInt = 1 * 1024 * 1024
+    """The most command output `run_in_guest` returns; more is truncated."""
+
     vrops_url: str | None = None
     """`VSPHERE_VROPS_URL`: vROps (Aria / VCF Operations), e.g. `https://vrops.example`."""
 

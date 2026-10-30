@@ -31,7 +31,7 @@ from PIL import Image
 from pyVmomi import vim, vmodl
 from starlette.responses import JSONResponse
 
-from vsphere_mcp import ages, hardware, resources, snapshots, storagehealth, timecheck
+from vsphere_mcp import ages, guestexec, hardware, resources, snapshots, storagehealth, timecheck
 from vsphere_mcp import scan as scanning
 from vsphere_mcp.checks import classify, count_states
 from vsphere_mcp.config import Settings
@@ -77,6 +77,10 @@ ANTICIPATED = (
 )
 
 READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True)
+# run_in_guest is the one tool that acts on a VM; it is not read-only and says so.
+GUEST_EXEC = ToolAnnotations(
+    readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=True
+)
 MAX_LIMIT = 500
 
 INSTRUCTIONS = """\
@@ -84,8 +88,11 @@ Read-only access to the vCenters (and vROps, if configured), for diagnosing VMs
 that are stuck — on first boot, after a reboot, or hung at any point — slow to
 come up, losing VMware Tools, blocked on a question, starved, or wedged by a
 virtual device; and for when the vCenter API itself is the problem (SSL EOF
-errors, resets, timeouts, often connection or session exhaustion). Nothing here
-can change anything in vSphere.
+errors, resets, timeouts, often connection or session exhaustion). Every tool
+reads only, with one deliberate exception: run_in_guest executes a command
+inside a guest OS (it needs VMware Tools running and guest credentials) for a
+diagnostic a read cannot answer. It is marked not-read-only; nothing else can
+change a VM.
 
 When the symptom is SSL EOF / reset / timeout against the vCenters that Sims,
 Sahara and this server all hit, start with check_vcenters: a high session count
@@ -187,8 +194,14 @@ def _registrar(server: MCPServer, resolved: Settings) -> Callable[[str | None], 
     """The decorator every tool is registered with: read-only, admitted, bounded, worded."""
     active = {"count": 0}
 
-    def tool(name: str | None = None) -> Callable[[Callable[..., Awaitable[dict[str, Any]]]], Any]:
-        """Register a read-only tool: admitted, bounded, a lookup miss answered rather than raised."""
+    def tool(
+        name: str | None = None, *, annotations: ToolAnnotations = READ_ONLY
+    ) -> Callable[[Callable[..., Awaitable[dict[str, Any]]]], Any]:
+        """Register a tool: admitted, bounded, a lookup miss answered rather than raised.
+
+        Read-only by default; `annotations=GUEST_EXEC` marks the one tool that acts
+        on a VM, so a client sees it is not read-only.
+        """
 
         def register(function: Callable[..., Awaitable[dict[str, Any]]]) -> Any:
             @wraps(function)
@@ -207,7 +220,7 @@ def _registrar(server: MCPServer, resolved: Settings) -> Callable[[str | None], 
                 finally:
                     active["count"] -= 1
 
-            return server.tool(name=name or function.__name__, annotations=READ_ONLY)(wrapped)
+            return server.tool(name=name or function.__name__, annotations=annotations)(wrapped)
 
         return register
 
@@ -617,7 +630,9 @@ def _register_fleet_tools(  # noqa: C901, PLR0915 - one closure per tool
         return await scanning.diagnose_window(fleet, resolved, names, begin, end)
 
 
-def _register_machine_tools(tool: Callable[..., Any], fleet: VCenterPool, resolved: Settings) -> None:
+def _register_machine_tools(  # noqa: C901 - one closure per tool
+    tool: Callable[..., Any], fleet: VCenterPool, resolved: Settings
+) -> None:
     """Environments and machines: finding them, diagnosing them, and each piece on its own."""
     # -- environments and machines ----------------------------------------------
 
@@ -742,6 +757,56 @@ def _register_machine_tools(tool: Callable[..., Any], fleet: VCenterPool, resolv
         """
         name = fleet.resolve(vcenter)
         return await fleet.run(name, lambda session: diagnose_environment(session, resolved, env_id=env_id))
+
+    @tool("run_in_guest", annotations=GUEST_EXEC)
+    async def run_in_guest_tool(
+        *,
+        vcenter: str,
+        command: str,
+        moref: str | None = None,
+        env_id: str | None = None,
+        vm_name: str | None = None,
+        username: str | None = None,
+        password: str | None = None,
+    ) -> dict[str, Any]:
+        """Run a command inside a guest OS and return its output and exit code. NOT read-only.
+
+        This is the one tool that acts on a VM rather than only reading it: it
+        executes `command` in the guest through VMware Tools, so it needs Tools
+        running in the guest and guest-OS credentials (passed here, or the
+        configured VSPHERE_GUEST_USERNAME/PASSWORD defaults). Use it for a
+        diagnostic a read cannot answer — "is the guest actually responsive?",
+        reading a file or a service state from inside — not for changes. Output
+        is captured by redirecting to a temp file in the guest, downloading it,
+        and deleting it (a small, temporary guest-filesystem write). The command
+        is handed to the guest's own shell (`cmd.exe` on Windows, `/bin/sh` on
+        Linux); a command containing the shell's quote character can break the
+        wrapping.
+
+        Find the VM by moref, or by env_id plus vm_name (never by name alone).
+
+        Args:
+            vcenter: the VM's vCenter.
+            command: the command line to run in the guest.
+            moref: the VM's moref, or give env_id and vm_name.
+            env_id: the Twix environment id, with vm_name.
+            vm_name: the machine's name inside its environment.
+            username: guest-OS account; the configured default when omitted.
+            password: that account's password; the configured default when omitted.
+
+        """
+        name = fleet.resolve(vcenter)
+        return await guestexec.run_in_guest(
+            fleet,
+            resolved,
+            name,
+            moref=moref,
+            env_id=env_id,
+            vm_name=vm_name,
+            command=command,
+            username=username,
+            password=password,
+        )
 
 
 def _register_piece_tools(  # noqa: C901 - one closure per tool

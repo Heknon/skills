@@ -85,6 +85,20 @@ fleet-wide. When `check_vcenters` shows the session count healthy but the errors
 persist, run **`check_host_time`**: it reports each host's NTP configuration and
 its clock skew from vCenter, and names the hosts that have drifted.
 
+## When a read cannot answer: run_in_guest
+
+Every tool above reads. One does not: **`run_in_guest`** executes a command
+inside the guest OS through VMware Tools. Reach for it only when the read-only
+evidence leaves a real gap a command would close — "is the guest actually
+responsive, or just painting a static console?", reading a file or a service
+state from inside the guest — and the guest has Tools running (without Tools
+there is no guest-ops channel; fall back to the console, serial and boot log).
+It needs guest credentials, it is the one tool that acts on the VM rather than
+observing it, and it runs exactly the command given — so prefer a read first,
+keep the command a diagnostic (not a change), and record what you ran in the
+verdict. It is not a substitute for the shared-cause checks: a responsive guest
+on a starved host is still starved.
+
 ## The steps
 
 | Step | Load |

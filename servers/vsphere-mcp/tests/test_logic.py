@@ -19,6 +19,7 @@ from vsphere_mcp import (
     contention,
     diagnose,
     formatting,
+    guestexec,
     resources,
     scan,
     snapshots,
@@ -1346,3 +1347,33 @@ def test_resource_limits_roll_up_by_template_base_disk() -> None:
     assert rolled[0]["clones"] == 2
     assert rolled[0]["cpu_limited"] == 2
     assert rolled[0]["memory_limited"] == 1
+
+
+# -- guest run-command: command shaping (the one non-read-only tool) -----------------------
+
+
+def test_the_windows_shell_wraps_the_command_and_captures_output() -> None:
+    program, arguments = guestexec.guest_program_spec("ipconfig /all", r"C:\Temp\o.txt", windows=True)
+
+    assert program.endswith("cmd.exe")
+    assert arguments == r'/c ipconfig /all > "C:\Temp\o.txt" 2>&1'
+
+
+def test_the_linux_shell_wraps_the_command_and_captures_output() -> None:
+    program, arguments = guestexec.guest_program_spec("systemctl status", "/tmp/o.txt", windows=False)  # noqa: S108
+
+    assert program == "/bin/sh"
+    assert arguments == "-c \"systemctl status > '/tmp/o.txt' 2>&1\""
+
+
+def test_the_guest_temp_path_is_os_specific() -> None:
+    assert guestexec.guest_temp_path("abc", windows=True).startswith(r"C:\Windows\Temp")
+    assert guestexec.guest_temp_path("abc", windows=False) == "/tmp/vsphere-mcp-abc.txt"  # noqa: S108
+
+
+def test_a_star_host_in_the_transfer_url_is_resolved_to_the_vcenter() -> None:
+    resolved = guestexec.rewrite_transfer_url("https://*:443/guestFile?id=5&token=x", "esx-7.lab")
+    unchanged = guestexec.rewrite_transfer_url("https://host-9.lab/guestFile?id=5", "esx-7.lab")
+
+    assert resolved == "https://esx-7.lab:443/guestFile?id=5&token=x"
+    assert unchanged == "https://host-9.lab/guestFile?id=5"

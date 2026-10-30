@@ -20,6 +20,7 @@ import logging
 import ssl
 import threading
 import time
+import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from http.client import HTTPException
@@ -476,6 +477,98 @@ class VCenterSession:
         """One host's own clock, read through its dateTimeSystem (QueryDateTime, read-only)."""
         system = self.reference("HostDateTimeSystem", datetime_system_moref)
         return as_utc(system.QueryDateTime())
+
+    def run_in_guest(
+        self,
+        moref: str,
+        *,
+        windows: bool,
+        command: str,
+        username: str,
+        password: str,
+        timeout_seconds: float,
+        max_output_bytes: int,
+    ) -> dict[str, Any]:
+        """Run a command in the guest and return its exit code and output. NOT read-only.
+
+        This is the single operation that bypasses `ReadOnlyStub`: it goes through
+        the raw SOAP stub on purpose, because the user has allowed commands on the
+        VM for diagnostics. Output is captured by redirecting to a guest temp file,
+        downloading it, and deleting it. Needs VMware Tools in the guest.
+        """
+        # Local import: guestexec imports diagnose, which imports this module.
+        from vsphere_mcp.guestexec import (  # noqa: PLC0415 - deferred to avoid a circular import
+            guest_program_spec,
+            guest_temp_path,
+            rewrite_transfer_url,
+        )
+
+        _ = self.content
+        if self._raw is None:
+            msg = "Session is not connected"
+            raise VSphereError(msg)
+        raw_stub = self._raw._stub  # noqa: SLF001 - the deliberate unguarded path for guest exec
+        manager = vim.GuestOperationsManager(self.content.guestOperationsManager._moId, raw_stub)  # noqa: SLF001
+        process_manager = manager.processManager
+        file_manager = manager.fileManager
+        vm = vim.VirtualMachine(moref, raw_stub)
+        auth = vim.vm.guest.NamePasswordAuthentication(
+            username=username, password=password, interactiveSession=False
+        )
+        token = uuid.uuid4().hex
+        out_path = guest_temp_path(token, windows=windows)
+        program_path, arguments = guest_program_spec(command, out_path, windows=windows)
+        spec = vim.vm.guest.ProcessManager.ProgramSpec(programPath=program_path, arguments=arguments)
+        pid = process_manager.StartProgramInGuest(vm, auth, spec)
+        deadline = time.monotonic() + timeout_seconds
+        exit_code: int | None = None
+        while time.monotonic() < deadline:
+            infos = process_manager.ListProcessesInGuest(vm, auth, [pid]) or []
+            info = next((item for item in infos if item.pid == pid), None)
+            if info is not None and info.exitCode is not None:
+                exit_code = info.exitCode
+                break
+            time.sleep(0.5)
+        output, truncated = "", False
+        try:
+            transfer = file_manager.InitiateFileTransferFromGuest(vm, auth, out_path)
+            output, truncated = self._download_text(
+                rewrite_transfer_url(transfer.url, self.vcenter.host), max_output_bytes
+            )
+        finally:
+            with contextlib.suppress(Exception):
+                file_manager.DeleteFileInGuest(vm, auth, out_path)
+        return {
+            "command": command,
+            "ran_as": username,
+            "pid": pid,
+            "exit_code": exit_code,
+            "timed_out": exit_code is None,
+            "output": output,
+            "output_truncated": truncated,
+        }
+
+    def _download_text(self, url: str, max_bytes: int) -> tuple[str, bool]:
+        """GET a guest file-transfer URL, capped, returned as text with a truncation flag."""
+        ensure_read_request("GET")
+        if self._http is None:
+            msg = "Session is not connected"
+            raise VSphereError(msg)
+        body = bytearray()
+        truncated = False
+        response = self._http.send(self._http.build_request("GET", url), stream=True)
+        try:
+            if response.status_code != 200:  # noqa: PLR2004
+                return f"(output file not readable: HTTP {response.status_code})", False
+            for chunk in response.iter_bytes():
+                body.extend(chunk)
+                if len(body) > max_bytes:
+                    truncated = True
+                    del body[max_bytes:]
+                    break
+        finally:
+            response.close()
+        return body.decode("utf-8", errors="replace"), truncated
 
     # -- events --------------------------------------------------------------
 

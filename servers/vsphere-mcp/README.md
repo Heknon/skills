@@ -4,6 +4,11 @@ A read-only MCP server over the vCenters (and, optionally, vROps), for
 diagnosing VMs that are stuck, did not come back after a reboot, or keep losing
 VMware Tools. The plan it implements is `plans/vsphere-vrops-mcp.md`.
 
+It is read-only with one deliberate exception: `run_in_guest` executes a
+command inside a guest OS for a diagnostic a read cannot answer. It is marked
+not-read-only and routed outside the read-only guard on purpose (see below);
+nothing else can change a VM.
+
 It answers two kinds of question:
 
 - **From a Sahara VMware Tools error** (which names the vCenter, the machine
@@ -14,27 +19,35 @@ It answers two kinds of question:
   linked-clone base disk, environment, ...) against their population, and
   `explain_group` says why a group is abnormal.
 
-## Read-only, by construction
+## Read-only, by construction (with one marked exception)
 
 The accounts it may run with can write, so the guarantee is in the code, not
 the account:
 
 - Every vSphere call goes through `readonly.ReadOnlyStub`, which refuses any
-  method not on `ALLOWED_METHODS` before a byte is sent. The list is 13
-  methods: login and logout, the clock, property reads, container views,
-  `QueryEvents`, `QueryPerf`, `BrowseDiagnosticLog` / `QueryDescriptions` and
-  `SearchDatastore_Task` (which only lists files).
+  method not on a short `ALLOWED_METHODS` allowlist before a byte is sent:
+  login and logout, the clock, property reads, container views, `QueryEvents`,
+  `QueryPerf`, `BrowseDiagnosticLog` / `QueryDescriptions`, `QueryDateTime` (a
+  host's clock) and `SearchDatastore_Task` (which only lists files).
 - Every HTTP request (`vmware.log` and serial files over `/folder`, the
   console over `/screen`) goes through `ensure_read_request`: GET only.
 - The console is read through `/screen`, never `CreateScreenshot_Task`, which
   writes a PNG into the VM's folder.
-- A test drives every tool against simulated vCenters and asserts that the
-  methods sent are a subset of the list; another tries power, reset, answer,
-  reconfigure, destroy and screenshot-to-datastore through a live session and
-  expects each to be refused.
+- A test drives every read-only tool against simulated vCenters and asserts
+  that the methods sent are a subset of the allowlist; another tries power,
+  reset, answer, reconfigure, destroy and screenshot-to-datastore through a
+  live session and expects each to be refused.
 
-Nothing is created, changed, answered, powered or deleted, and the server
-runs nothing in the background.
+**The one exception is `run_in_guest`**, enabled deliberately: it runs a
+command inside a guest OS through VMware Tools, so it cannot be read-only. It
+does **not** go through `ReadOnlyStub` — it uses the session's raw stub on
+purpose (`VCenterSession.run_in_guest`) and is the only path that can change a
+VM. It needs VMware Tools running in the guest and guest-OS credentials (per
+call, or `VSPHERE_GUEST_USERNAME` / `VSPHERE_GUEST_PASSWORD`), captures output
+via a temp file in the guest that it downloads and deletes, and a test proves
+that invoking it never adds a method to the read-only (guarded) surface.
+Everything else is read-only: nothing is created, changed, answered, powered or
+deleted, and the server runs nothing in the background.
 
 ## Concepts, not constants
 
@@ -119,6 +132,7 @@ read, and diagnostics (host logs).
 | `find_environment` | where an environment's folder is, on which vCenter(s), and its VMs |
 | `diagnose_vm` | one VM: machine, CPU, storage, environment, boot timeline, serial console (EMS), console; the likely cause with evidence for and against |
 | `diagnose_environment` | every VM of an environment, grouped, with CPU and storage |
+| `run_in_guest` | **not read-only** — runs a command inside a guest OS (needs VMware Tools and guest credentials) and returns its output and exit code, for a diagnostic a read cannot answer |
 | `get_boot_timeline` | how far the last boot got, from `vmware.log`, plus the serial console |
 | `read_vm_log` | `vmware.log` / `vmware-N.log` lines, filtered on the server |
 | `read_serial_console` | Windows EMS or a Linux kernel console, when the VM has a serial port to a file; stop codes with the layer each points at |
@@ -245,6 +259,13 @@ What the simulator cannot do, and how the tests deal with it:
   are read on the simulator, but confirm that a linked clone made from a template
   with a limit actually inherits it (the clone-inheritance note in
   `find_resource_limits` rests on that).
+- `run_in_guest`: the simulator does not implement guest operations, so the
+  guest-command path is unit-tested only (command shaping, the `*`-host transfer
+  URL). Confirm against a real vCenter: the guest-operation privileges the
+  account needs, that output capture via a redirected temp file and
+  `InitiateFileTransferFromGuest` works for your Windows and Linux guests, and
+  that the credentials behave as expected. `run_in_guest` is the one tool that
+  changes a VM; keep its credentials scoped accordingly.
 - That a guest reboot in your fleet logs a reset or guest-reboot event (so
   uptime is measured from the reboot, not power-on); if some reboots are
   silent to vCenter, pass `rebooted_at` from Sahara. The simulator cannot

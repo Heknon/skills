@@ -2,18 +2,24 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 from typing import TYPE_CHECKING, Any
 
 import pytest
 from conftest import call, png
+from mcp.server.mcpserver.exceptions import ToolError
 from pyVmomi import vim
 
 from vsphere_mcp.readonly import ALLOWED_METHODS, ReadOnlyViolationError, ensure_read_request
+from vsphere_mcp.server import build_server
 from vsphere_mcp.vcenter import VCenterSession
 
 if TYPE_CHECKING:
     import scenario
     from mcp.server import MCPServer
+
+    from vsphere_mcp.config import Settings
 
 
 def states(result: dict[str, Any]) -> dict[str, str]:
@@ -469,6 +475,53 @@ def test_every_call_the_tools_made_is_on_the_read_list(
     seen = server.vcenters.methods_seen()
     assert seen
     assert seen <= ALLOWED_METHODS, seen - ALLOWED_METHODS
+
+
+def test_run_in_guest_needs_credentials(server: MCPServer, worlds: tuple[scenario.World, ...]) -> None:
+    moref = worlds[0].moref("environments/env-1003", "ok-01")
+
+    # No creds passed and none configured: refused in words, before anything runs.
+    args = {"vcenter": "vc-a", "moref": moref, "command": "echo a"}
+    with pytest.raises(ToolError, match="guest credentials"):
+        asyncio.run(server.call_tool("run_in_guest", args))
+
+
+def test_run_in_guest_refuses_a_guest_without_tools(
+    server: MCPServer, worlds: tuple[scenario.World, ...]
+) -> None:
+    # web-01 is powered on but Tools is not running: guest operations are impossible.
+    moref = worlds[0].moref("environments/env-1001", "web-01")
+
+    result = call(
+        server,
+        "run_in_guest",
+        {"vcenter": "vc-a", "moref": moref, "command": "echo a", "username": "u", "password": "p"},
+    )
+
+    assert result["ran"] is False
+    assert "Tools is not running" in result["reason"]
+
+
+def test_guest_exec_never_dirties_the_read_only_surface(
+    settings: Settings, worlds: tuple[scenario.World, ...], plan: object
+) -> None:
+    # ok-01 reports Tools running, so run_in_guest proceeds to the guest-ops call.
+    # The simulator cannot perform it, so the call errors (or its poll times out) —
+    # but the point is that guest exec goes through the raw stub, so the guarded
+    # (read-only) surface is untouched whatever happens. A 1 s guest timeout keeps
+    # the simulator's non-answer from stalling the suite.
+    _ = plan  # the controlled perf fixture, applied to the session class
+    fast = settings.model_copy(update={"guest_exec_timeout_seconds": 1.0})
+    built = build_server(fast)
+    try:
+        moref = worlds[0].moref("environments/env-1003", "ok-01")
+        args = {"vcenter": "vc-a", "moref": moref, "command": "echo a", "username": "u", "password": "p"}
+        with contextlib.suppress(ToolError):
+            asyncio.run(built.call_tool("run_in_guest", args))
+        seen = built.vcenters.methods_seen()
+        assert seen <= ALLOWED_METHODS, seen - ALLOWED_METHODS
+    finally:
+        built.vcenters.close()
 
 
 def test_a_write_cannot_be_sent_even_from_inside(
