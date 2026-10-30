@@ -284,7 +284,7 @@ class VCenterSession:
         A read-only role may not be allowed the global session list; then only
         this server's own session is visible and the result says so. The count
         is the signal for connection/session exhaustion that causes SSL EOFs and
-        resets for every client, this MCP, Sims and Sahara alike.
+        resets for every client hitting the vCenter, this server included.
         """
         manager = self.content.sessionManager
         current = getattr(manager.currentSession, "userName", None) if manager.currentSession else None

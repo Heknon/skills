@@ -94,13 +94,13 @@ inside a guest OS (it needs VMware Tools running and guest credentials) for a
 diagnostic a read cannot answer. It is marked not-read-only; nothing else can
 change a VM.
 
-When the symptom is SSL EOF / reset / timeout against the vCenters that Sims,
-Sahara and this server all hit, start with check_vcenters: a high session count
-or slow login points at the vCenter near its limit, not at any one VM.
+When the symptom is SSL EOF / reset / timeout against a vCenter that many
+clients hit (this server included), start with check_vcenters: a high session
+count or slow login points at the vCenter near its limit, not at any one VM.
 
 Concepts:
 - Environments are short-lived (minutes to a day) and each is a folder named by
-  its Twix environment id, under a parent folder that groups environments (some
+  its environment id, under a parent folder that groups environments (some
   vCenters call it environments, others projects). The layout is discovered,
   not assumed: find_environment reports where it found a folder.
 - A VM is identified by its vCenter and moref. Its name is reused by later
@@ -110,18 +110,19 @@ Concepts:
   read one disk on one datastore.
 
 Two ways in:
-1. From a Sahara VMware Tools error, which names the vCenter, the machine and
-   the environment id: diagnose_vm(vcenter, env_id=..., vm_name=...).
+1. From a VMware Tools error your monitoring raised, which names the vCenter,
+   the machine and the environment id: diagnose_vm(vcenter, env_id=..., vm_name=...).
 2. From a question about the fleet ("anything stuck on vc-04?"): scan, then
    explain_group on its strongest group, then diagnose_vm on that group's
    representatives. A past window, when VMs are gone: diagnose_window.
 
 Reading the answers:
 - Shared causes first. CPU starvation on an overcommitted ESXi host (ready time,
-  host demand over 100% of capacity) and storage latency (PowerFlex datastores)
-  have both stopped VMs from coming back. Check the host and the storage before
-  explaining the guest, and check that the healthy VMs beside the stuck ones
-  were not in the same situation before blaming what they share.
+  host demand over 100% of capacity) and storage latency (a saturated datastore
+  or its backing array) have both stopped VMs from coming back. Check the host
+  and the storage before explaining the guest, and check that the healthy VMs
+  beside the stuck ones were not in the same situation before blaming what they
+  share.
 - Starved is not hung: a VM busy on CPU with a changing console is booting
   slowly and may come up; the Tools error is then a timeout upstream.
 - vmware.log is the hypervisor's log, not the guest's: it shows how far a boot
@@ -259,8 +260,8 @@ def _register_fleet_tools(  # noqa: C901, PLR0915 - one closure per tool
         """Each vCenter's reachability, login time, and open-session count.
 
         For when the symptom is the vCenter API itself — SSL EOF errors, resets
-        or timeouts that Sims, Sahara and this server all hit. A high or climbing
-        session count, or a slow login, points at connection/session exhaustion
+        or timeouts that many clients hit at once (this server included). A high
+        or climbing session count, or a slow login, points at connection/session exhaustion
         on the vCenter, which looks like a dropped connection to every client.
         The session count needs the account to be allowed the global session
         list; otherwise only this server's own session is visible and it says so.
@@ -524,8 +525,8 @@ def _register_fleet_tools(  # noqa: C901, PLR0915 - one closure per tool
         """Each ESXi host's NTP configuration and clock skew from vCenter, worst first.
 
         A drifting host clock breaks TLS handshakes and Kerberos/Active Directory
-        token auth — a frequent root of the SSL/handshake errors Sims, Sahara and
-        this server hit, separate from session exhaustion (check_vcenters). Reads
+        token auth — a frequent root of the SSL/handshake errors clients hit,
+        separate from session exhaustion (check_vcenters). Reads
         the NTP servers configured, whether the time service runs, and each host's
         own clock against vCenter's. Skew past ~300 s breaks AD auth outright.
 
@@ -644,7 +645,7 @@ def _register_machine_tools(  # noqa: C901 - one closure per tool
         reports its full path and parent; ambiguity is reported, not resolved.
 
         Args:
-            env_id: the Twix environment id.
+            env_id: the environment id.
             vcenter: the vCenter, if known; every vCenter otherwise.
 
         """
@@ -711,19 +712,19 @@ def _register_machine_tools(  # noqa: C901 - one closure per tool
         in vmware.log, the serial console (EMS) if it has one, and the console
         screen (two captures).
 
-        Pass rebooted_at (the time Sahara logged the reboot or power-on you are
-        investigating) when you have it: a guest reboot does not move vCenter's
-        power-on time, so without it a warm-rebooted VM can look up for days and
-        be misjudged as stuck. The result's machine.values.boot_time_source says
-        what uptime was measured from (reported_reboot, reboot_event or
-        power_on).
+        Pass rebooted_at (the time your orchestrator or monitoring logged the
+        reboot or power-on you are investigating) when you have it: a guest reboot
+        does not move vCenter's power-on time, so without it a warm-rebooted VM
+        can look up for days and be misjudged as stuck. The result's
+        machine.values.boot_time_source says what uptime was measured from
+        (reported_reboot, reboot_event or power_on).
 
         Args:
-            vcenter: any spelling of the vCenter's name (as Sahara logs it).
-            env_id: the Twix environment id, with vm_name.
+            vcenter: any spelling of the vCenter's name (as your monitoring logs it).
+            env_id: the environment id, with vm_name.
             vm_name: the machine's name inside its environment.
             moref: the VM's moref (vm-1234), instead of env_id and vm_name.
-            rebooted_at: when the reboot happened, ISO 8601, from Sahara.
+            rebooted_at: when the reboot happened, ISO 8601, from your orchestrator.
             console_captures: screenshots to take (0 to skip the console).
             console_interval_seconds: seconds between screenshots.
 
@@ -752,7 +753,7 @@ def _register_machine_tools(  # noqa: C901 - one closure per tool
 
         Args:
             vcenter: any spelling of the vCenter's name.
-            env_id: the Twix environment id.
+            env_id: the environment id.
 
         """
         name = fleet.resolve(vcenter)
@@ -789,7 +790,7 @@ def _register_machine_tools(  # noqa: C901 - one closure per tool
             vcenter: the VM's vCenter.
             command: the command line to run in the guest.
             moref: the VM's moref, or give env_id and vm_name.
-            env_id: the Twix environment id, with vm_name.
+            env_id: the environment id, with vm_name.
             vm_name: the machine's name inside its environment.
             username: guest-OS account; the configured default when omitted.
             password: that account's password; the configured default when omitted.

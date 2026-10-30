@@ -765,7 +765,10 @@ def next_checks(conclusion: dict[str, Any], vm: VmFacts) -> list[str]:
         steps.append("take the console again in a few minutes: is it still progressing?")
     if not leading:
         steps.append("scan the vCenter: is this VM alone, or part of a group?")
-    steps.append("Sahara and Sims logs: when the reboot was asked for, and how long Sims waited")
+    steps.append(
+        "your orchestrator's / monitoring's logs: when the reboot was asked for, and how long it "
+        "waited for Tools before raising the error"
+    )
     return steps
 
 
@@ -811,7 +814,7 @@ def diagnose_vm(
     # Find the reboot before judging uptime: a warm reboot does not move
     # runtime.bootTime, so without this the VM looks up for days. Look back over
     # the VM's life (capped), not from bootTime, since bootTime may be the stale
-    # power-on. The caller's rebooted_at (from Sahara) wins when given.
+    # power-on. The caller's rebooted_at (from an orchestrator/monitoring) wins when given.
     lookback = min(max(vm.age_hours or 24.0, 1.0), 24.0)
     events = piece(
         "events",

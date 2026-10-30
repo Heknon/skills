@@ -1,8 +1,12 @@
-# vsphere-mcp
+# vsphere-vrops-mcp
 
-A read-only MCP server over the vCenters (and, optionally, vROps), for
-diagnosing VMs that are stuck, did not come back after a reboot, or keep losing
-VMware Tools. The plan it implements is `plans/vsphere-vrops-mcp.md`.
+A read-only vSphere and vROps MCP server for diagnosing VMs that are stuck, did
+not come back after a reboot, or keep losing VMware Tools — across a fleet of
+vCenters where VMs are short-lived and their names are reused. It discovers each
+vCenter's layout rather than assuming it, so it is not tied to any one platform;
+it plugs into an orchestrator like Sahara through configuration and a skill
+(see [Using it with an orchestrator](docs/orchestrator-integration.md)). The
+design it implements is `plans/vsphere-vrops-mcp.md`.
 
 It is read-only with one deliberate exception: `run_in_guest` executes a
 command inside a guest OS for a diagnostic a read cannot answer. It is marked
@@ -11,9 +15,9 @@ nothing else can change a VM.
 
 It answers two kinds of question:
 
-- **From a Sahara VMware Tools error** (which names the vCenter, the machine
-  and the Twix environment id): `diagnose_vm(vcenter, env_id, vm_name)` runs
-  every check in a fixed order and ends in the likely cause.
+- **From a VMware Tools error your monitoring raised** (which names the vCenter,
+  the machine and the environment id): `diagnose_vm(vcenter, env_id, vm_name)`
+  runs every check in a fixed order and ends in the likely cause.
 - **About the fleet** ("anything stuck on these vCenters?"): `scan` judges
   every VM, groups the abnormal ones by what they share (host, datastore,
   linked-clone base disk, environment, ...) against their population, and
@@ -53,15 +57,15 @@ deleted, and the server runs nothing in the background.
 
 Nothing hard-codes a folder path, a log field or a naming pattern:
 
-- An environment is a folder named by its Twix id. `find_environment` looks for
-  it (exact name first, then names containing it) and reports where it found
-  it and under which parent (environments, projects, anything). Several
+- An environment is a folder named by its environment id. `find_environment`
+  looks for it (exact name first, then names containing it) and reports where it
+  found it and under which parent (environments, projects, anything). Several
   matches are reported, never guessed between.
   `VSPHERE_ENV_PARENT_HINTS` only orders the search.
 - A VM is identified by `(vcenter, moref)`. Its name is looked up only inside
   its environment folder, since later environments reuse it.
 - A vCenter answers to its name, host, the host's first label and any
-  configured alias, so whatever spelling a Sahara log uses resolves.
+  configured alias, so whatever spelling an upstream log uses resolves.
 - Group values carry their vCenter (`vc-a:DC0_H0`): two vCenters' hosts of the
   same name are different hosts.
 - Every check returns the numbers it judged, beside its verdict; thresholds
@@ -108,7 +112,7 @@ An MCP client config, over stdio:
 }
 ```
 
-Or shared over HTTP, beside the Sahara MCP:
+Or shared over HTTP, alongside your other MCP servers:
 `vsphere-mcp --transport streamable-http --host 0.0.0.0 --port 8000 --allowed-host vsphere-mcp.example`
 (`/healthz` for probes). Over HTTP every caller shares the configured
 credential, which is read-only in effect either way.
@@ -195,8 +199,8 @@ fit a context window.
   overcommit; usage alone is reported as such, since it cannot exceed 100%.
 - **Storage**: the hosts' `datastore.total{Read,Write}Latency` for the VM's
   datastores, `disk.{device,kernel,queue}Latency`, aborts and resets per
-  device. High device latency points at the array (PowerFlex), high queue
-  latency at the host's own queue.
+  device. High device latency points at the storage array (e.g. PowerFlex),
+  high queue latency at the host's own queue.
 - **The environment**: whether the healthy VMs beside a stuck one share its
   host, datastore and base disk (which argues against them) or not.
 - **The boot**: `vmware.log` is the hypervisor's log, not the guest's. It shows
@@ -268,8 +272,8 @@ What the simulator cannot do, and how the tests deal with it:
   changes a VM; keep its credentials scoped accordingly.
 - That a guest reboot in your fleet logs a reset or guest-reboot event (so
   uptime is measured from the reboot, not power-on); if some reboots are
-  silent to vCenter, pass `rebooted_at` from Sahara. The simulator cannot
-  exercise this — the logic is covered by unit tests only.
+  silent to vCenter, pass `rebooted_at` from your orchestrator. The simulator
+  cannot exercise this — the logic is covered by unit tests only.
 - The `dcPath` for a datacenter that sits inside a folder, and a datastore
   name shared across two datacenters. The simulator has one flat datacenter,
   so these paths (full datacenter inventory path, datastore identity by moref)

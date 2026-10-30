@@ -139,7 +139,7 @@ async def check_host_time(
     if skewed:
         findings.append(
             f"{len(skewed)} host(s) are skewed from vCenter — skew breaks TLS and Kerberos/AD auth, "
-            "a common root of the SSL/handshake errors Sims and Sahara hit"
+            "a common root of the SSL/handshake errors clients hit"
         )
     if measure_skew and could_not_measure:
         findings.append(

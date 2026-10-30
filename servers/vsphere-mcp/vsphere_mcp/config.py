@@ -61,9 +61,9 @@ class VCenter(BaseModel):
     aliases: tuple[str, ...] = ()
     """Other spellings the upstream systems use for it.
 
-    A Sahara log may name a vCenter by its short name, its FQDN or something
-    else again. The host and the first label of the host are matched without
-    being listed; anything else goes here.
+    An upstream system's log may name a vCenter by its short name, its FQDN or
+    something else again. The host and the first label of the host are matched
+    without being listed; anything else goes here.
     """
 
     username: str | None = None

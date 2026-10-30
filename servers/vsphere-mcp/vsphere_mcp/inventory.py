@@ -1,9 +1,9 @@
 """A vCenter's inventory as facts: VMs, the folders they live in, their hosts and disks.
 
 The layout is discovered, never assumed. An environment is a folder named by its
-Twix id; which parent groups it (environments, projects, anything else) is read
-from the tree and reported, not expected. A VM is identified by its vCenter and
-moref; its name means something only inside its folder.
+environment id; which parent groups it (environments, projects, anything else)
+is read from the tree and reported, not expected. A VM is identified by its
+vCenter and moref; its name means something only inside its folder.
 
 Where vCenter's own data disagrees with itself (a boot time in one place and
 not the other, a VM outside any folder) the disagreement is kept as a note on
@@ -929,8 +929,9 @@ def read_inventory(
     """Read a vCenter's VMs (all, or the given ones) and what they sit on.
 
     `reboots` maps a VM's moref to the most recent reboot/reset event vCenter
-    logged for it; `rebooted_at` is a reboot time the caller knows from Sahara.
-    Either overrides power-on time for the uptime judgement when it is newer.
+    logged for it; `rebooted_at` is a reboot time the caller already knows (from
+    an orchestrator or monitoring). Either overrides power-on time for the
+    uptime judgement when it is newer.
     """
     read_at = session.now()
     folders = read_folders(session)
@@ -1092,8 +1093,9 @@ def set_effective_boot(
     runtime.bootTime only moves on a power cycle, never on an in-guest reboot, so
     for a warm-rebooted VM it is the original power-on, hours or days ago. The
     reboot vCenter actually saw (a reset or guest-reboot event), or the reboot
-    time the caller knows from Sahara, is newer and is what the stuck/booting
-    judgement must rest on. Called again by `diagnose_vm` once it has fetched
+    time the caller already knows (from an orchestrator or monitoring), is newer
+    and is what the stuck/booting judgement must rest on. Called again by
+    `diagnose_vm` once it has fetched
     the events, so a scan's power-on estimate is refined to the real reboot.
     """
     reported = as_utc(rebooted_at) if rebooted_at is not None else None

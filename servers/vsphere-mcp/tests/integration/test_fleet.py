@@ -128,7 +128,7 @@ def test_an_unknown_scan_is_answered_not_raised(server: MCPServer) -> None:
 
 
 def test_storage_storm_on_a_shared_base_disk(server: MCPServer, worlds: tuple[scenario.World, ...]) -> None:
-    # As a Sahara Tools error names it: the vCenter by an alias, the env id, the machine.
+    # As an upstream Tools error names it: the vCenter by an alias, the env id, the machine.
     result = call(
         server,
         "diagnose_vm",
