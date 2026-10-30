@@ -33,8 +33,8 @@ LINUX_SHELL = "/bin/sh"
 def guest_temp_path(token: str, *, windows: bool) -> str:
     """Where the command's output is redirected in the guest, by OS."""
     if windows:
-        return rf"C:\Windows\Temp\vsphere-mcp-{token}.txt"
-    return f"/tmp/vsphere-mcp-{token}.txt"  # noqa: S108 - a path inside the guest, not a host temp file
+        return rf"C:\Windows\Temp\vsphere-triage-{token}.txt"
+    return f"/tmp/vsphere-triage-{token}.txt"  # noqa: S108 - a path inside the guest, not a host temp file
 
 
 def guest_program_spec(command: str, out_path: str, *, windows: bool) -> tuple[str, str]:

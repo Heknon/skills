@@ -1368,7 +1368,7 @@ def test_the_linux_shell_wraps_the_command_and_captures_output() -> None:
 
 def test_the_guest_temp_path_is_os_specific() -> None:
     assert guestexec.guest_temp_path("abc", windows=True).startswith(r"C:\Windows\Temp")
-    assert guestexec.guest_temp_path("abc", windows=False) == "/tmp/vsphere-mcp-abc.txt"  # noqa: S108
+    assert guestexec.guest_temp_path("abc", windows=False) == "/tmp/vsphere-triage-abc.txt"  # noqa: S108
 
 
 def test_a_star_host_in_the_transfer_url_is_resolved_to_the_vcenter() -> None:

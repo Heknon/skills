@@ -168,8 +168,8 @@ def build_server(settings: Settings | None = None, pool: VCenterPool | None = No
                 await vrops.aclose()
 
     server = MCPServer(
-        name="vsphere",
-        title="vSphere and vROps (read-only)",
+        name="vsphere-triage",
+        title="vSphere triage (read-only)",
         version="0.1.0",
         instructions=INSTRUCTIONS,
         lifespan=lifespan,

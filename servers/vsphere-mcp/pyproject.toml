@@ -1,10 +1,10 @@
 [project]
-name = "vsphere-vrops-mcp"
+name = "vsphere-triage"
 version = "0.1.0"
-description = "Read-only vSphere and vROps MCP server for diagnosing stuck, hung and unreachable VMs across a fleet"
+description = "Read-only vSphere MCP server that triages stuck, hung and unreachable VMs across a fleet and names the shared cause (optional vROps history)"
 readme = "README.md"
 requires-python = ">=3.12"
-keywords = ["mcp", "vsphere", "vcenter", "vrops", "aria-operations", "diagnostics", "read-only", "pyvmomi"]
+keywords = ["mcp", "vsphere", "vcenter", "esxi", "triage", "diagnostics", "read-only", "pyvmomi", "vrops"]
 # Add a License classifier (and a LICENSE file / license field) before publishing.
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -28,7 +28,7 @@ ocr = ["pytesseract>=0.3.10"]
 dev = ["pytest>=8", "ruff>=0.16.7,<0.17"]
 
 [project.scripts]
-vsphere-mcp = "vsphere_mcp.cli:app"
+vsphere-triage = "vsphere_mcp.cli:app"
 
 [build-system]
 requires = ["hatchling"]

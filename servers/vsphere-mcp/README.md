@@ -1,12 +1,19 @@
-# vsphere-vrops-mcp
+# vsphere-triage
 
-A read-only vSphere and vROps MCP server for diagnosing VMs that are stuck, did
-not come back after a reboot, or keep losing VMware Tools — across a fleet of
-vCenters where VMs are short-lived and their names are reused. It discovers each
-vCenter's layout rather than assuming it, so it is not tied to any one platform;
-it plugs into an orchestrator like Sahara through configuration and a skill
-(see [Using it with an orchestrator](docs/orchestrator-integration.md)). The
-design it implements is `plans/vsphere-vrops-mcp.md`.
+A read-only vSphere MCP server that triages VMs which are stuck, did not come
+back after a reboot, or keep losing VMware Tools — across a fleet of vCenters
+where VMs are short-lived and their names are reused. It sweeps the fleet,
+groups the abnormal VMs by what they share, weighs the causes, and ends in a
+verdict. It discovers each vCenter's layout rather than assuming it, so it is
+not tied to any one platform; it plugs into an orchestrator like Sahara through
+configuration and a skill (see [Using it with an
+orchestrator](docs/orchestrator-integration.md)). The design it implements is
+`plans/vsphere-vrops-mcp.md`.
+
+vROps (Aria / VCF Operations) is an **optional** integration: configure
+`VSPHERE_VROPS_URL` and it adds a handful of history tools (longer and finer
+than vCenter keeps). Everything else — the whole diagnosis — runs on vCenter
+alone, so the server is fully useful with no vROps at all.
 
 It is read-only with one deliberate exception: `run_in_guest` executes a
 command inside a guest OS for a diagnostic a read cannot answer. It is marked
@@ -99,7 +106,7 @@ An MCP client config, over stdio:
 {
   "mcpServers": {
     "vsphere": {
-      "command": "vsphere-mcp",
+      "command": "vsphere-triage",
       "env": {
         "VSPHERE_VCENTERS": "[{\"name\": \"vc-01\", \"host\": \"vc01.example\"}]",
         "VSPHERE_USERNAME": "svc-readonly@vsphere.local",
@@ -113,7 +120,7 @@ An MCP client config, over stdio:
 ```
 
 Or shared over HTTP, alongside your other MCP servers:
-`vsphere-mcp --transport streamable-http --host 0.0.0.0 --port 8000 --allowed-host vsphere-mcp.example`
+`vsphere-triage --transport streamable-http --host 0.0.0.0 --port 8000 --allowed-host vsphere-triage.example`
 (`/healthz` for probes). Over HTTP every caller shares the configured
 credential, which is read-only in effect either way.
 

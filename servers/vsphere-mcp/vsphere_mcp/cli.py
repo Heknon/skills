@@ -21,8 +21,8 @@ class Transport(StrEnum):
 
 
 app = typer.Typer(
-    name="vsphere-mcp",
-    help="Read-only MCP access to vCenters and vROps.",
+    name="vsphere-triage",
+    help="Read-only vSphere fleet triage over MCP (optional vROps history).",
     invoke_without_command=True,
     no_args_is_help=False,
     add_completion=False,
@@ -52,7 +52,7 @@ def serve(
         msg = "VSPHERE_VCENTERS is empty: configure at least one vCenter"
         raise typer.BadParameter(msg)
     names = ", ".join(vcenter.name for vcenter in settings.vcenters)
-    typer.echo(f"vsphere-mcp -> {names} ({transport.value}, read-only)", err=True)
+    typer.echo(f"vsphere-triage -> {names} ({transport.value}, read-only)", err=True)
     server = build_server(settings)
     if transport == Transport.stdio:
         server.run()
