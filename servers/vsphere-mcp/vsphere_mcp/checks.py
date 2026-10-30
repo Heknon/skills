@@ -78,6 +78,8 @@ HOST_NOT_CONNECTED = "host_not_connected"
 HOST_IN_MAINTENANCE = "host_in_maintenance"
 LONG_RUNNING = "long_running"
 TOOLS_OUTDATED = "tools_outdated"
+CPU_LIMITED = "cpu_limited"
+MEMORY_LIMITED = "memory_limited"
 
 # Flags worth a look on their own. The rest only add detail to a verdict.
 ATTENTION_FLAGS = (
@@ -91,7 +93,7 @@ ATTENTION_FLAGS = (
     LONG_RUNNING,
     CONSOLIDATION_NEEDED,
 )
-DETAIL_FLAGS = (HOST_IN_MAINTENANCE, TOOLS_OUTDATED)
+DETAIL_FLAGS = (HOST_IN_MAINTENANCE, TOOLS_OUTDATED, CPU_LIMITED, MEMORY_LIMITED)
 FLAGS = (*ATTENTION_FLAGS, *DETAIL_FLAGS)
 FLAG_MEANING = {
     BOOT_LOOP: "reset or rebooted several times in a short window",
@@ -105,6 +107,8 @@ FLAG_MEANING = {
     CONSOLIDATION_NEEDED: "its disks need consolidation",
     HOST_IN_MAINTENANCE: "its host is in maintenance mode",
     TOOLS_OUTDATED: "its Tools version is too old, too new or blocklisted for this host",
+    CPU_LIMITED: "a CPU limit caps it below full speed: apparent starvation that is configured, not the host",
+    MEMORY_LIMITED: "a memory limit is set below its configured RAM, forcing the host to balloon or swap it",
 }
 OUTDATED_TOOLS = ("guestToolsTooOld", "guestToolsBlacklisted", "guestToolsTooNew")
 
@@ -164,6 +168,10 @@ def classify(  # noqa: C901, PLR0911, PLR0912 - one decision list, kept in one p
         "guest_state": vm.guest_state,
         "cpu_mhz": vm.cpu_mhz,
         "cpu_share_of_vcpus": _round(fraction, 3),
+        "cpu_limit_mhz": vm.cpu_limit_mhz,
+        "cpu_reservation_mhz": vm.cpu_reservation_mhz,
+        "memory_limit_mb": vm.memory_limit_mb,
+        "memory_reservation_mb": vm.memory_reservation_mb,
         "memory_mb": vm.memory_mb,
         "ballooned_mb": vm.ballooned_mb,
         "swapped_mb": vm.swapped_mb,
@@ -265,6 +273,10 @@ def _flags(vm: VmFacts, thresholds: Thresholds, resets_in_window: int) -> list[s
         flags.append(HOST_IN_MAINTENANCE)
     if vm.tools_version_status in OUTDATED_TOOLS:
         flags.append(TOOLS_OUTDATED)
+    if vm.cpu_limit_mhz is not None:
+        flags.append(CPU_LIMITED)
+    if vm.memory_limit_mb is not None and (vm.memory_mb is None or vm.memory_limit_mb < vm.memory_mb):
+        flags.append(MEMORY_LIMITED)
     return flags
 
 

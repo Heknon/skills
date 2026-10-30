@@ -27,12 +27,15 @@ from pyVmomi import vim
 from vsphere_mcp.checks import (
     ABNORMAL,
     BLOCKED_ON_QUESTION,
+    BOOTED_NOT_UP,
     BUSY_NOT_UP,
+    CPU_LIMITED,
     HEARTBEAT_INTERMITTENT,
     HOST_MEMORY_PRESSURE,
     HOST_NOT_CONNECTED,
     HUNG,
     INACCESSIBLE,
+    MEMORY_LIMITED,
     MEMORY_RECLAIMED,
     NO_TOOLS,
     PAUSED,
@@ -86,6 +89,8 @@ INACCESSIBLE_CAUSE = "vCenter cannot reach the VM"
 QUESTION = "a pending VM question blocks it"
 HARDWARE = "a virtual device is blocking or breaking the boot"
 SNAPSHOT = "snapshots are consuming disk and slowing I/O"
+CPU_LIMIT_CAUSE = "throttled by a configured CPU limit (not host starvation)"
+MEMORY_LIMIT_CAUSE = "a configured memory limit is forcing reclamation"
 PAUSED_CAUSE = "the VM is paused"
 MEMORY = "memory pressure (the host ballooning or swapping the VM)"
 HOST_DISCONNECTED = "its ESXi host is not connected to vCenter"
@@ -552,6 +557,20 @@ def conclude(  # noqa: C901, PLR0912, PLR0913, PLR0915 - one ordered list of cau
         evidence(HOST_DISCONNECTED, weight=3, text="vCenter reports the host not connected")
     if HEARTBEAT_INTERMITTENT in verdict.flags:
         evidence(TOOLS_FLAPPING_CAUSE, weight=2, text="Tools runs but its heartbeat is intermittent (yellow)")
+    if CPU_LIMITED in verdict.flags and verdict.state in (BUSY_NOT_UP, HUNG, BOOTED_NOT_UP):
+        evidence(
+            CPU_LIMIT_CAUSE,
+            weight=3,
+            text=f"a CPU limit of {values.get('cpu_limit_mhz')} MHz is set: the VM is capped below its "
+            "full speed, which looks like host starvation but is configured, not the host",
+        )
+    if MEMORY_LIMITED in verdict.flags and MEMORY_RECLAIMED in verdict.flags:
+        evidence(
+            MEMORY_LIMIT_CAUSE,
+            weight=2,
+            text=f"a memory limit of {values.get('memory_limit_mb')} MB is set below the VM's "
+            f"{values.get('memory_mb')} MB RAM, so the host must balloon or swap it",
+        )
 
     if cpu.get("available", True):
         for text in cpu.get("findings", []):

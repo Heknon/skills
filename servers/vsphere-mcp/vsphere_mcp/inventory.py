@@ -33,6 +33,10 @@ VM_PATHS = (
     "config.createDate",
     "config.guestId",
     "config.guestFullName",
+    "config.cpuAllocation.limit",
+    "config.cpuAllocation.reservation",
+    "config.memoryAllocation.limit",
+    "config.memoryAllocation.reservation",
     "summary.config.numCpu",
     "runtime.powerState",
     "runtime.connectionState",
@@ -77,9 +81,29 @@ DATASTORE_PATHS = (
     "summary.url",
     "summary.capacity",
     "summary.freeSpace",
+    "summary.uncommitted",
     "summary.accessible",
     "summary.type",
 )
+# Per-datastore mount state, read only by check_datastores (heavier than the fleet-wide read).
+DATASTORE_MOUNT_PATHS = (
+    "name",
+    "summary.url",
+    "summary.capacity",
+    "summary.freeSpace",
+    "summary.uncommitted",
+    "summary.accessible",
+    "summary.type",
+    "host",
+)
+HOST_TIME_PATHS = (
+    "name",
+    "runtime.connectionState",
+    "config.dateTimeInfo.ntpConfig.server",
+    "config.service.service",
+    "configManager.dateTimeSystem",
+)
+TIME_SERVICE_KEYS = ("ntpd", "chronyd", "ptpd")
 FOLDER_PATHS = ("name", "parent", "childType")
 DATACENTER_PATHS = ("name", "parent", "vmFolder")
 CLUSTER_PATHS = ("name",)
@@ -147,6 +171,10 @@ class VmFacts:
     os_family: str = "unknown"
     num_cpu: int | None = None
     cpu_mhz: float | None = None
+    cpu_limit_mhz: int | None = None
+    cpu_reservation_mhz: int | None = None
+    memory_limit_mb: int | None = None
+    memory_reservation_mb: int | None = None
     host: str | None = None
     host_moref: str | None = None
     host_core_mhz: float | None = None
@@ -598,6 +626,124 @@ def read_vm_devices(session: VCenterSession, folders: dict[str, FolderFacts]) ->
     return result
 
 
+RESOURCE_POLICY_PATHS = (
+    "name",
+    "parent",
+    "config.template",
+    "summary.config.numCpu",
+    "summary.config.memorySizeMB",
+    "config.cpuAllocation.limit",
+    "config.cpuAllocation.reservation",
+    "config.memoryAllocation.limit",
+    "config.memoryAllocation.reservation",
+)
+
+
+def read_vm_resource_policy(session: VCenterSession, folders: dict[str, FolderFacts]) -> list[dict[str, Any]]:
+    """Every VM's CPU/memory limit and reservation — a lean read for the throttled-by-config sweep.
+
+    A CPU limit caps a VM below its full speed and looks exactly like host
+    starvation without being it; a memory limit forces balloon/swap; a large
+    reservation locks capacity the cluster then cannot admit others into. These
+    ride on config, not runtime, so a template keeps marked: a linked clone
+    inherits the template's allocation, so a limit on a template is the root of
+    the same limit on every clone of it.
+    """
+    rows = session.retrieve(vim.VirtualMachine, RESOURCE_POLICY_PATHS)
+    result = []
+    for row in rows:
+        parent = row.get("parent")
+        folder = folders.get(parent._moId) if parent is not None else None  # noqa: SLF001
+        result.append(
+            {
+                "vcenter": session.vcenter.name,
+                "moref": row["moref"],
+                "name": row.get("name", row["moref"]),
+                "template": bool(row.get("config.template")),
+                "folder": folder.path if folder else None,
+                "environment": folder.name if folder else None,
+                "num_cpu": row.get("summary.config.numCpu"),
+                "memory_mb": row.get("summary.config.memorySizeMB"),
+                "cpu_limit_mhz": _limit(row.get("config.cpuAllocation.limit")),
+                "cpu_reservation_mhz": _reservation(row.get("config.cpuAllocation.reservation")),
+                "memory_limit_mb": _limit(row.get("config.memoryAllocation.limit")),
+                "memory_reservation_mb": _reservation(row.get("config.memoryAllocation.reservation")),
+            }
+        )
+    return result
+
+
+def read_datastore_mounts(session: VCenterSession) -> list[dict[str, Any]]:
+    """Every datastore with its per-host mount state: the APD/PDL and over-provisioning read.
+
+    `summary.uncommitted` plus the committed space says how far thin disks could
+    grow past capacity; each host's `mountInfo` says whether that host can still
+    reach the datastore, and `inaccessibleReason` names an all-paths-down or
+    permanent-device-loss when it cannot.
+    """
+    rows = session.retrieve(vim.Datastore, DATASTORE_MOUNT_PATHS)
+    result = []
+    for row in rows:
+        mounts = []
+        for mount in row.get("host") or []:
+            info = getattr(mount, "mountInfo", None)
+            host_ref = getattr(mount, "key", None)
+            mounts.append(
+                {
+                    "host_moref": host_ref._moId if host_ref is not None else None,  # noqa: SLF001
+                    "mounted": getattr(info, "mounted", None),
+                    "accessible": getattr(info, "accessible", None),
+                    "inaccessible_reason": getattr(info, "inaccessibleReason", None),
+                }
+            )
+        result.append(
+            {
+                "vcenter": session.vcenter.name,
+                "moref": row["moref"],
+                "name": row.get("name"),
+                "url": row.get("summary.url"),
+                "type": row.get("summary.type"),
+                "capacity_bytes": row.get("summary.capacity"),
+                "free_bytes": row.get("summary.freeSpace"),
+                "uncommitted_bytes": row.get("summary.uncommitted"),
+                "accessible": row.get("summary.accessible"),
+                "mounts": mounts,
+            }
+        )
+    return result
+
+
+def read_host_time(session: VCenterSession) -> list[dict[str, Any]]:
+    """Each host's time configuration: NTP servers, the time service's state, and how to read its clock.
+
+    Returns raw fields; `timecheck.classify_host_time` judges them. The clock
+    itself is read separately per host (a `QueryDateTime` call), because it is a
+    method on the host's dateTimeSystem, not a property.
+    """
+    rows = session.retrieve(vim.HostSystem, HOST_TIME_PATHS)
+    result = []
+    for row in rows:
+        services = row.get("config.service.service") or []
+        time_service = next(
+            (service for service in services if getattr(service, "key", None) in TIME_SERVICE_KEYS), None
+        )
+        dt_system = row.get("configManager.dateTimeSystem")
+        result.append(
+            {
+                "vcenter": session.vcenter.name,
+                "moref": row["moref"],
+                "name": row.get("name", row["moref"]),
+                "connection_state": row.get("runtime.connectionState"),
+                "ntp_servers": list(row.get("config.dateTimeInfo.ntpConfig.server") or []),
+                "service_key": getattr(time_service, "key", None) if time_service else None,
+                "service_running": getattr(time_service, "running", None) if time_service else None,
+                "service_policy": getattr(time_service, "policy", None) if time_service else None,
+                "datetime_system_moref": dt_system._moId if dt_system is not None else None,  # noqa: SLF001
+            }
+        )
+    return result
+
+
 def read_folders(session: VCenterSession) -> dict[str, FolderFacts]:
     """Every folder with its path from its datacenter, read in two calls."""
     datacenters = session.retrieve(vim.Datacenter, DATACENTER_PATHS)
@@ -719,6 +865,7 @@ def read_datastores(session: VCenterSession) -> dict[str, dict[str, Any]]:
             "url": row.get("summary.url"),
             "capacity_bytes": row.get("summary.capacity"),
             "free_bytes": row.get("summary.freeSpace"),
+            "uncommitted_bytes": row.get("summary.uncommitted"),
             "accessible": row.get("summary.accessible"),
             "type": row.get("summary.type"),
         }
@@ -851,6 +998,10 @@ def vm_facts(  # noqa: C901, PLR0913, PLR0915 - one flattening of one row
     facts.os_family = os_family(facts.guest_id, facts.guest_os, row.get("guest.guestFamily"))
     facts.num_cpu = row.get("summary.config.numCpu")
     facts.cpu_mhz = _number(row.get("summary.quickStats.overallCpuUsage"))
+    facts.cpu_limit_mhz = _limit(row.get("config.cpuAllocation.limit"))
+    facts.cpu_reservation_mhz = _reservation(row.get("config.cpuAllocation.reservation"))
+    facts.memory_limit_mb = _limit(row.get("config.memoryAllocation.limit"))
+    facts.memory_reservation_mb = _reservation(row.get("config.memoryAllocation.reservation"))
 
     host_ref = row.get("runtime.host")
     if host_ref is not None:
@@ -969,3 +1120,17 @@ def _number(value: object) -> float | None:
     if isinstance(value, (int, float)):
         return float(value)
     return None
+
+
+def _limit(value: object) -> int | None:
+    """A resource limit, or None when it is unset (-1 means unlimited)."""
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
+def _reservation(value: object) -> int | None:
+    """A resource reservation, or None when there is none (0 is the default)."""
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        return None
+    return value

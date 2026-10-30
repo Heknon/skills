@@ -45,6 +45,8 @@ ALLOWED_METHODS = frozenset(
         # Host logs, and which ones a host offers.
         "QueryDescriptions",
         "BrowseDiagnosticLog",
+        # A host's own clock, to measure skew against vCenter's.
+        "QueryDateTime",
         # The configured session idle-timeout, read to judge the session count.
         "QueryOptions",
         # Listing a datastore folder: a task, but one that only reads.

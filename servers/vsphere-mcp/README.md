@@ -128,6 +128,9 @@ read, and diagnostics (host logs).
 | `find_vms_by_device` | every VM across the vCenters that has, or lacks, a device — by category (sound, ethernet, usb, ...) or a kind substring (Vmxnet3, HdAudioCard); scoped with vcenters/under |
 | `hardware_profile` | the whole fleet's virtual hardware generically: counts per category and kind, NIC-type breakdown, and the VMs that differ from their environment's norm |
 | `find_vms_by_snapshot` | VMs with snapshots across the vCenters, biggest first — delta + memory-state size, oldest age, redo-chain depth, and consolidation-needed; the fleet view that catches a forgotten 50 GB snapshot |
+| `find_resource_limits` | VMs throttled or constrained by a configured CPU/memory limit or reservation — a CPU limit mimics host starvation, a memory limit forces balloon/swap; templates marked, since a linked clone inherits the template's limit |
+| `check_host_time` | each ESXi host's NTP configuration and clock skew from vCenter — drift breaks TLS and Kerberos/AD auth, a root of the SSL/handshake errors separate from session exhaustion |
+| `check_datastores` | every datastore's fill, thin over-provisioning and per-host reachability (APD/PDL); datastores holding a template's base disk are marked, since they take every clone down with them |
 | `get_host_health` | a host's CPU demand against capacity, its storage, its VMs |
 | `get_datastore_health` | a datastore's latency and IOPS from every host mounting it, its VMs |
 | `read_host_log` | `vmkernel` / `hostd` / `vpxa` lines, filtered |
@@ -157,8 +160,11 @@ Tools may be crashing), `memory_reclaimed` (ballooned, swapped or compressed),
 `host_memory_pressure`, `vcenter_alarm` (a red alarm, by name),
 `host_not_connected`, `long_running` (older than `long_running_hours`, 24 by
 default), `consolidation_needed`. Those that only add detail:
-`host_in_maintenance`, `tools_outdated`. `scan(states=[...])` selects any
-state or flag, for example `["no_tools"]` or `["long_running"]`.
+`host_in_maintenance`, `tools_outdated`, `cpu_limited` (a CPU limit caps it
+below full speed — apparent starvation that is configured, not the host) and
+`memory_limited` (a memory limit below its RAM forces balloon/swap).
+`scan(states=[...])` selects any state or flag, for example `["no_tools"]` or
+`["long_running"]`.
 
 The bulk read asks for about 35 properties per VM. A property an older vCenter
 does not have is dropped and the read retried, rather than failing the scan,
@@ -225,6 +231,20 @@ What the simulator cannot do, and how the tests deal with it:
 - Snapshot sizes: the simulator reports them as 0, so the delta/memory-state
   accounting from `layoutEx` is unit-tested only; confirm the GB figures and the
   `Sessions.View` privilege for sessions against a real vCenter.
+- Host clock skew: `QueryDateTime` per host and the `config.dateTimeInfo`/
+  `config.service` fields `check_host_time` reads — the simulator does not model
+  NTP state or a drifting clock, so the classification is unit-tested only.
+  Confirm the exact NTP service key (`ntpd` vs `chronyd`) and the skew at which
+  your AD auth breaks.
+- Datastore over-provisioning and APD/PDL: `summary.uncommitted` for thin space,
+  and a host mount that is `mounted` but `accessible: false` with an
+  `inaccessibleReason`. The simulator does not model either, so `check_datastores`
+  is unit-tested only; confirm the exact `inaccessibleReason` values your arrays
+  raise.
+- Resource limits: a VM's `config.cpuAllocation.limit` / `memoryAllocation.limit`
+  are read on the simulator, but confirm that a linked clone made from a template
+  with a limit actually inherits it (the clone-inheritance note in
+  `find_resource_limits` rests on that).
 - That a guest reboot in your fleet logs a reset or guest-reboot event (so
   uptime is measured from the reboot, not power-on); if some reboots are
   silent to vCenter, pass `rebooted_at` from Sahara. The simulator cannot

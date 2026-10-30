@@ -147,6 +147,10 @@ class Machine:
     serial: bool = False
     sound: bool = False
     snapshots: int = 0
+    template: bool = False
+    cpu_limit_mhz: int | None = None
+    mem_size_mb: int | None = None
+    mem_limit_mb: int | None = None
     vmware_log: str | None = None
     previous_log: str | None = None
     serial_text: str | None = None
@@ -188,7 +192,7 @@ def connect(port: int) -> Any:
     )
 
 
-def build(container: str, folders: list[str], machines: list[Machine], *, work: Path) -> World:
+def build(container: str, folders: list[str], machines: list[Machine], *, work: Path) -> World:  # noqa: PLR0912 - one fixture build
     """Build, save, edit and load one vCenter. Returns the loaded world."""
     builder = f"{container}-builder"
     stop(builder)
@@ -250,11 +254,18 @@ def build(container: str, folders: list[str], machines: list[Machine], *, work: 
                         operation="add", device=vim.vm.device.VirtualHdAudioCard(key=-1)
                     )
                 )
-            wait(
-                vm.ReconfigVM_Task(
-                    vim.vm.ConfigSpec(guestId=machine.guest[0], numCPUs=machine.vcpus, deviceChange=changes)
-                )
-            )
+            spec_kwargs: dict[str, Any] = {
+                "guestId": machine.guest[0],
+                "numCPUs": machine.vcpus,
+                "deviceChange": changes,
+            }
+            if machine.mem_size_mb is not None:
+                spec_kwargs["memoryMB"] = machine.mem_size_mb
+            if machine.cpu_limit_mhz is not None:
+                spec_kwargs["cpuAllocation"] = vim.ResourceAllocationInfo(limit=machine.cpu_limit_mhz)
+            if machine.mem_limit_mb is not None:
+                spec_kwargs["memoryAllocation"] = vim.ResourceAllocationInfo(limit=machine.mem_limit_mb)
+            wait(vm.ReconfigVM_Task(vim.vm.ConfigSpec(**spec_kwargs)))
             for index in range(machine.snapshots):
                 wait(vm.CreateSnapshot_Task(f"snap{index + 1}", "", memory=False, quiesce=False))
             machine.moref = vm._moId
@@ -300,7 +311,7 @@ def _stamp(moment: datetime) -> str:
     return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def edit(model: Path, machine: Machine) -> None:
+def edit(model: Path, machine: Machine) -> None:  # noqa: PLR0912 - one saved-VM edit
     """Give one saved VM the runtime state it should be loaded with."""
     path = next(model.glob(f"*-VirtualMachine-{machine.moref}.xml"))
     tree = ET.parse(path)  # noqa: S314 - our own file
@@ -362,6 +373,8 @@ def edit(model: Path, machine: Machine) -> None:
         _child(state, "acknowledged", "false")
     _child(guest, "guestFamily", machine.guest[2])
     _child(config, "guestFullName", machine.guest[1])
+    if machine.template:
+        _child(config, "template", "true")
     if machine.base_disk:
         for backing in root.iter("backing"):
             if (
@@ -661,6 +674,30 @@ def fleet(work: Path) -> tuple[World, World]:
             vcpus=1,
         ),
         Machine("off-01", "environments/env-1003", "DC0_C1_H2", "LocalDS_1", powered_on=False),
+        # env-1005: a healthy VM throttled by a configured CPU limit and a memory limit
+        # below its RAM — looks starved/pressured but is config, not the host.
+        Machine(
+            "capped-01",
+            "environments/env-1005",
+            "DC0_C0_H0",
+            "LocalDS_0",
+            tools="guestToolsRunning",
+            heartbeat="green",
+            cpu_mhz=400,
+            cpu_limit_mhz=600,
+            mem_size_mb=8192,
+            mem_limit_mb=2048,
+        ),
+        # The template its linked clones come from, carrying a CPU limit every clone inherits.
+        Machine(
+            "tmpl-win10",
+            "templates",
+            "DC0_C0_H0",
+            "LocalDS_0",
+            powered_on=False,
+            template=True,
+            cpu_limit_mhz=500,
+        ),
     ]
     b_machines = [
         Machine(
@@ -720,6 +757,7 @@ def fleet(work: Path) -> tuple[World, World]:
             "environments/env-1002",
             "environments/env-1003",
             "environments/env-1004",
+            "environments/env-1005",
             "environments/env-0999",
             "templates",
         ],

@@ -148,6 +148,27 @@ class Thresholds(BaseModel):
     snapshot_deep_chain: PositiveInt = 4
     """A redo chain at least this deep slows every read through it."""
 
+    clock_skew_seconds: PositiveFloat = 60.0
+    """A host clock this many seconds from vCenter is worth flagging.
+
+    Small drift is normal; this is the "look at it" line. Auth breaks harder
+    further out: Kerberos / Active Directory reject a ticket past about 300 s of
+    skew, which is a frequent root of the TLS/handshake errors seen fleet-wide.
+    """
+
+    datastore_full_percent: PositiveFloat = 5.0
+    """At or below this percent free, a datastore is nearly full: a thin disk on it stalls."""
+
+    datastore_overprovision_ratio: PositiveFloat = 2.0
+    """Provisioned (committed + thin, unallocated) over capacity, above which over-provisioning is flagged.
+
+    A ratio over 1.0 means thin disks could grow past the datastore's capacity;
+    this is the stronger line, where that risk is worth acting on.
+    """
+
+    cpu_limit_warn_percent: PositiveFloat = 90.0
+    """A CPU limit at or below this percent of the VM's full speed is throttling it meaningfully."""
+
     console_black_fraction: Fraction = 0.98
     """A screenshot with at least this share of near-black pixels is black."""
 

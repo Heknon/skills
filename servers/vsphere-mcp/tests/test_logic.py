@@ -12,7 +12,18 @@ import pytest
 from PIL import Image
 from pyVmomi import vim, vmodl
 
-from vsphere_mcp import ages, checks, console, contention, diagnose, formatting, scan, vmlog
+from vsphere_mcp import (
+    ages,
+    checks,
+    console,
+    contention,
+    diagnose,
+    formatting,
+    scan,
+    storagehealth,
+    timecheck,
+    vmlog,
+)
 from vsphere_mcp.config import Settings, Thresholds, VCenter
 from vsphere_mcp.inventory import (
     FolderFacts,
@@ -1117,3 +1128,165 @@ def test_snapshot_usage_sums_delta_and_memory_state() -> None:
 def test_snapshot_usage_is_none_without_snapshots() -> None:
     assert snapshot_usage(None, None, NOW) is None
     assert snapshot_usage(_Info([]), None, NOW) is None
+
+
+# -- host time health (NTP and clock skew) -------------------------------------------------
+
+
+def _host_time(**fields: object) -> dict:
+    base: dict[str, object] = {
+        "vcenter": "vc-a",
+        "moref": "host-1",
+        "name": "esx-1",
+        "connection_state": "connected",
+        "ntp_servers": ["10.0.0.1"],
+        "service_key": "ntpd",
+        "service_running": True,
+        "service_policy": "automatic",
+        "skew_seconds": 1.0,
+        "skew_error": None,
+    }
+    base.update(fields)
+    return base
+
+
+def test_a_well_configured_host_with_a_tight_clock_is_healthy() -> None:
+    verdict = timecheck.classify_host_time(_host_time(), LIMITS)
+
+    assert verdict["healthy"] is True
+    assert verdict["findings"] == []
+
+
+def test_a_host_without_ntp_or_with_its_service_down_is_flagged() -> None:
+    no_ntp = timecheck.classify_host_time(_host_time(ntp_servers=[]), LIMITS)
+    stopped = timecheck.classify_host_time(_host_time(service_running=False, service_policy="off"), LIMITS)
+
+    assert no_ntp["healthy"] is False
+    assert any("no NTP servers" in finding for finding in no_ntp["findings"])
+    assert stopped["healthy"] is False
+    assert any("not running" in finding for finding in stopped["findings"])
+    assert any("policy is 'off'" in finding for finding in stopped["findings"])
+
+
+def test_a_clock_past_the_skew_threshold_is_flagged_and_auth_breakage_noted() -> None:
+    small = timecheck.classify_host_time(_host_time(skew_seconds=10.0), LIMITS)
+    big = timecheck.classify_host_time(_host_time(skew_seconds=-412.0), LIMITS)
+
+    assert small["healthy"] is True  # under the 60 s threshold
+    assert big["healthy"] is False
+    assert any("Kerberos/AD" in finding for finding in big["findings"])
+    assert big["skew_seconds"] == -412.0
+
+
+def test_a_disconnected_host_is_not_judged() -> None:
+    verdict = timecheck.classify_host_time(_host_time(connection_state="notResponding"), LIMITS)
+
+    assert verdict["checked"] is False
+    assert verdict["healthy"] is None
+
+
+# -- CPU and memory limits -----------------------------------------------------------------
+
+
+def test_a_cpu_limit_flags_the_vm_without_making_it_abnormal_on_its_own() -> None:
+    healthy = checks.classify(
+        vm(tools_running="guestToolsRunning", heartbeat="green", cpu_mhz=200.0, cpu_limit_mhz=500),
+        LIMITS,
+    )
+
+    assert healthy.state == checks.HEALTHY
+    assert checks.CPU_LIMITED in healthy.flags
+    assert not healthy.abnormal  # a detail flag, not an attention flag
+    assert healthy.values["cpu_limit_mhz"] == 500
+
+
+def test_a_memory_limit_below_configured_ram_flags_memory_limited() -> None:
+    capped = checks.classify(vm(memory_mb=8192, memory_limit_mb=2048), LIMITS)
+    uncapped = checks.classify(vm(memory_mb=8192, memory_limit_mb=8192), LIMITS)
+
+    assert checks.MEMORY_LIMITED in capped.flags
+    assert checks.MEMORY_LIMITED not in uncapped.flags  # a limit at or above RAM caps nothing
+
+
+def test_a_cpu_limit_on_a_stuck_vm_is_weighed_as_throttled_not_host_starvation() -> None:
+    machine = vm(cpu_mhz=3600.0, cpu_limit_mhz=600)
+    result = diagnose.conclude(
+        checks.classify(machine, LIMITS),
+        vm=machine,
+        cpu={"findings": [], "starved": False},
+        disk={"findings": [], "slow": False, "datastores": []},
+        environment={"signals": []},
+        logs={"available": False},
+        serial={"available": False},
+        console={"available": False},
+        host_log={"available": False},
+    )
+
+    assert any(cause["cause"] == diagnose.CPU_LIMIT_CAUSE for cause in result["causes"])
+
+
+# -- datastore health (fill, over-provisioning, APD/PDL) -----------------------------------
+
+
+def _store(**fields: object) -> dict:
+    gb = 1024**3
+    base: dict[str, object] = {
+        "vcenter": "vc-a",
+        "moref": "datastore-1",
+        "name": "LocalDS_0",
+        "type": "VMFS",
+        "capacity_bytes": 1000 * gb,
+        "free_bytes": 500 * gb,
+        "uncommitted_bytes": 0,
+        "accessible": True,
+        "mounts": [
+            {"host_moref": "host-1", "mounted": True, "accessible": True, "inaccessible_reason": None}
+        ],
+    }
+    base.update(fields)
+    return base
+
+
+def test_a_half_empty_datastore_is_healthy() -> None:
+    verdict = storagehealth.classify_datastore(_store(), LIMITS)
+
+    assert verdict["healthy"] is True
+    assert verdict["free_percent"] == 50.0
+
+
+def test_a_nearly_full_datastore_is_flagged() -> None:
+    gb = 1024**3
+    verdict = storagehealth.classify_datastore(_store(free_bytes=20 * gb), LIMITS)
+
+    assert verdict["healthy"] is False
+    assert verdict["free_percent"] == 2.0
+    assert any("nearly full" in finding for finding in verdict["findings"])
+
+
+def test_thin_disks_past_capacity_are_over_provisioned() -> None:
+    gb = 1024**3
+    # committed 500 GB + 2000 GB uncommitted = 2500 GB provisioned on a 1000 GB store (2.5x).
+    verdict = storagehealth.classify_datastore(_store(uncommitted_bytes=2000 * gb), LIMITS)
+
+    assert verdict["overprovision_ratio"] == 2.5
+    assert any("over-provisioned" in finding for finding in verdict["findings"])
+
+
+def test_a_mounted_but_unreachable_host_is_apd_pdl() -> None:
+    verdict = storagehealth.classify_datastore(
+        _store(
+            mounts=[
+                {
+                    "host_moref": "host-9",
+                    "mounted": True,
+                    "accessible": False,
+                    "inaccessible_reason": "AllPathsDown_Timeout",
+                }
+            ]
+        ),
+        LIMITS,
+    )
+
+    assert verdict["healthy"] is False
+    assert verdict["hosts_unreachable"] == [{"host_moref": "host-9", "reason": "AllPathsDown_Timeout"}]
+    assert any("all-paths-down" in finding for finding in verdict["findings"])

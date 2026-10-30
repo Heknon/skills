@@ -308,7 +308,7 @@ def storage(  # noqa: C901, PLR0912, PLR0915 - one report over many counters
         free, capacity = store.get("free_bytes"), store.get("capacity_bytes")
         if free is not None and capacity:
             entry["free_percent"] = round(free / capacity * 100, 1)
-            if entry["free_percent"] < 5:  # noqa: PLR2004 - a thin VM on a full datastore stops
+            if entry["free_percent"] <= thresholds.datastore_full_percent:
                 findings.append(
                     f"datastore {store.get('name')} is nearly full ({entry['free_percent']}% free)"
                 )

@@ -31,7 +31,7 @@ from PIL import Image
 from pyVmomi import vim, vmodl
 from starlette.responses import JSONResponse
 
-from vsphere_mcp import ages, hardware, snapshots
+from vsphere_mcp import ages, hardware, resources, snapshots, storagehealth, timecheck
 from vsphere_mcp import scan as scanning
 from vsphere_mcp.checks import classify, count_states
 from vsphere_mcp.config import Settings
@@ -502,6 +502,93 @@ def _register_fleet_tools(  # noqa: C901, PLR0915 - one closure per tool
             under=[term for term in (under or []) if term.strip("/ ")],
             include_templates=include_templates,
             limit=max(1, min(limit, MAX_LIMIT)),
+        )
+
+    @tool()
+    async def check_host_time(
+        *, vcenters: list[str] | None = None, measure_skew: bool = True
+    ) -> dict[str, Any]:
+        """Each ESXi host's NTP configuration and clock skew from vCenter, worst first.
+
+        A drifting host clock breaks TLS handshakes and Kerberos/Active Directory
+        token auth — a frequent root of the SSL/handshake errors Sims, Sahara and
+        this server hit, separate from session exhaustion (check_vcenters). Reads
+        the NTP servers configured, whether the time service runs, and each host's
+        own clock against vCenter's. Skew past ~300 s breaks AD auth outright.
+
+        Args:
+            vcenters: vCenter names; all when empty.
+            measure_skew: also read each host's clock (one QueryDateTime per host)
+                to measure skew; set False to read only the NTP configuration.
+
+        """
+        names = _names(fleet, vcenters)
+        return await timecheck.check_host_time(fleet, resolved, names, measure_skew=measure_skew)
+
+    @tool()
+    async def find_resource_limits(
+        *,
+        kind: str = "all",
+        vcenters: list[str] | None = None,
+        under: list[str] | None = None,
+        include_templates: bool = True,
+        limit: int = 100,
+    ) -> dict[str, Any]:
+        """VMs throttled or constrained by a configured CPU/memory limit or reservation.
+
+        A CPU limit caps a VM below its full speed and looks exactly like host CPU
+        starvation without being it — the same symptom, a different fix. A memory
+        limit below the VM's RAM forces balloon/swap; a large reservation locks
+        capacity the cluster can no longer admit other VMs into, blocking
+        power-ons. These ride on config, so a template passes them to every linked
+        clone of it — templates are marked, since fixing the template fixes the
+        clones.
+
+        Args:
+            kind: "limits", "reservations", or "all".
+            vcenters: vCenter names; all when empty.
+            under: folder path segments to look under; everywhere when empty.
+            include_templates: also include template VMs (the usual root of a clone's limit).
+            limit: how many VMs to list (the counts cover all).
+
+        """
+        if kind not in ("limits", "reservations", "all"):
+            msg = 'kind must be "limits", "reservations", or "all"'
+            raise ValueError(msg)
+        names = _names(fleet, vcenters)
+        return await resources.find_resource_limits(
+            fleet,
+            resolved,
+            names,
+            kind=kind,
+            include_templates=include_templates,
+            under=[term for term in (under or []) if term.strip("/ ")],
+            limit=max(1, min(limit, MAX_LIMIT)),
+        )
+
+    @tool()
+    async def check_datastores(
+        *, vcenters: list[str] | None = None, only_problems: bool = False, limit: int = 100
+    ) -> dict[str, Any]:
+        """Every datastore's fill, thin over-provisioning, and per-host reachability (APD/PDL).
+
+        When a datastore fills or a host loses its paths to it, every VM on it
+        wedges at once — the layer above PowerFlex latency. Flags datastores
+        nearly full (a thin disk then stalls on write), over-provisioned (thin
+        disks could grow past capacity), or mounted-but-unreachable on a host
+        (all-paths-down / permanent-device-loss). Datastores that hold a
+        template's base disk are marked, since a linked clone reads its base from
+        there and goes down with it.
+
+        Args:
+            vcenters: vCenter names; all when empty.
+            only_problems: list only the troubled datastores, not every one.
+            limit: how many datastores to list (the counts cover all).
+
+        """
+        names = _names(fleet, vcenters)
+        return await storagehealth.check_datastores(
+            fleet, resolved, names, only_problems=only_problems, limit=max(1, min(limit, MAX_LIMIT))
         )
 
     @tool()

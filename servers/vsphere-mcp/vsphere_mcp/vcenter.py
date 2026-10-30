@@ -472,6 +472,11 @@ class VCenterSession:
         _ = self.content
         return getattr(vim, kind)(moref, self._stub)
 
+    def host_datetime(self, datetime_system_moref: str) -> datetime:
+        """One host's own clock, read through its dateTimeSystem (QueryDateTime, read-only)."""
+        system = self.reference("HostDateTimeSystem", datetime_system_moref)
+        return as_utc(system.QueryDateTime())
+
     # -- events --------------------------------------------------------------
 
     def events(

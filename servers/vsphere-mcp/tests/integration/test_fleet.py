@@ -460,6 +460,9 @@ def test_every_call_the_tools_made_is_on_the_read_list(
     call(server, "diagnose_window", {"minutes": 10})
     call(server, "hardware_profile", {"vcenters": ["vc-a"]})
     call(server, "find_vms_by_snapshot", {"vcenters": ["vc-a"]})
+    call(server, "find_resource_limits", {"vcenters": ["vc-a"]})
+    call(server, "check_host_time", {"vcenters": ["vc-a"]})
+    call(server, "check_datastores", {"vcenters": ["vc-a"]})
     call(server, "check_vcenters")
     call(server, "vcenter_sessions", {"vcenter": "vc-a"})
 

@@ -284,3 +284,51 @@ def test_a_vm_with_snapshots_surfaces_them_in_diagnose(server: MCPServer, worlds
     result = call(server, "diagnose_vm", {"vcenter": "vc-a", "moref": moref, "console_captures": 0})
 
     assert result["snapshots"]["count"] == 2
+
+
+# -- resource limits, host time, datastore health --------------------------------------------
+
+
+def test_find_resource_limits_finds_capped_vms_and_marks_templates(server: MCPServer) -> None:
+    result = call(server, "find_resource_limits", {"vcenters": ["vc-a"]})
+
+    by_name = {vm["name"]: vm for vm in result["vms"]}
+    assert "capped-01" in by_name
+    assert by_name["capped-01"]["cpu_limit_mhz"] == 600
+    assert by_name["capped-01"]["memory_limit_mb"] == 2048
+    assert any("mimics starvation" in problem for problem in by_name["capped-01"]["problems"])
+    # the template carries a limit and is marked, with the clone-inheritance note.
+    template = next((vm for vm in result["vms"] if vm["template"]), None)
+    assert template is not None
+    assert template["cpu_limit_mhz"] == 500
+    assert any("are templates" in finding for finding in result["findings"])
+
+
+def test_resource_limits_can_exclude_templates(server: MCPServer) -> None:
+    result = call(server, "find_resource_limits", {"vcenters": ["vc-a"], "include_templates": False})
+
+    assert all(not vm["template"] for vm in result["vms"])
+    assert "capped-01" in {vm["name"] for vm in result["vms"]}
+
+
+def test_check_host_time_returns_a_row_per_host(server: MCPServer) -> None:
+    result = call(server, "check_host_time", {"vcenters": ["vc-a"], "measure_skew": True})
+
+    assert result["hosts_total"] >= 1
+    # Every row carries the NTP and skew fields, whatever the simulator populates.
+    row = result["hosts"][0]
+    assert "ntp_servers" in row
+    assert "skew_seconds" in row
+    assert "time_service_running" in row
+
+
+def test_check_datastores_reports_each_store_and_marks_template_datastores(server: MCPServer) -> None:
+    result = call(server, "check_datastores", {"vcenters": ["vc-a"]})
+
+    assert result["datastores_total"] >= 1
+    row = result["datastores"][0]
+    assert "free_percent" in row
+    assert "overprovision_ratio" in row
+    assert "hosts_mounting" in row
+    # LocalDS_0 holds the template's base disk, so it is marked as a clone-root datastore.
+    assert any(store["holds_template"] for store in result["datastores"])

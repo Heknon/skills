@@ -78,6 +78,13 @@ session metrics are the history.
 A VM diagnosis that keeps failing with a dropped-connection error is the same
 story from below: run `check_vcenters` before trusting any one VM's result.
 
+SSL / handshake errors have a second root that is not exhaustion: a host whose
+**clock has drifted**. Skew breaks TLS, and past about 300 s it breaks
+Kerberos/Active Directory auth outright, so it reads as the same SSL errors
+fleet-wide. When `check_vcenters` shows the session count healthy but the errors
+persist, run **`check_host_time`**: it reports each host's NTP configuration and
+its clock skew from vCenter, and names the hosts that have drifted.
+
 ## The steps
 
 | Step | Load |
