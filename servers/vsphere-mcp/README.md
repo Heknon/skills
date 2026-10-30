@@ -127,6 +127,7 @@ read, and diagnostics (host logs).
 | `get_vm_hardware` | the VM's virtual devices (adapters, controllers, disks, CD-ROM, sound, serial, USB, video) and vCenter's connection view; flags a down boot NIC, a mounted ISO or a device error |
 | `find_vms_by_device` | every VM across the vCenters that has, or lacks, a device — by category (sound, ethernet, usb, ...) or a kind substring (Vmxnet3, HdAudioCard); scoped with vcenters/under |
 | `hardware_profile` | the whole fleet's virtual hardware generically: counts per category and kind, NIC-type breakdown, and the VMs that differ from their environment's norm |
+| `find_vms_by_snapshot` | VMs with snapshots across the vCenters, biggest first — delta + memory-state size, oldest age, redo-chain depth, and consolidation-needed; the fleet view that catches a forgotten 50 GB snapshot |
 | `get_host_health` | a host's CPU demand against capacity, its storage, its VMs |
 | `get_datastore_health` | a datastore's latency and IOPS from every host mounting it, its VMs |
 | `read_host_log` | `vmkernel` / `hostd` / `vpxa` lines, filtered |
@@ -221,6 +222,9 @@ What the simulator cannot do, and how the tests deal with it:
   its line.
 - What EMS writes to the serial port on the Windows versions in the fleet.
 - The vROps stat keys on your version. `vrops_list_stat_keys` reads them.
+- Snapshot sizes: the simulator reports them as 0, so the delta/memory-state
+  accounting from `layoutEx` is unit-tested only; confirm the GB figures and the
+  `Sessions.View` privilege for sessions against a real vCenter.
 - That a guest reboot in your fleet logs a reset or guest-reboot event (so
   uptime is measured from the reboot, not power-on); if some reboots are
   silent to vCenter, pass `rebooted_at` from Sahara. The simulator cannot

@@ -58,6 +58,7 @@ from vsphere_mcp.inventory import (
     read_folders,
     read_hosts,
     set_effective_boot,
+    snapshot_usage,
     vm_facts,
 )
 from vsphere_mcp.vcenter import REALTIME_SPAN, VSphereError, parse_datastore_path
@@ -84,11 +85,19 @@ TOOLS_FLAPPING_CAUSE = "Tools flapping"
 INACCESSIBLE_CAUSE = "vCenter cannot reach the VM"
 QUESTION = "a pending VM question blocks it"
 HARDWARE = "a virtual device is blocking or breaking the boot"
+SNAPSHOT = "snapshots are consuming disk and slowing I/O"
 PAUSED_CAUSE = "the VM is paused"
 MEMORY = "memory pressure (the host ballooning or swapping the VM)"
 HOST_DISCONNECTED = "its ESXi host is not connected to vCenter"
 
-DIAGNOSE_PATHS = (*VM_PATHS, DEVICE_PATH, "config.files.vmPathName", "config.files.logDirectory")
+DIAGNOSE_PATHS = (
+    *VM_PATHS,
+    DEVICE_PATH,
+    "config.files.vmPathName",
+    "config.files.logDirectory",
+    "snapshot",
+    "layoutEx",
+)
 LAYOUT_TTL_SECONDS = 60.0
 EVENTS_KEPT = 40
 HOST_LOG_LINES = 2000
@@ -487,6 +496,8 @@ def conclude(  # noqa: C901, PLR0912, PLR0913, PLR0915 - one ordered list of cau
     serial: dict[str, Any],
     console: dict[str, Any],
     host_log: dict[str, Any],
+    snapshots: dict[str, Any] | None = None,
+    consolidation_needed: bool = False,
 ) -> dict[str, Any]:
     """Weigh the evidence into causes, strongest first, with what argues against each."""
     causes: dict[str, dict[str, Any]] = {}
@@ -505,6 +516,23 @@ def conclude(  # noqa: C901, PLR0912, PLR0913, PLR0915 - one ordered list of cau
         # device), but rarely stops a boot from completing, so it is weighed
         # below a CPU or storage cause rather than above it.
         evidence(HARDWARE, weight=1, text=finding)
+    if snapshots and snapshots["count"]:
+        gb = snapshots["total_bytes"] / (1024**3)
+        if gb >= 1:
+            evidence(SNAPSHOT, weight=1, text=f"{gb:.1f} GB in {snapshots['count']} snapshot(s)")
+        if (snapshots.get("oldest_age_hours") or 0) >= 24:  # noqa: PLR2004
+            days = snapshots["oldest_age_hours"] / 24
+            evidence(SNAPSHOT, weight=1, text=f"oldest snapshot {days:.1f} days old")
+        if snapshots.get("max_chain_depth", 0) >= 4:  # noqa: PLR2004
+            evidence(
+                SNAPSHOT, weight=1, text=f"redo chain {snapshots['max_chain_depth']} deep slows every read"
+            )
+    if consolidation_needed:
+        evidence(
+            SNAPSHOT,
+            weight=2,
+            text="consolidation needed: a snapshot delete left delta disks behind that keep growing",
+        )
     if verdict.state == PAUSED:
         evidence(PAUSED_CAUSE, weight=5, text=verdict.reasons[0])
     values = verdict.values
@@ -759,6 +787,7 @@ def diagnose_vm(
     thresholds = settings.thresholds
     now = session.now()
     host = layout.hosts.get(vm.host_moref or "")
+    snapshots = snapshot_usage(row.get("snapshot"), row.get("layoutEx"), now)
 
     # Find the reboot before judging uptime: a warm reboot does not move
     # runtime.bootTime, so without this the VM looks up for days. Look back over
@@ -837,6 +866,8 @@ def diagnose_vm(
         serial=serial,
         console=console,
         host_log=host_log,
+        snapshots=snapshots,
+        consolidation_needed=vm.consolidation_needed,
     )
     return {
         "found": True,
@@ -866,6 +897,7 @@ def diagnose_vm(
         "serial_console": serial,
         "console": console,
         "host_log": host_log,
+        "snapshots": snapshots or {"count": 0},
         "events": summarize_events(raw_events) if "events" in events else events,
     }
 

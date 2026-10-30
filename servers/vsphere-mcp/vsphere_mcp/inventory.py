@@ -466,6 +466,102 @@ def describe_devices(
 
 
 DEVICE_QUERY_PATHS = ("name", "parent", "config.template", "config.hardware.device")
+SNAPSHOT_LIST_PATHS = ("name", "parent", "config.template", "runtime.consolidationNeeded", "snapshot")
+SNAPSHOT_STATE_TYPES = ("snapshotData", "snapshotMemory")
+
+
+def _walk_snapshots(nodes: Any, depth: int = 0) -> list[dict[str, Any]]:
+    """Flatten a snapshot tree into (name, created, moref, depth, memory) rows."""
+    flat: list[dict[str, Any]] = []
+    for node in nodes or []:
+        flat.append(
+            {
+                "name": node.name,
+                "created": as_utc(node.createTime) if getattr(node, "createTime", None) else None,
+                "moref": node.snapshot._moId,  # noqa: SLF001
+                "depth": depth,
+                "quiesced": bool(getattr(node, "quiesced", False)),
+                "state": getattr(node, "state", None),
+            }
+        )
+        flat.extend(_walk_snapshots(getattr(node, "childSnapshotList", None), depth + 1))
+    return flat
+
+
+def snapshot_usage(snapshot_info: Any, layoutex: Any, read_at: datetime) -> dict[str, Any] | None:
+    """How many snapshots a VM has, how old, how deep the redo chain, and how much disk they use.
+
+    Delta (redo-log) bytes are the file sizes of every disk-chain link past the
+    base; state bytes are the .vmsn memory/state files. Their sum is what the
+    snapshots are costing on the datastore — the "50 GB snapshot" figure. Returns
+    None when the VM has no snapshots.
+    """
+    if snapshot_info is None or not getattr(snapshot_info, "rootSnapshotList", None):
+        return None
+    nodes = _walk_snapshots(snapshot_info.rootSnapshotList)
+    dated = [node for node in nodes if node["created"]]
+    oldest = min(dated, key=lambda node: node["created"]) if dated else None
+    oldest_age = round((read_at - oldest["created"]).total_seconds() / 3600, 1) if oldest else None
+    delta_bytes = 0
+    state_bytes = 0
+    max_chain_depth = 0
+    if layoutex is not None:
+        files = {f.key: f for f in (layoutex.file or [])}
+        for disk in layoutex.disk or []:
+            chain = disk.chain or []
+            max_chain_depth = max(max_chain_depth, len(chain) - 1)
+            for unit in chain[1:]:  # chain[0] is the base disk; the rest are snapshot deltas
+                delta_bytes += sum(files[key].size for key in (unit.fileKey or []) if key in files)
+        state_bytes = sum(f.size for f in (layoutex.file or []) if f.type in SNAPSHOT_STATE_TYPES)
+    return {
+        "count": len(nodes),
+        "max_chain_depth": max_chain_depth,
+        "oldest_age_hours": oldest_age,
+        "oldest_name": oldest["name"] if oldest else None,
+        "has_memory_snapshot": state_bytes > 0,
+        "delta_bytes": delta_bytes,
+        "state_bytes": state_bytes,
+        "total_bytes": delta_bytes + state_bytes,
+        "snapshots": nodes,
+    }
+
+
+def read_vm_snapshots(session: VCenterSession, folders: dict[str, FolderFacts]) -> list[dict[str, Any]]:
+    """Every VM that has snapshots, with its snapshot usage — a two-pass fleet read.
+
+    Pass one reads the small `snapshot` property for all VMs; pass two reads the
+    heavier `layoutEx` only for the VMs that actually have snapshots, so the cost
+    falls on the (usually few) VMs with them, not the whole fleet.
+    """
+    read_at = session.now()
+    rows = session.retrieve(vim.VirtualMachine, SNAPSHOT_LIST_PATHS)
+    with_snaps = [row for row in rows if row.get("snapshot") is not None]
+    layouts: dict[str, Any] = {}
+    if with_snaps:
+        for layout_row in session.retrieve(
+            vim.VirtualMachine, ("layoutEx",), objects=[row["_ref"] for row in with_snaps]
+        ):
+            layouts[layout_row["moref"]] = layout_row.get("layoutEx")
+    result = []
+    for row in with_snaps:
+        usage = snapshot_usage(row.get("snapshot"), layouts.get(row["moref"]), read_at)
+        if usage is None:
+            continue
+        parent = row.get("parent")
+        folder = folders.get(parent._moId) if parent is not None else None  # noqa: SLF001
+        result.append(
+            {
+                "vcenter": session.vcenter.name,
+                "moref": row["moref"],
+                "name": row.get("name", row["moref"]),
+                "template": bool(row.get("config.template")),
+                "folder": folder.path if folder else None,
+                "environment": folder.name if folder else None,
+                "consolidation_needed": bool(row.get("runtime.consolidationNeeded")),
+                **usage,
+            }
+        )
+    return result
 
 
 def read_vm_devices(session: VCenterSession, folders: dict[str, FolderFacts]) -> list[dict[str, Any]]:

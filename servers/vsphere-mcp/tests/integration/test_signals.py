@@ -262,3 +262,25 @@ def test_hardware_profile_counts_devices_and_finds_outliers(server: MCPServer) -
     assert "ok-01" in outlier_names
     ok = next(o for o in result["environment_outliers"] if o["name"] == "ok-01")
     assert any("Audio" in extra or "Sound" in extra for extra in ok["extra"])
+
+
+def test_find_vms_by_snapshot_lists_vms_with_snapshots(server: MCPServer) -> None:
+    result = call(server, "find_vms_by_snapshot", {"vcenters": ["vc-a"]})
+
+    names = {vm["name"] for vm in result["vms"]}
+    assert "ok-01" in names  # the one VM given snapshots
+    ok = next(vm for vm in result["vms"] if vm["name"] == "ok-01")
+    assert ok["snapshots"] == 2
+    # the simulator reports zero sizes, so a size filter excludes it, a count filter keeps it
+    by_size = call(server, "find_vms_by_snapshot", {"vcenters": ["vc-a"], "min_total_gb": 1})
+    assert by_size["matched_total"] == 0
+    by_count = call(server, "find_vms_by_snapshot", {"vcenters": ["vc-a"], "min_count": 2})
+    assert "ok-01" in {vm["name"] for vm in by_count["vms"]}
+
+
+def test_a_vm_with_snapshots_surfaces_them_in_diagnose(server: MCPServer, worlds: tuple[Any, ...]) -> None:
+    moref = worlds[0].moref("environments/env-1003", "ok-01")
+
+    result = call(server, "diagnose_vm", {"vcenter": "vc-a", "moref": moref, "console_captures": 0})
+
+    assert result["snapshots"]["count"] == 2

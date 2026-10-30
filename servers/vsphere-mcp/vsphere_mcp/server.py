@@ -31,7 +31,7 @@ from PIL import Image
 from pyVmomi import vim, vmodl
 from starlette.responses import JSONResponse
 
-from vsphere_mcp import ages, hardware
+from vsphere_mcp import ages, hardware, snapshots
 from vsphere_mcp import scan as scanning
 from vsphere_mcp.checks import classify, count_states
 from vsphere_mcp.config import Settings
@@ -424,6 +424,48 @@ def _register_fleet_tools(  # noqa: C901, PLR0915 - one closure per tool
             device=device,
             present=present,
             include_templates=include_templates,
+            under=[term for term in (under or []) if term.strip("/ ")],
+            limit=max(1, min(limit, MAX_LIMIT)),
+        )
+
+    @tool()
+    async def find_vms_by_snapshot(
+        *,
+        min_total_gb: float = 0.0,
+        older_than_hours: float | None = None,
+        min_count: int = 1,
+        only_problems: bool = False,
+        vcenters: list[str] | None = None,
+        under: list[str] | None = None,
+        limit: int = 100,
+    ) -> dict[str, Any]:
+        """VMs with snapshots across the vCenters, biggest first — for finding the space hogs.
+
+        Snapshots are a top cause here: a forgotten one grows unbounded, fills
+        the datastore, and slows every read through its redo chain. This lists
+        the VMs that have them, with how much disk each is using (delta files
+        plus the memory/state file), how old the oldest is, how deep the chain
+        runs, and whether a failed delete left delta disks needing consolidation.
+
+        Args:
+            min_total_gb: only VMs whose snapshots use at least this many GB.
+            older_than_hours: only VMs whose oldest snapshot is at least this old.
+            min_count: only VMs with at least this many snapshots.
+            only_problems: only VMs flagged over the warn/old/deep/consolidation thresholds.
+            vcenters: vCenter names; all when empty.
+            under: folder path segments to look under; everywhere when empty.
+            limit: how many VMs to list (the counts cover all).
+
+        """
+        names = _names(fleet, vcenters)
+        return await snapshots.find_vms_by_snapshot(
+            fleet,
+            resolved,
+            names,
+            min_total_gb=max(0.0, min_total_gb),
+            older_than_hours=older_than_hours,
+            min_count=max(1, min_count),
+            only_problems=only_problems,
             under=[term for term in (under or []) if term.strip("/ ")],
             limit=max(1, min(limit, MAX_LIMIT)),
         )

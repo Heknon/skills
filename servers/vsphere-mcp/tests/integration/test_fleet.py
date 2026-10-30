@@ -459,6 +459,7 @@ def test_every_call_the_tools_made_is_on_the_read_list(
     call(server, "read_host_log", {"vcenter": "vc-a", "host": "DC0_C0_H0"})
     call(server, "diagnose_window", {"minutes": 10})
     call(server, "hardware_profile", {"vcenters": ["vc-a"]})
+    call(server, "find_vms_by_snapshot", {"vcenters": ["vc-a"]})
     call(server, "check_vcenters")
     call(server, "vcenter_sessions", {"vcenter": "vc-a"})
 

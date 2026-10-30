@@ -33,6 +33,7 @@ One VM has exactly one state. The state is the symptom; the cause is below it.
 | **Host memory pressure** | the VM's host near memory capacity; the VM ballooned, swapped or compressed (`memory_reclaimed` flag) | host memory healthy; nothing reclaimed |
 | **Pending VM question** | `runtime.question` set, with its choices | no question |
 | **A virtual device blocks the boot** | `get_vm_hardware` / `diagnose_vm`'s hardware findings: a disconnected boot NIC (PXE/DHCP fails), a stale ISO mounted on the CD-ROM, a device in an error state | every device connected and healthy |
+| **Snapshots filling the datastore / slowing I/O** | `find_vms_by_snapshot` or `diagnose_vm`'s snapshots block: a large or old snapshot, a deep redo chain, or consolidation-needed (a delete that left growing delta disks) | no snapshots, or small and recent |
 | **The vCenter is exhausted** (not a VM) | SSL EOF / resets / timeouts across callers; `check_vcenters` shows a high or climbing session count or a slow login | the vCenter's sessions and login are normal |
 | **Windows crashed (stop error)** | a stop code on the EMS serial console, or a blue screen on the console | the console shows the logon screen |
 | **Windows still working (slow, not hung)** | CPU busy; the console changes; on screen: updates, "Getting devices ready", a disk check | the console is frozen; CPU near zero |

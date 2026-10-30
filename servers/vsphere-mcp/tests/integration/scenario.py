@@ -146,6 +146,7 @@ class Machine:
     base_disk: str | None = None
     serial: bool = False
     sound: bool = False
+    snapshots: int = 0
     vmware_log: str | None = None
     previous_log: str | None = None
     serial_text: str | None = None
@@ -254,6 +255,8 @@ def build(container: str, folders: list[str], machines: list[Machine], *, work: 
                     vim.vm.ConfigSpec(guestId=machine.guest[0], numCPUs=machine.vcpus, deviceChange=changes)
                 )
             )
+            for index in range(machine.snapshots):
+                wait(vm.CreateSnapshot_Task(f"snap{index + 1}", "", memory=False, quiesce=False))
             machine.moref = vm._moId
         world_hosts = {name: host._moId for name, host in hosts.items()}
         world_stores = {name: store._moId for name, store in stores.items()}
@@ -641,6 +644,7 @@ def fleet(work: Path) -> tuple[World, World]:
             serial=True,
             serial_text="",
             sound=True,
+            snapshots=2,
             tools="guestToolsRunning",
             heartbeat="green",
             cpu_mhz=200,

@@ -24,6 +24,7 @@ from vsphere_mcp.inventory import (
     find_environment,
     os_family,
     set_effective_boot,
+    snapshot_usage,
 )
 from vsphere_mcp.readonly import ALLOWED_METHODS, ReadOnlyStub, ReadOnlyViolationError, ensure_read_request
 from vsphere_mcp.vcenter import PerfSeries, VCenterSession
@@ -1034,3 +1035,85 @@ def test_hardware_ignores_connection_state_when_powered_off() -> None:
 
     assert findings == []
     assert blocking == []
+
+
+# -- snapshots -------------------------------------------------------------------------------
+
+
+class _Tree:
+    def __init__(self, name: str, created: datetime, moref: str, children: list | None = None) -> None:
+        self.name = name
+        self.createTime = created
+        self.snapshot = type("S", (), {"_moId": moref})()
+        self.childSnapshotList = children or []
+        self.quiesced = False
+        self.state = "poweredOn"
+
+
+class _Info:
+    def __init__(self, roots: list) -> None:
+        self.rootSnapshotList = roots
+
+
+class _File:
+    def __init__(self, key: int, ftype: str, size: int) -> None:
+        self.key = key
+        self.type = ftype
+        self.size = size
+
+
+class _Unit:
+    def __init__(self, *file_keys: int) -> None:
+        self.fileKey = list(file_keys)
+
+
+class _Disk:
+    def __init__(self, key: int, chain: list) -> None:
+        self.key = key
+        self.chain = chain
+
+
+class _LayoutEx:
+    def __init__(self, files: list, disks: list) -> None:
+        self.file = files
+        self.disk = disks
+
+
+def test_snapshot_usage_sums_delta_and_memory_state() -> None:
+    gb = 1024**3
+    layoutex = _LayoutEx(
+        files=[
+            _File(1, "config", 1000),
+            _File(2, "diskExtent", 40 * gb),  # base disk — not counted
+            _File(3, "diskExtent", 30 * gb),  # snapshot delta — counted
+            _File(4, "diskExtent", 20 * gb),  # a second snapshot delta — counted
+            _File(5, "snapshotData", 8 * gb),  # .vmsn memory state — counted
+        ],
+        disks=[_Disk(200, [_Unit(2), _Unit(3), _Unit(4)])],  # base + two deltas: chain depth 2
+    )
+    info = _Info(
+        [
+            _Tree(
+                "snap1",
+                NOW - timedelta(days=5),
+                "snapshot-1",
+                [_Tree("snap2", NOW - timedelta(hours=2), "snapshot-2")],
+            )
+        ]
+    )
+
+    usage = snapshot_usage(info, layoutex, NOW)
+
+    assert usage["count"] == 2
+    assert usage["max_chain_depth"] == 2
+    assert usage["delta_bytes"] == 50 * gb  # 30 + 20, base excluded
+    assert usage["state_bytes"] == 8 * gb
+    assert usage["total_bytes"] == 58 * gb
+    assert usage["oldest_name"] == "snap1"
+    assert usage["oldest_age_hours"] == pytest.approx(5 * 24, abs=0.1)
+    assert usage["has_memory_snapshot"] is True
+
+
+def test_snapshot_usage_is_none_without_snapshots() -> None:
+    assert snapshot_usage(None, None, NOW) is None
+    assert snapshot_usage(_Info([]), None, NOW) is None

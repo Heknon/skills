@@ -139,6 +139,15 @@ class Thresholds(BaseModel):
     host_memory_percent: PositiveFloat = 95.0
     """Host memory in use at or over this is pressure: its VMs balloon and swap."""
 
+    snapshot_warn_gb: PositiveFloat = 20.0
+    """Snapshots using at least this many GB on a VM are worth flagging (datastore fill, slow I/O)."""
+
+    snapshot_old_hours: PositiveFloat = 24.0
+    """A snapshot older than this is a forgotten one that keeps growing."""
+
+    snapshot_deep_chain: PositiveInt = 4
+    """A redo chain at least this deep slows every read through it."""
+
     console_black_fraction: Fraction = 0.98
     """A screenshot with at least this share of near-black pixels is black."""
 
