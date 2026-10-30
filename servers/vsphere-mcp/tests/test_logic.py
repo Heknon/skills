@@ -19,7 +19,9 @@ from vsphere_mcp import (
     contention,
     diagnose,
     formatting,
+    resources,
     scan,
+    snapshots,
     storagehealth,
     timecheck,
     vmlog,
@@ -1290,3 +1292,57 @@ def test_a_mounted_but_unreachable_host_is_apd_pdl() -> None:
     assert verdict["healthy"] is False
     assert verdict["hosts_unreachable"] == [{"host_moref": "host-9", "reason": "AllPathsDown_Timeout"}]
     assert any("all-paths-down" in finding for finding in verdict["findings"])
+
+
+# -- template (base-disk) rollups ----------------------------------------------------------
+
+
+def test_snapshots_roll_up_by_template_base_disk() -> None:
+    gb = 1024**3
+    rows = [
+        {
+            "base_disk": "[DS] Cool/Cool.vmdk",
+            "name": "vm-b",
+            "total_bytes": 30 * gb,
+            "oldest_age_hours": 40.0,
+        },
+        {
+            "base_disk": "[DS] Cool/Cool.vmdk",
+            "name": "vm-a",
+            "total_bytes": 50 * gb,
+            "oldest_age_hours": 10.0,
+        },
+        {
+            "base_disk": "[DS] Other/Other.vmdk",
+            "name": "vm-c",
+            "total_bytes": 5 * gb,
+            "oldest_age_hours": 1.0,
+        },
+        {"base_disk": None, "name": "full-clone", "total_bytes": 90 * gb, "oldest_age_hours": 2.0},
+    ]
+
+    rolled = snapshots._by_template(rows)
+
+    assert [entry["base_disk"] for entry in rolled] == ["[DS] Cool/Cool.vmdk", "[DS] Other/Other.vmdk"]
+    cool = rolled[0]
+    assert cool["clones"] == 2
+    assert cool["total_gb"] == 80.0  # 50 + 30
+    assert cool["oldest_age_hours"] == 40.0  # the worst across the clones
+    assert cool["names"] == ["vm-a", "vm-b"]  # differently-named clones, named together
+    # a full clone / template with no parent base disk is not grouped under a template
+    assert all(entry["base_disk"] for entry in rolled)
+
+
+def test_resource_limits_roll_up_by_template_base_disk() -> None:
+    rows = [
+        {"base_disk": "[DS] Cool/Cool.vmdk", "name": "a", "cpu_limit_mhz": 600, "memory_limit_mb": None},
+        {"base_disk": "[DS] Cool/Cool.vmdk", "name": "b", "cpu_limit_mhz": 600, "memory_limit_mb": 2048},
+        {"base_disk": None, "name": "loner", "cpu_limit_mhz": 400, "memory_limit_mb": None},
+    ]
+
+    rolled = resources._by_template(rows)
+
+    assert rolled[0]["base_disk"] == "[DS] Cool/Cool.vmdk"
+    assert rolled[0]["clones"] == 2
+    assert rolled[0]["cpu_limited"] == 2
+    assert rolled[0]["memory_limited"] == 1

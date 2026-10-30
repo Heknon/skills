@@ -332,3 +332,29 @@ def test_check_datastores_reports_each_store_and_marks_template_datastores(serve
     assert "hosts_mounting" in row
     # LocalDS_0 holds the template's base disk, so it is marked as a clone-root datastore.
     assert any(store["holds_template"] for store in result["datastores"])
+
+
+# -- template (base-disk) rollups: broad issues named by template ----------------------------
+
+
+def test_snapshot_findings_roll_up_to_the_template_even_when_clones_are_renamed(
+    server: MCPServer,
+) -> None:
+    result = call(server, "find_vms_by_snapshot", {"vcenters": ["vc-a"], "min_count": 2})
+
+    # Every VM row names the base disk (its template).
+    assert all("base_disk" in vm for vm in result["vms"])
+    # The two differently-named Cool-Win clones roll up under their shared base disk.
+    cool = next(t for t in result["by_template"] if "coolwin" in (t["base_disk"] or ""))
+    assert cool["clones"] == 2
+    assert set(cool["names"]) == {"coolwin-blue", "coolwin-green"}
+    assert any("template-wide" in finding for finding in result["findings"])
+
+
+def test_resource_limits_carry_the_template_base_disk(server: MCPServer) -> None:
+    result = call(server, "find_resource_limits", {"vcenters": ["vc-a"]})
+
+    capped = next(vm for vm in result["vms"] if vm["name"] == "capped-01")
+    assert "coolwin" in (capped["base_disk"] or "")
+    # the rollup names the template the capped clone came from
+    assert any("coolwin" in (t["base_disk"] or "") for t in result["by_template"])

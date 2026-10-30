@@ -675,18 +675,44 @@ def fleet(work: Path) -> tuple[World, World]:
         ),
         Machine("off-01", "environments/env-1003", "DC0_C1_H2", "LocalDS_1", powered_on=False),
         # env-1005: a healthy VM throttled by a configured CPU limit and a memory limit
-        # below its RAM — looks starved/pressured but is config, not the host.
+        # below its RAM — looks starved/pressured but is config, not the host. A clone of
+        # the Cool-Win template, so the limit traces back to that template.
         Machine(
             "capped-01",
             "environments/env-1005",
             "DC0_C0_H0",
             "LocalDS_0",
+            base_disk="[LocalDS_0] tmpl-coolwin/tmpl-coolwin.vmdk",
             tools="guestToolsRunning",
             heartbeat="green",
             cpu_mhz=400,
             cpu_limit_mhz=600,
             mem_size_mb=8192,
             mem_limit_mb=2048,
+        ),
+        # env-1006: two differently-named clones of ONE template, each carrying snapshots —
+        # the template-wide snapshot case. Their shared base disk names the template.
+        Machine(
+            "coolwin-blue",
+            "environments/env-1006",
+            "DC0_C0_H0",
+            "LocalDS_0",
+            base_disk="[LocalDS_0] tmpl-coolwin/tmpl-coolwin.vmdk",
+            snapshots=2,
+            tools="guestToolsRunning",
+            heartbeat="green",
+            cpu_mhz=200,
+        ),
+        Machine(
+            "coolwin-green",
+            "environments/env-1006",
+            "DC0_C0_H1",
+            "LocalDS_0",
+            base_disk="[LocalDS_0] tmpl-coolwin/tmpl-coolwin.vmdk",
+            snapshots=2,
+            tools="guestToolsRunning",
+            heartbeat="green",
+            cpu_mhz=200,
         ),
         # The template its linked clones come from, carrying a CPU limit every clone inherits.
         Machine(
@@ -758,6 +784,7 @@ def fleet(work: Path) -> tuple[World, World]:
             "environments/env-1003",
             "environments/env-1004",
             "environments/env-1005",
+            "environments/env-1006",
             "environments/env-0999",
             "templates",
         ],

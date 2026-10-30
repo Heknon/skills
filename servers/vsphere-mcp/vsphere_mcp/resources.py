@@ -53,6 +53,26 @@ def _findings_for(row: dict[str, Any]) -> list[str]:
     return reasons
 
 
+def _by_template(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Roll the constrained VMs up by base disk (template), so a template-wide policy stands out."""
+    templates: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        key = row.get("base_disk")
+        if not key:
+            continue
+        entry = templates.setdefault(
+            key, {"base_disk": key, "clones": 0, "cpu_limited": 0, "memory_limited": 0, "names": []}
+        )
+        entry["clones"] += 1
+        entry["cpu_limited"] += row["cpu_limit_mhz"] is not None
+        entry["memory_limited"] += row["memory_limit_mb"] is not None
+        entry["names"].append(row["name"])
+    ranked = sorted(templates.values(), key=lambda entry: entry["clones"], reverse=True)
+    for entry in ranked:
+        entry["names"] = sorted(entry["names"])[:20]
+    return ranked
+
+
 def _matches(row: dict[str, Any], kind: str) -> bool:
     has_limit = row["cpu_limit_mhz"] is not None or row["memory_limit_mb"] is not None
     has_reservation = row["cpu_reservation_mhz"] is not None or row["memory_reservation_mb"] is not None
@@ -111,18 +131,27 @@ async def find_resource_limits(
             f"{len(templates)} of these are templates — every linked clone made from one inherits its "
             "limit/reservation, so fixing the template fixes the clones"
         )
+    by_template = _by_template(matched)
+    if by_template and by_template[0]["clones"] > 1:
+        worst = by_template[0]
+        findings.append(
+            f"template-wide: {worst['clones']} clones of {worst['base_disk']} carry the same policy — "
+            "the template is the common factor, whatever the clones are named"
+        )
     for name, error in errors.items():
         findings.append(f"vCenter {name} not read: {error}")
     return {
         "kind": kind,
         "findings": findings,
         "matched_total": len(matched),
+        "by_template": by_template,
         "vms": [
             {
                 "vcenter": row["vcenter"],
                 "moref": row["moref"],
                 "name": row["name"],
                 "folder": row["folder"],
+                "base_disk": row["base_disk"],
                 "template": row["template"],
                 "num_cpu": row["num_cpu"],
                 "memory_mb": row["memory_mb"],

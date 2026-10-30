@@ -23,6 +23,34 @@ if TYPE_CHECKING:
 GIGABYTE = 1024**3
 
 
+def _by_template(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Roll the matched VMs up by their base disk (template), biggest first.
+
+    This is what names a template-wide problem when the clones are all renamed:
+    the base-disk file is identical across every clone of one template.
+    """
+    templates: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        key = row.get("base_disk")
+        if not key:
+            continue
+        entry = templates.setdefault(
+            key,
+            {"base_disk": key, "clones": 0, "total_bytes": 0, "oldest_age_hours": None, "names": []},
+        )
+        entry["clones"] += 1
+        entry["total_bytes"] += row["total_bytes"]
+        entry["names"].append(row["name"])
+        age = row.get("oldest_age_hours")
+        if age is not None and (entry["oldest_age_hours"] is None or age > entry["oldest_age_hours"]):
+            entry["oldest_age_hours"] = age
+    ranked = sorted(templates.values(), key=lambda entry: entry["total_bytes"], reverse=True)
+    for entry in ranked:
+        entry["total_gb"] = round(entry.pop("total_bytes") / GIGABYTE, 2)
+        entry["names"] = sorted(entry["names"])[:20]
+    return ranked
+
+
 def _scan_snapshots(session: VCenterSession, under: Sequence[str]) -> list[dict[str, Any]]:
     folders = read_folders(session)
     rows = read_vm_snapshots(session, folders)
@@ -105,17 +133,27 @@ async def find_vms_by_snapshot(  # noqa: PLR0913 - one filtered fleet query
             f"{len(stuck)} of them need consolidation — a snapshot delete left delta disks behind "
             "that are still growing (the worst kind, invisible in the snapshot manager)"
         )
+    by_template = _by_template(matched)
+    if by_template and by_template[0]["clones"] > 1:
+        worst = by_template[0]
+        findings.append(
+            f"template-wide: {worst['clones']} clones of {worst['base_disk']} carry "
+            f"{worst['total_gb']} GB of snapshots between them — the template is the common factor, "
+            "whatever the clones are named"
+        )
     for name, error in errors.items():
         findings.append(f"vCenter {name} not read: {error}")
     return {
         "findings": findings,
         "matched_total": len(matched),
+        "by_template": by_template,
         "vms": [
             {
                 "vcenter": row["vcenter"],
                 "moref": row["moref"],
                 "name": row["name"],
                 "folder": row["folder"],
+                "base_disk": row["base_disk"],
                 "snapshots": row["count"],
                 "total_gb": round(row["total_bytes"] / GIGABYTE, 2),
                 "delta_gb": round(row["delta_bytes"] / GIGABYTE, 2),

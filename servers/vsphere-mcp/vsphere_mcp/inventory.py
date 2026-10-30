@@ -371,6 +371,29 @@ def disk_chains(devices: Iterable[Any]) -> list[list[str]]:
     return chains
 
 
+def base_disk_of(devices: Iterable[Any]) -> str | None:
+    """The VM's linked-clone base disk: the last link of its disk chain, the template's own VMDK.
+
+    This is how clones of one template are joined when their names differ: the
+    base-disk file is identical across every clone and its path names the
+    template folder (e.g. `[DS] Windows-Cool/Windows-Cool.vmdk`). None when the
+    VM has no parented disk (a full clone or the template itself).
+    """
+    bases = sorted({chain[-1] for chain in disk_chains(devices) if len(chain) > 1})
+    return bases[0] if bases else None
+
+
+def base_disks_for(session: VCenterSession, refs: Iterable[Any]) -> dict[str, str | None]:
+    """The base disk of each given VM, read in one targeted device-list pass (for a small set)."""
+    objects = list(refs)
+    if not objects:
+        return {}
+    return {
+        row["moref"]: base_disk_of(row.get("config.hardware.device") or [])
+        for row in session.retrieve(vim.VirtualMachine, ("config.hardware.device",), objects=objects)
+    }
+
+
 def serial_files(devices: Iterable[Any]) -> list[str]:
     """Datastore files the VM's serial ports write to: where EMS or a kernel console lands."""
     files = []
@@ -565,11 +588,18 @@ def read_vm_snapshots(session: VCenterSession, folders: dict[str, FolderFacts]) 
     rows = session.retrieve(vim.VirtualMachine, SNAPSHOT_LIST_PATHS)
     with_snaps = [row for row in rows if row.get("snapshot") is not None]
     layouts: dict[str, Any] = {}
+    bases: dict[str, str | None] = {}
     if with_snaps:
-        for layout_row in session.retrieve(
-            vim.VirtualMachine, ("layoutEx",), objects=[row["_ref"] for row in with_snaps]
+        # The layoutEx (sizes) and the device list (the base disk, to tie clones
+        # of one template together) are both read here, only for the few VMs that
+        # actually have snapshots, in one pass.
+        for extra in session.retrieve(
+            vim.VirtualMachine,
+            ("layoutEx", "config.hardware.device"),
+            objects=[row["_ref"] for row in with_snaps],
         ):
-            layouts[layout_row["moref"]] = layout_row.get("layoutEx")
+            layouts[extra["moref"]] = extra.get("layoutEx")
+            bases[extra["moref"]] = base_disk_of(extra.get("config.hardware.device") or [])
     result = []
     for row in with_snaps:
         usage = snapshot_usage(row.get("snapshot"), layouts.get(row["moref"]), read_at)
@@ -585,6 +615,7 @@ def read_vm_snapshots(session: VCenterSession, folders: dict[str, FolderFacts]) 
                 "template": bool(row.get("config.template")),
                 "folder": folder.path if folder else None,
                 "environment": folder.name if folder else None,
+                "base_disk": bases.get(row["moref"]),
                 "consolidation_needed": bool(row.get("runtime.consolidationNeeded")),
                 **usage,
             }
@@ -650,6 +681,20 @@ def read_vm_resource_policy(session: VCenterSession, folders: dict[str, FolderFa
     the same limit on every clone of it.
     """
     rows = session.retrieve(vim.VirtualMachine, RESOURCE_POLICY_PATHS)
+    constrained = []
+    for row in rows:
+        row["_cpu_limit"] = _limit(row.get("config.cpuAllocation.limit"))
+        row["_cpu_reservation"] = _reservation(row.get("config.cpuAllocation.reservation"))
+        row["_memory_limit"] = _limit(row.get("config.memoryAllocation.limit"))
+        row["_memory_reservation"] = _reservation(row.get("config.memoryAllocation.reservation"))
+        if any(
+            row[key] is not None
+            for key in ("_cpu_limit", "_cpu_reservation", "_memory_limit", "_memory_reservation")
+        ):
+            constrained.append(row)
+    # The base disk (template) is read only for the few VMs that carry a policy,
+    # to tie clones of one template together without a device read of the fleet.
+    bases = base_disks_for(session, [row["_ref"] for row in constrained])
     result = []
     for row in rows:
         parent = row.get("parent")
@@ -662,12 +707,13 @@ def read_vm_resource_policy(session: VCenterSession, folders: dict[str, FolderFa
                 "template": bool(row.get("config.template")),
                 "folder": folder.path if folder else None,
                 "environment": folder.name if folder else None,
+                "base_disk": bases.get(row["moref"]),
                 "num_cpu": row.get("summary.config.numCpu"),
                 "memory_mb": row.get("summary.config.memorySizeMB"),
-                "cpu_limit_mhz": _limit(row.get("config.cpuAllocation.limit")),
-                "cpu_reservation_mhz": _reservation(row.get("config.cpuAllocation.reservation")),
-                "memory_limit_mb": _limit(row.get("config.memoryAllocation.limit")),
-                "memory_reservation_mb": _reservation(row.get("config.memoryAllocation.reservation")),
+                "cpu_limit_mhz": row["_cpu_limit"],
+                "cpu_reservation_mhz": row["_cpu_reservation"],
+                "memory_limit_mb": row["_memory_limit"],
+                "memory_reservation_mb": row["_memory_reservation"],
             }
         )
     return result
